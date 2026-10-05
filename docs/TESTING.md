@@ -45,7 +45,7 @@ PDFのバイナリsnapshotは使わない。生成日時・内部ID・TeX版で�
 
 `.github/workflows/ci.yml`にfrontend-quality、rust-quality、required-checksを実装。前者はLinuxでTS品質ゲート・台帳ツールの最小結合テスト・Vite build、後者はmacOSでRust品質ゲート・cargo testを実行する。全依存ジョブがsuccessのときだけrequired-checksを成功にする。Actionsは公式リリースのcommit SHA、Node/pnpm/Rustはリポジトリの固定版を使用する。workflow構文はactionlint 1.7.12で検証する。
 
-GitHub remote未設定のため、ホスト上の実行は未確認。T03はその確認まで未完了。下表の実TeX・デスクトップジョブはT09・T25で拡充する。
+GitHubの非公開リポジトリ`alsterium/resume-studio`でホストCIを確認済み。T03は完了し、書式付きエディタを追加したコミット19e80d7でもfrontend-quality・rust-quality・required-checksがすべて成功した（[実行結果](https://github.com/alsterium/resume-studio/actions/runs/37341177300)）。下表の実TeX・デスクトップジョブはT09・T25で拡充する。
 
 | ジョブ | runner | チェック内容 |
 | --- | --- | --- |
@@ -98,6 +98,6 @@ M1で成立しない場合は、理由・代替候補をADRに記録する。UI�
 
 ## 最小生成エンジンの実TeX結合テスト
 
-T06の`generator`は氏名とプレーン本文を検証し、共通エスケープで`content.tex`を生成する。`templates/draft/main.tex`を同梱し、隔離ディレクトリで実コンパイルする。これはM1の縦切り用で、正式プロジェクトモデル・本文AST・提出用テンプレートは後続タスクで追加する。
+T06の`generator`は氏名とプレーン本文を検証し、共通エスケープで`content.tex`を生成する。T08では限定本文ASTの検証・変換を加えた。`templates/draft/main.tex`を同梱し、隔離ディレクトリで実コンパイルする。これはM1の縦切り用で、正式プロジェクトモデル・本文ASTの契約確定・提出用テンプレートは後続タスクで追加する。
 
 `pnpm test:tex`は`real-tex` featureを有効にした`real_tex` targetを実行する。実TeX未導入なら失敗し、skipして成功扱いにしない。通常の`pnpm check`とは別の明示的なゲートで、CI必須化はT25。日本語fixtureの生成成功、PDFヘッダ、欠落文字・Overfull警告を検査し、macOSではPDFKitで文字抽出して氏名・本文・全TeX特殊文字の保持を検証する。PDFKit呼出はRustテストからmacOSのSwiftを使う。開発補助サーバー・台帳ツールはNode.jsのまま。
