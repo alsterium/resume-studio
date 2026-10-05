@@ -1,0 +1,11 @@
+# ADR 0004: macOSデスクトップE2E
+
+状態: 採用（2026-10-06、ホストCIの実行確認中）
+
+[Tauri公式資料](https://v2.tauri.app/develop/tests/webdriver/)のembedded方式を採用する。WebdriverIO 9.30.1のstandalone clientがtauri-plugin-wdio-webdriver 1.4.0のW3C serverへ接続する。単一の既知バイナリをテストするため、CLI/serviceの自動検出や追加のexecute/mockプラグインは不要。Node.jsのtools/desktop-e2e.mjsが空きポートの選択、子プロセスの起動、期限付きready待機、セッション削除、子プロセスの終了を担う。
+
+プラグインはoptional dependencyとdesktop-e2e featureで有効にする。通常ビルドのfeature・capability・フロントへテスト用権限やJSを追加しない。CIで既定featureのcargo treeにテストサーバーが含まれないことを検証する。テスト中はローカルのWebDriver serverがアプリを操作できるため、専用プロセスを終了時に停止する。
+
+要素入力で日本語とTeX特殊文字を本文へ入れ、PDF更新の実IPC・実TeX・PDF.jsの描画ピクセルを検証する。embedded driverのkeyboard actionsはcontenteditableの文字挿入を実装していないため、要素のaddValueを使う。selectのoption clickではchangeイベントが発火しなかったため、倍率変更のみbrowser.executeでnative value setterとDOM changeイベントを操作する。PDF生成と描画は代替しない。これらはOSのIMEやnative selectの実操作テストではなく、実IMEはT08のユーザー確認を別証跡として保持する。
+
+macOS CIはBasicTeX 2026.0301のpkgを公式CTAN URLから取得し、Homebrew公式cask掲載のSHA-256を照合して導入する。latexmk・luatexja・haranoajiと依存をtlmgrで追加する。追加パッケージの完全なsnapshot固定はT25で拡充し、現時点では基礎配布の固定と実行時の版記録を行う。TeX未導入時に成功扱いでskipしない。

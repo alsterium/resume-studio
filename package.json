@@ -8,9 +8,9 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "tauri": "tauri",
-    "lint": "oxlint --deny-warnings src tests vite.config.ts vitest.config.ts",
-    "format": "oxfmt --write src tests vite.config.ts vitest.config.ts tsconfig.json index.html package.json .oxlintrc.json .oxfmtrc.json src-tauri/tauri.conf.json src-tauri/capabilities",
-    "format:check": "oxfmt --check src tests vite.config.ts vitest.config.ts tsconfig.json index.html package.json .oxlintrc.json .oxfmtrc.json src-tauri/tauri.conf.json src-tauri/capabilities",
+    "lint": "oxlint --deny-warnings src tests vite.config.ts vitest.config.ts tools/desktop-e2e.mjs",
+    "format": "oxfmt --write src tests vite.config.ts vitest.config.ts tsconfig.json index.html package.json .oxlintrc.json .oxfmtrc.json src-tauri/tauri.conf.json src-tauri/capabilities tools/desktop-e2e.mjs",
+    "format:check": "oxfmt --check src tests vite.config.ts vitest.config.ts tsconfig.json index.html package.json .oxlintrc.json .oxfmtrc.json src-tauri/tauri.conf.json src-tauri/capabilities tools/desktop-e2e.mjs",
     "typecheck": "tsc --noEmit",
     "rust:format": "cargo fmt --manifest-path src-tauri/Cargo.toml --all",
     "rust:format:check": "cargo fmt --manifest-path src-tauri/Cargo.toml --all --check",
@@ -20,7 +20,9 @@
     "check": "pnpm lint && pnpm format:check && pnpm typecheck && pnpm rust:format:check && pnpm rust:check && pnpm rust:lint && pnpm test:tasks && pnpm test:integration && pnpm rust:test",
     "test:integration": "vitest run",
     "rust:test": "cargo test --manifest-path src-tauri/Cargo.toml --locked",
-    "test:tex": "cargo test --manifest-path src-tauri/Cargo.toml --locked --features real-tex --test real_tex"
+    "test:tex": "cargo test --manifest-path src-tauri/Cargo.toml --locked --features real-tex --test real_tex",
+    "build:e2e": "pnpm build && cargo build --manifest-path src-tauri/Cargo.toml --locked --features desktop-e2e,tauri/custom-protocol",
+    "test:e2e": "node tools/desktop-e2e.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "2.12.1",
@@ -47,7 +49,8 @@
     "oxlint": "1.87.0",
     "typescript": "7.0.2",
     "vite": "8.3.2",
-    "vitest": "5.0.3"
+    "vitest": "5.0.3",
+    "webdriverio": "9.30.1"
   },
   "engines": {
     "node": ">=22.14.0 <23",

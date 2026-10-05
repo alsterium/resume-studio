@@ -144,3 +144,14 @@ T08の本文エディタはTiptap 3.31.4。doc・paragraph・text・hardBreak・
 実TiptapでJSON取得→クリア→再投入を確認し、書式付き日本語fixtureの実PDF生成・文字抽出も確認した。RESUME_STUDIO_PROBE=editorのネイティブ検証はツールバー・JSON往復・合成compositionイベント・実PDF描画を確認する。合成compositionをOSの日本語IME検証の代わりにはしない。
 
 実IMEの受け入れ確認は、pnpm tauri devの本文欄で日本語IMEの変換・候補選択・Enterによる確定・続きの入力を行う。確定時の消失・二重入力・余計な改行がないことと、PDF更新で確定した日本語が表示されることを確認する。2026-10-06、ユーザーから一連の操作について「全て正常です」と回答を得て、T08の実IME受け入れを完了した。
+
+## デスクトップE2E
+
+```sh
+pnpm build:e2e
+pnpm test:e2e
+```
+
+最初のコマンドは同梱フロントとdesktop-e2e featureのテスト用バイナリを作る。2つ目はNode.jsで専用アプリを起動し、WebdriverIOから本文入力→実IPC→実TeX→PDF描画と倍率変更を確認する。要素入力と倍率用DOMイベントの制限は[ADR 0004](adr/0004-desktop-e2e.md)に記録した。終了時にセッションとアプリを停止する。実TeX環境とmacOSのWebViewが必要で、通常CIのブラウザ内mockテストとは別に報告する。
+
+E2E後に本番アプリを作るときは通常のpnpm tauri buildを使う。desktop-e2e featureを渡さない。WebDriverプラグインは既定の依存グラフに含まれず、通常のcapabilityを増やさない。

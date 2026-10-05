@@ -94,6 +94,8 @@ Oxlintの型情報を使う追加ルールは導入可能だが、Lintの成功�
 
 テスト用WebDriverプラグインは明示的なtest featureでのみ有効にする。production buildには制御サーバーを含めない。native dialogの自動化が難しいケースではテスト用adapterを使い、dialogを含めた保存・読込は手動受け入れで補完する。E2Eでmockした境界を記録する。
 
+T09ではWebdriverIO standaloneからembedded W3C serverへ直接接続する。CLI/serviceによる自動検出が不要な単一アプリのため、Node.jsが起動・待機・セッション削除・終了を管理する。ブラウザ用mockや`@wdio/tauri-plugin`は導入しない。[ADR 0004](adr/0004-desktop-e2e.md)に境界と制限を記録する。入力→実IPC→実TeX→PDF描画をmacOS CIで実行し、required-checksに含める。保存・再起動・写真は後続実装時に追加する。
+
 M1で成立しない場合は、理由・代替候補をADRに記録する。UI結合＋Rust実TeX結合で進捗は継続できるが、実macOS全フローの受け入れ確認を省略しない。
 
 ## 最小生成エンジンの実TeX結合テスト
