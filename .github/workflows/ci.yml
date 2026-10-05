@@ -72,9 +72,10 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Install BasicTeX 2026.0301
         run: |
-          curl --fail --location --retry 3 https://mirror.ctan.org/systems/mac/mactex/mactex-basictex-20260301.pkg --output "$RUNNER_TEMP/basictex.pkg"
+          curl --fail --location --retry 3 https://ctan.math.illinois.edu/systems/mac/mactex/mactex-basictex-20260301.pkg --output "$RUNNER_TEMP/basictex.pkg"
           echo "19164fbfef08c30fd433f59203c8804abbbd685d3a344ef7f0ba8c1fd4157cb3  $RUNNER_TEMP/basictex.pkg" | shasum --algorithm 256 --check
           sudo installer -pkg "$RUNNER_TEMP/basictex.pkg" -target /
+          sudo /Library/TeX/texbin/tlmgr option repository https://ctan.math.illinois.edu/systems/texlive/tlnet
           sudo /Library/TeX/texbin/tlmgr update --self
           sudo /Library/TeX/texbin/tlmgr install latexmk luatexja haranoaji
           /Library/TeX/texbin/latexmk --version
