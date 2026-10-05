@@ -95,3 +95,9 @@ Oxlintの型情報を使う追加ルールは導入可能だが、Lintの成功�
 テスト用WebDriverプラグインは明示的なtest featureでのみ有効にする。production buildには制御サーバーを含めない。native dialogの自動化が難しいケースではテスト用adapterを使い、dialogを含めた保存・読込は手動受け入れで補完する。E2Eでmockした境界を記録する。
 
 M1で成立しない場合は、理由・代替候補をADRに記録する。UI結合＋Rust実TeX結合で進捗は継続できるが、実macOS全フローの受け入れ確認を省略しない。
+
+## 最小生成エンジンの実TeX結合テスト
+
+T06の`generator`は氏名とプレーン本文を検証し、共通エスケープで`content.tex`を生成する。`templates/draft/main.tex`を同梱し、隔離ディレクトリで実コンパイルする。これはM1の縦切り用で、正式プロジェクトモデル・本文AST・提出用テンプレートは後続タスクで追加する。
+
+`pnpm test:tex`は`real-tex` featureを有効にした`real_tex` targetを実行する。実TeX未導入なら失敗し、skipして成功扱いにしない。通常の`pnpm check`とは別の明示的なゲートで、CI必須化はT25。日本語fixtureの生成成功、PDFヘッダ、欠落文字・Overfull警告を検査し、macOSではPDFKitで文字抽出して氏名・本文・全TeX特殊文字の保持を検証する。PDFKit呼出はRustテストからmacOSのSwiftを使う。開発補助サーバー・台帳ツールはNode.jsのまま。

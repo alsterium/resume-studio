@@ -19,7 +19,8 @@
     "test:tasks": "node --test tools/tests/*.test.mjs",
     "check": "pnpm lint && pnpm format:check && pnpm typecheck && pnpm rust:format:check && pnpm rust:check && pnpm rust:lint && pnpm test:tasks && pnpm test:integration && pnpm rust:test",
     "test:integration": "vitest run",
-    "rust:test": "cargo test --manifest-path src-tauri/Cargo.toml --locked"
+    "rust:test": "cargo test --manifest-path src-tauri/Cargo.toml --locked",
+    "test:tex": "cargo test --manifest-path src-tauri/Cargo.toml --locked --features real-tex --test real_tex"
   },
   "dependencies": {
     "@tauri-apps/api": "2.12.1",

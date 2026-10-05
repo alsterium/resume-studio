@@ -7,3 +7,4 @@ pub fn run() {
 }
 mod commands;
 pub mod compiler;
+pub mod generator;

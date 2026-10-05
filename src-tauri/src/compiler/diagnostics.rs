@@ -71,7 +71,7 @@ impl TexRuntime {
         }
     }
 
-    fn command(&self, path: &Path) -> Command {
+    pub(super) fn command(&self, path: &Path) -> Command {
         let mut command = Command::new(path);
         let mut dirs: Vec<PathBuf> = [
             self.latexmk.as_ref(),
