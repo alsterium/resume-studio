@@ -143,4 +143,4 @@ T08の本文エディタはTiptap 3.31.4。doc・paragraph・text・hardBreak・
 
 実TiptapでJSON取得→クリア→再投入を確認し、書式付き日本語fixtureの実PDF生成・文字抽出も確認した。RESUME_STUDIO_PROBE=editorのネイティブ検証はツールバー・JSON往復・合成compositionイベント・実PDF描画を確認する。合成compositionをOSの日本語IME検証の代わりにはしない。
 
-実IMEの受け入れ確認は、pnpm tauri devの本文欄で日本語IMEの変換・候補選択・Enterによる確定・続きの入力を行う。確定時の消失・二重入力・余計な改行がないことと、PDF更新で確定した日本語が表示されることを確認してT08を完了する。現在は実IME確認待ち。
+実IMEの受け入れ確認は、pnpm tauri devの本文欄で日本語IMEの変換・候補選択・Enterによる確定・続きの入力を行う。確定時の消失・二重入力・余計な改行がないことと、PDF更新で確定した日本語が表示されることを確認する。2026-10-06、ユーザーから一連の操作について「全て正常です」と回答を得て、T08の実IME受け入れを完了した。
