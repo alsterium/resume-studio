@@ -14,7 +14,7 @@
 | Rust結合 | cargo test、一時FS | JSON往復、写真展開、保存失敗、版不整合、生成bundle、既存ファイル維持 |
 | 実TeX結合 | cargo testの専用target、latexmk/LuaLaTeX | 日本語、特殊文字、空欄、太字・斜体・リスト、両テンプレート、複数ページ、写真 |
 | デスクトップE2E | WebdriverIO＋Tauri embedded WebDriver | 入力→保存→終了→再起動→読込→実PDF生成→出力、本文書式・写真の維持 |
-| Unit | Rust／Vitest | TeX escape、AST visitor、日付・容量検証、migration、revision・ジョブ状態遷移 |
+| Unit | Rust／Vitest | TeX escape、AST visitor、日付・書類日付時点の年齢（閏年・誕生日境界）、URL検証・変換、容量検証、migration、revision・ジョブ状態遷移 |
 | 手動受け入れ | 実macOS | IME、native dialog、bundleのTeX検出、紙面品質、オフライン |
 
 UI結合テストでは安定したadapterを差し替え、コンポーネント内部やDOM構造の細部をmockしない。保存成功・失敗など利用者の観測できる結果を確認する。
@@ -37,7 +37,7 @@ PDFのバイナリsnapshotは使わない。生成日時・内部ID・TeX版で�
 1. TeX：正規化した期待ファイルとの比較で変換の退行を検出する。
 2. PDF：ページ数・A4寸法・日本語の期待文字列・終端の目印を確認する。ページ数は代表fixtureだけ固定し、長文は内容維持と妥当な範囲を確認する。
 3. ログ：Missing character、エラー、固定fixtureでの重大なOverfull警告を失敗にする。許容例外は理由と範囲を明記する。
-4. 紙面：固定TeX環境でPDFを画像化し、テンプレート変更時に目視する。通常・長文・写真なしを対象にする。
+4. 紙面：固定TeX環境でPDFを画像化し、テンプレート変更時に目視する。通常・長文・写真なしを対象にする。[参考テンプレート仕様](TEMPLATE_REFERENCE.md)の罫線帳票、スキル表、会社帯、案件階層を確認する。長い住所・学校名・URL、継続表、会社／案件見出しの孤立も検証する。基準画像は架空データから作り、原本の本文や写真を使わない。
 
 テスト専用のPDF抽出／画像化ツールはCIへ導入する。利用者のPCにはアプリ実行に必要なTeX環境だけを要求する。
 

@@ -88,7 +88,10 @@ JSONは唯一の編集データ。生成TeX、PDF、絶対パス、コンパイ�
 ```
 
 - 学歴・職歴は`id`、`yearMonth`、`text`を持つ順序付き配列。資格も同じ形式。
-- 職務詳細は`id`、`companyName`、`startYearMonth`、`endYearMonth`（在職中はnull）、`role`、本文`description`を持つ。スキルは`id`、`name`、`description`。
+- `profile`には`addressKana`、任意の`genderLabel`、任意の`alternateContact`を追加する。別連絡先は郵便番号・住所・ふりがな・電話・メール。年齢は書類日付と生年月日から算出し、保存しない。
+- `career.positions`は会社単位。`id/companyName/startYearMonth/endYearMonth/role/companyOverview/projects`を持ち、終了年月nullは在籍中。会社概要は事業内容・資本金表示・従業員数表示などの任意項目。
+- `projects`は順序付き案件配列。`id/name/startYearMonth/endYearMonth/overview/phases/responsibilities/achievements/teamSize/languages/technologies/url`。概要・業務・実績は本文AST、フェーズ・言語・技術は文字列配列、規模は表示用文字列、URLは任意のhttp/https文字列。終了年月nullは進行中。
+- スキルは`id/name/experienceLabel/description`。資格は`resume.qualifications`を職務経歴書からも参照する。実装時の正式Schemaにこれらを含め、上の例は追加任意項目を省略した最小サンプルとして扱う。
 - 日付はISO形式、年月は`YYYY-MM`。配列順を紙面順として扱い、勝手にソートしない。
 - 本文はTiptap互換JSONの限定サブセット。`doc/paragraph/text/bulletList/orderedList/listItem/hardBreak`、markは`bold/italic`。許可属性も定義する。見出しは書類構造で表現する。
 - 未対応node/mark/属性はエラーとして扱い、保存・出力時に黙って捨てない。貼付HTMLはエディタ側で許可書式へ変換する。
@@ -109,11 +112,13 @@ PDF.jsはnpmで導入しworkerも同梱する。WebViewの内蔵PDF表示に依�
 
 ## 5. TeXジェネレータとテンプレート
 
+標準テンプレートの紙面は[参考テンプレート仕様](TEMPLATE_REFERENCE.md)に従う。履歴書は罫線付き帳票、職務経歴書は見出し・スキル表・会社帯・案件詳細の階層とする。
+
 `validate(Project) → DocumentModel → render(template, model) → GeneratedBundle`の順に実行する。GeneratedBundleは`main.tex`、必要な`.sty`などの資源、写真を含む。
 
 通常テキストには単一のエスケープ関数を使い、`\ { } $ & # % _ ^ ~`を処理する。改行、リスト、太字・斜体は限定ASTのvisitorでTeX構造へ変換する。本文をHTMLとしてRustへ渡したり、ユーザー入力をTeX命令として扱ったりしない。
 
-テンプレートの`main.tex`と共通スタイルに紙面の定義を置く。生成された`content.tex`などをそこから読み込む設計にし、プレースホルダの単純な文字列置換で全項目を埋めない。入力由来のファイル名は使わず、資源は固定名で出力する。
+テンプレートの`main.tex`と共通スタイルに紙面の定義を置く。生成された`content.tex`などをそこから読み込む設計にし、プレースホルダの単純な文字列置換で全項目を埋めない。入力由来のファイル名は使わず、資源は固定名で出力する。案件URLは専用の検証・エスケープ処理を通し、長いURLの折返しに対応する。生のTeX命令や任意スキームを許可しない。
 
 manifestにはID、版、書類種別、対応schemaVersion、TeXエンジン、必要パッケージ、フォントを記載する。MVPでは同梱した開発者管理テンプレートだけを実行する。指定版が見つからない場合は勝手に最新版へ置換せず、利用可能な版への変更をUIで提示する。
 
