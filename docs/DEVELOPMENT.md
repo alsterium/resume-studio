@@ -50,3 +50,25 @@ node --test tools/tests/*.test.mjs
 ```
 
 上記は台帳の整合性、依存、完了証跡、検索とHTTP配信を検証する。Node.js 22で動作確認。アプリの実装タスクと独立した開発補助ツールで、将来のCIへ組み込む対象とする。
+
+## アプリの開発環境
+
+T01ではTauri 2＋React＋TypeScript＋Viteの初期画面を追加する。MVPの最低OSはmacOS 12.0として`src-tauri/tauri.conf.json`へ設定。CPUはApple Silicon（aarch64）を先行検証する。Intel（x86_64）、最低OS上の実機検証、Windows/Linux対応は未実施。
+
+| 項目 | 固定版／検証環境 |
+| --- | --- |
+| macOS実機 | 26.5.2、arm64 |
+| 開発環境 | Xcode（`xcode-select -p`が開発環境を指すこと） |
+| Node.js | 22.14.0、`.node-version`に記録 |
+| pnpm | 10.26.2、`package.json`の`packageManager`に固定 |
+| Rust | 1.96.1、`rust-toolchain.toml`に固定、rustfmt・Clippyを含む |
+| Tauri | Rust/API/CLI 2.12.1、tauri-build 2.7.1 |
+| React / TypeScript / Vite | 19.3.0 / 7.0.2 / 8.3.2（package.jsonとlockfileに固定） |
+
+初回は`pnpm install --frozen-lockfile`、開発起動は`pnpm tauri dev`。Rust依存はCargo.lockで固定し、初回コンパイル時に取得する。ブラウザのみの画面確認は`pnpm dev`、フロントの型チェックと本番ビルドは`pnpm build`。TauriとViteを別々に起動する必要はない。
+
+Rustの型チェックは`cargo check --locked --all-targets`、書式確認は`cargo fmt --all --check`を`src-tauri`で実行する。フロントLint・整形のコマンドはT02で整備する。初期画面での書類切り替えは編集内容の保存を伴わない。現在はファイル・shell等のIPC機能を公開していない。必要な権限は機能を追加するタスクで宣言する。
+
+T01の検証ではフロントビルド、Cargoチェック、開発起動と実macOSの1200×800ウィンドウ生成を確認。Browserプラグイン内の参照先不整合と画面収録・アクセシビリティ権限不足により、画面の目視と操作確認は未実施。macOSのWebView操作を含む自動テストはT09、結合テスト基盤はT04で追加する。
+
+設定は[TauriのVite連携](https://v2.tauri.app/start/frontend/vite/)と[macOS bundle設定](https://v2.tauri.app/distribute/macos-application-bundle/)を参考にする。最低OS 12.0は本プロジェクトの設定値であり、その版での動作保証は実機検証後に確定する。

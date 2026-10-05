@@ -2,7 +2,18 @@
 
 日本語の履歴書・職務経歴書を編集し、JSONプロジェクトからLaTeXとPDFを生成するローカルデスクトップアプリ。
 
-現段階の成果物は設計ドキュメント。アプリケーション、TeXテンプレート、CIは未実装。
+Tauri 2＋Reactの初期画面を実装済み。書類の切り替えができる。編集、JSON保存、TeX・PDF生成、CIは後続タスクで追加する。
+
+## 開発起動
+
+macOSでXcodeの開発環境、Node.js 22.14.0、pnpm 10.26.2、Rust 1.96.1を用意する。
+
+```sh
+pnpm install --frozen-lockfile
+pnpm tauri dev
+```
+
+`pnpm dev`はブラウザ用、`pnpm build`はフロントの型チェックと本番ビルド。対応範囲と検証済み環境は[開発規約](docs/DEVELOPMENT.md#アプリの開発環境)を参照。
 
 開発は [開発規約](docs/DEVELOPMENT.md) に沿って進め、[JSONL台帳](tasks/tasks.jsonl) でタスクを管理する。[HTMLダッシュボード](tools/dashboard/index.html) で進捗を閲覧できる。起動手順は開発規約を参照。
 
