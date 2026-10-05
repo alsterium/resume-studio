@@ -61,6 +61,8 @@ try {
   });
   await browser.$(".draft-editor input").waitForExist({ timeout: 30000 });
   await browser.execute(() => {
+    // PDF.js must also work when the host WebKit lacks this newer Map API.
+    delete Map.prototype.getOrInsertComputed;
     window.__e2eConsoleFailures = [];
     const original = console.error.bind(console);
     console.error = (...args) => {

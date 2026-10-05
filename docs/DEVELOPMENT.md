@@ -125,7 +125,7 @@ env PATH=/usr/bin:/bin src-tauri/target/debug/examples/gui_diagnostics
 
 T07では氏名・本文を入力し「PDF更新」でRustのgenerate_draftを実行する。Rustが最大4件の成功PDFをメモリに保持し、結果IDからread_pdfのバイナリIPCで取得する。任意パスの読取や任意TeX入力は公開しない。編集後はPDFに「更新前の内容」と表示し、再生成に失敗しても成功PDFを維持する。正式モデルとジョブのリビジョン照合は後続で拡張する。
 
-PDF.js 6.4.299とworkerをViteで同梱する。外部CDNを利用せず、Uint8Arrayを渡して描画する。倍率50〜200%、前／次のページに対応。CSPは同梱workerとPDF内フォント用のblob/dataのみ追加する。Wasm画像デコードは現時点で無効にし、写真実装時に検証する。
+PDF.js 6.4.299のlegacy版と同版workerをViteで同梱する。通常版は新しいMap.getOrInsertComputedを描画時に使用するため、旧WebKitにも対応する互換版を採用する。E2EではこのAPIを明示的に無効にして実描画を検証する。外部CDNを利用せず、Uint8Arrayを渡して描画する。倍率50〜200%、前／次のページに対応。CSPは同梱workerとPDF内フォント用のblob/dataのみ追加する。Wasm画像デコードは現時点で無効にし、写真実装時に検証する。
 
 以下は実macOS WebViewで180行の架空日本語を入力→実TeX→複数ページPDF描画→150%拡大→2ページ目描画を確認する。canvasの描画ピクセルも検査する。
 
