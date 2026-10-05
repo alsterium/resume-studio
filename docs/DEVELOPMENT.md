@@ -111,4 +111,8 @@ cargo run --manifest-path src-tauri/Cargo.toml --locked --example diagnose_tex
 
 T05の現在の検証環境はTeX Live 2026basic。LuaLaTeX・LuaTeX-ja・Harano Ajiは検出できたが、`tlmgr info --only-installed latexmk`で`installed: No`を確認。GUIに近い`PATH=/usr/bin:/bin`でも診断はLuaLaTeXを検出し、不足依存をlatexmkだけと報告する。実日本語PDFの生成とGUIからの診断成功は未確認のため、T05を完了にはしない。
 
-必要な追加はシステムTeXへのlatexmkパッケージ（[CTANのlatexmk](https://ctan.org/pkg/latexmk?lang=en)）。環境変更の許可後に追加して再検証する。診断のRust結合テストはテスト専用の実行ファイルを使うため、実TeX成功の検証には数えない。
+必要な追加はシステムTeXへのlatexmkパッケージ（[CTANのlatexmk](https://ctan.org/pkg/latexmk?lang=en)）。追加はユーザー許可済みだが、root所有のTeXに対するsudoが管理者パスワードを要求したため、ユーザーのターミナルで以下を実行してから再検証する。診断のRust結合テストはテスト専用の実行ファイルを使うため、実TeX成功の検証には数えない。
+
+```sh
+sudo /Library/TeX/texbin/tlmgr --repository https://mirror.ctan.org/systems/texlive/tlnet install latexmk
+```

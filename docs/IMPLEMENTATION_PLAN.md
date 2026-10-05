@@ -19,7 +19,7 @@ M0 → M1で「入力→TeX→実PDF表示」を動かし、M2以降で書類の
 
 完了判定：空アプリが起動し、GitHubで必須チェックが成功する。検証なしに依存の最新版を羅列せず、互換性を確認した版を固定する。
 
-T03のworkflow実装とGitHubでの実行確認を区別する。remote未設定の間はT03を未完了として保持する。T04はT02のローカル品質コマンドだけで実装・検証できるため、依存をT02へ調整して進める。GitHub必須チェック成功のM0受け入れ条件は維持する。
+T03は[GitHub Actions実行37335662197](https://github.com/alsterium/resume-studio/actions/runs/37335662197)でTS/Linux・Rust/macOS・結果集約の全成功を確認し完了した。T04はT02のローカル品質コマンドだけで実装・検証できるため、依存をT02へ調整した。GitHub必須チェック成功のM0受け入れ条件は維持する。
 
 ## M1：最大リスクを解消する縦切り
 
@@ -87,7 +87,7 @@ T03のworkflow実装とGitHubでの実行確認を区別する。remote未設定
 | T27 利用・開発ドキュメント | TeX前提環境、起動・テスト・エラー対処、JSON仕様、テンプレート追加、ライセンス |
 | T28 MVP受け入れ | PRDのF01〜F14、N01〜N08を検証し、実macOSで全フローを完了 |
 
-GitHubへのリポジトリ作成、template repository設定、公開、Release発行は後の実装・公開依頼で行う。今回の成果物は実装可能な計画まで。
+GitHubへのリポジトリ作成・pushは2026-10-06のユーザー依頼により許可済み。非公開のalsterium/resume-studioで開発とCI検証を行う。template repository設定はT26で再利用手順と合わせて扱い、公開・Release発行は別途依頼時に行う。
 
 ## DEV：開発補助ツール
 
