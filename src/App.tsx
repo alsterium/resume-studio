@@ -1,9 +1,27 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { type AppClient, tauriClient } from "./infrastructure/app-client";
 
 const documents = ["履歴書", "職務経歴書"] as const;
 
-export function App() {
+export function App({ client = tauriClient }: { client?: AppClient }) {
   const [document, setDocument] = useState<(typeof documents)[number]>("履歴書");
+  const [version, setVersion] = useState<string | null>(null);
+  const [versionError, setVersionError] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    void client.getAppVersion().then(
+      (value) => {
+        if (active) setVersion(value);
+      },
+      () => {
+        if (active) setVersionError(true);
+      },
+    );
+    return () => {
+      active = false;
+    };
+  }, [client]);
 
   return (
     <main className="workspace">
@@ -29,6 +47,15 @@ export function App() {
         <h2 id="document-title">{document}</h2>
         <p>編集・保存・PDF生成は、これから追加します。</p>
       </section>
+      <footer>
+        <output>
+          {versionError
+            ? "アプリ情報を取得できませんでした。"
+            : version
+              ? `バージョン ${version}`
+              : "アプリ情報を確認中…"}
+        </output>
+      </footer>
     </main>
   );
 }

@@ -65,7 +65,7 @@ macOS先行でも、純粋なフロント処理とTeXテンプレートはLinux 
 
 ## 6. 開発コマンドの契約
 
-T02でLint・整形・型チェック・フロントビルドをpackage scriptsへ対応付けた。`pnpm check`でそれらと台帳テストを一括実行できる。アプリの結合・Unit・E2Eと以下の専用Cargo test targetは後続で追加する。
+T02でLint・整形・型チェック・フロントビルドをpackage scriptsへ対応付けた。T04で`pnpm test:integration`（Vitest/Testing Library）と`pnpm rust:test`（Cargo）を追加し、`pnpm check`へ組み込んだ。UIは書類切り替えとIPC失敗、Rustの`configuration` targetは実設定ファイルのメタデータと権限を確認する。IPC mockのUIテストで実WebView動作は保証しない。重要ロジックのUnit・実TeX・E2Eと以下の専用Cargo test targetは後続で追加する。
 
 ```sh
 pnpm lint             # oxlint

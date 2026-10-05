@@ -67,7 +67,7 @@ T01ではTauri 2＋React＋TypeScript＋Viteの初期画面を追加する。MVP
 
 初回は`pnpm install --frozen-lockfile`、開発起動は`pnpm tauri dev`。Rust依存はCargo.lockで固定し、初回コンパイル時に取得する。ブラウザのみの画面確認は`pnpm dev`、フロントの型チェックと本番ビルドは`pnpm build`。TauriとViteを別々に起動する必要はない。
 
-初期画面での書類切り替えは編集内容の保存を伴わない。現在はファイル・shell等のIPC機能を公開していない。必要な権限は機能を追加するタスクで宣言する。
+初期画面での書類切り替えは編集内容の保存を伴わない。T04では型付きAppClientからTauriのアプリ版を取得する。メインウィンドウに`core:app:allow-version`だけを許可し、ファイル・shell等の汎用IPCは公開していない。必要な権限は機能を追加するタスクで宣言する。
 
 T01の検証ではフロントビルド、Cargoチェック、開発起動と実macOSの1200×800ウィンドウ生成を確認。Browserプラグイン内の参照先不整合と画面収録・アクセシビリティ権限不足により、画面の目視と操作確認は未実施。macOSのWebView操作を含む自動テストはT09、結合テスト基盤はT04で追加する。
 
@@ -86,9 +86,13 @@ T01の検証ではフロントビルド、Cargoチェック、開発起動と実
 | `pnpm rust:check` | Cargoの全target型チェック（locked） |
 | `pnpm rust:lint` | Clippy、全target、警告も失敗（locked） |
 | `pnpm test:tasks` | JSONL・ダッシュボード・localhost HTTPの6テスト |
+| `pnpm test:integration` | Vitest＋Testing Library、UIとTauri adapterの結合テスト |
+| `pnpm rust:test` | cargo test、実設定ファイルの結合テスト |
 
-フロントLint対象は`src`とVite設定。Oxfmt対象は同じアプリソースとHTML・TS・npm・Tauri・Oxc設定。既存の設計文書、JSONL台帳、独立したダッシュボードは一括整形対象に含めない。後続のフロントテスト追加時には対象を広げる。ダッシュボードは`test:tasks`で検証する。
+フロントLint対象は`src`・`tests`とVite/Vitest設定。Oxfmt対象は同じアプリ・テストソースとHTML・TS・npm・Tauri・Oxc設定。既存の設計文書、JSONL台帳、独立したダッシュボードは一括整形対象に含めない。ダッシュボードは`test:tasks`で検証する。
 
 `pnpm build`は型チェック後に本番bundleを生成する。`pnpm check`はファイルの書き換えを行わない。HTTP結合テストは127.0.0.1への待受を必要とするため、待受を禁止したsandboxでは通常の開発環境で実行する。テストをskipして成功扱いにしない。
 
 設定は[Oxlint設定資料](https://oxc.rs/docs/guide/usage/linter/config)と[Oxfmt CLI](https://oxc.rs/docs/guide/usage/formatter/cli.html)を参照。Oxlintの成功でTypeScript型チェックを代替しない。
+
+テスト基盤はVitest 5.0.3、Testing Library React 16.3.3、user-event 14.6.7、jest-dom 7.0.1。jsdomはNode 22.14.0と互換の26.1.0に固定する。UIテストのIPCはTauri公式mockIPCで代替するため、実WebView・実Rust通信の検証には含めない。Rust結合テストは実ファイルからTauri設定・権限・npmメタデータを読み取り、crateとの整合を確認する。架空日本語入力は`tests/fixtures`へ置く。重要な変換ロジックのUnitテストは対象ロジックの実装時に追加する。
