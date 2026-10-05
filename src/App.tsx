@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { type AppClient, tauriClient } from "./infrastructure/app-client";
+import { TexDiagnosticsPanel } from "./features/diagnostics/TexDiagnosticsPanel";
 
 const documents = ["履歴書", "職務経歴書"] as const;
 
@@ -47,6 +48,7 @@ export function App({ client = tauriClient }: { client?: AppClient }) {
         <h2 id="document-title">{document}</h2>
         <p>編集・保存・PDF生成は、これから追加します。</p>
       </section>
+      <TexDiagnosticsPanel client={client} />
       <footer>
         <output>
           {versionError

@@ -1,0 +1,4 @@
+[[permission]]
+identifier = "allow-diagnose-tex"
+description = "固定された日本語TeXの診断を実行する"
+commands.allow = ["diagnose_tex"]

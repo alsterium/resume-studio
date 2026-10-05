@@ -67,7 +67,7 @@ T01ではTauri 2＋React＋TypeScript＋Viteの初期画面を追加する。MVP
 
 初回は`pnpm install --frozen-lockfile`、開発起動は`pnpm tauri dev`。Rust依存はCargo.lockで固定し、初回コンパイル時に取得する。ブラウザのみの画面確認は`pnpm dev`、フロントの型チェックと本番ビルドは`pnpm build`。TauriとViteを別々に起動する必要はない。
 
-初期画面での書類切り替えは編集内容の保存を伴わない。T04では型付きAppClientからTauriのアプリ版を取得する。メインウィンドウに`core:app:allow-version`だけを許可し、ファイル・shell等の汎用IPCは公開していない。必要な権限は機能を追加するタスクで宣言する。
+初期画面での書類切り替えは編集内容の保存を伴わない。T04では型付きAppClientからTauriのアプリ版を取得する。T05ではメインウィンドウにアプリ版読取と`allow-diagnose-tex`を許可する。独自コマンドはAppManifestでも宣言し、ファイル・shell等の汎用IPCは公開していない。
 
 T01の検証ではフロントビルド、Cargoチェック、開発起動と実macOSの1200×800ウィンドウ生成を確認。Browserプラグイン内の参照先不整合と画面収録・アクセシビリティ権限不足により、画面の目視と操作確認は未実施。macOSのWebView操作を含む自動テストはT09、結合テスト基盤はT04で追加する。
 
@@ -96,3 +96,19 @@ T01の検証ではフロントビルド、Cargoチェック、開発起動と実
 設定は[Oxlint設定資料](https://oxc.rs/docs/guide/usage/linter/config)と[Oxfmt CLI](https://oxc.rs/docs/guide/usage/formatter/cli.html)を参照。Oxlintの成功でTypeScript型チェックを代替しない。
 
 テスト基盤はVitest 5.0.3、Testing Library React 16.3.3、user-event 14.6.7、jest-dom 7.0.1。jsdomはNode 22.14.0と互換の26.1.0に固定する。UIテストのIPCはTauri公式mockIPCで代替するため、実WebView・実Rust通信の検証には含めない。Rust結合テストは実ファイルからTauri設定・権限・npmメタデータを読み取り、crateとの整合を確認する。架空日本語入力は`tests/fixtures`へ置く。重要な変換ロジックのUnitテストは対象ロジックの実装時に追加する。
+
+## TeX環境の診断
+
+初期画面の「TeX環境を確認」で、Rust側の`diagnose_tex`を実行する。PATHとmacOSの既知の配置（`/Library/TeX/texbin`等）からlatexmk、LuaLaTeX、kpsewhichを探し、版・日本語パッケージ・Harano Ajiフォントを確認する。診断コマンドに入力TeXや任意の実行パスを渡すことはできない。
+
+依存が揃っていれば、同梱の固定日本語TeXを隔離した一時ディレクトリでlatexmkへ渡す。ユーザーのlatexmk設定を読み込まない`-norc`、LuaLaTeX、非対話、エラー停止、shell escape無効を指定する。生成終了コードとPDFヘッダを確認し、診断の一時ファイルを削除する。プロセスのログは標準出力・標準エラーそれぞれ先頭64KiBだけ保持し、全出力は読み続ける。タイムアウト時はmacOSの専用プロセスグループを停止する。操作キャンセル・ジョブ状態の管理はT21・T22で追加する。
+
+診断結果の確認用に以下も実行できる。依存不足や生成失敗なら終了コード1を返す。
+
+```sh
+cargo run --manifest-path src-tauri/Cargo.toml --locked --example diagnose_tex
+```
+
+T05の現在の検証環境はTeX Live 2026basic。LuaLaTeX・LuaTeX-ja・Harano Ajiは検出できたが、`tlmgr info --only-installed latexmk`で`installed: No`を確認。GUIに近い`PATH=/usr/bin:/bin`でも診断はLuaLaTeXを検出し、不足依存をlatexmkだけと報告する。実日本語PDFの生成とGUIからの診断成功は未確認のため、T05を完了にはしない。
+
+必要な追加はシステムTeXへのlatexmkパッケージ（[CTANのlatexmk](https://ctan.org/pkg/latexmk?lang=en)）。環境変更の許可後に追加して再検証する。診断のRust結合テストはテスト専用の実行ファイルを使うため、実TeX成功の検証には数えない。

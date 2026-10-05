@@ -21,7 +21,7 @@ fn application_metadata_matches_frontend_and_cargo() {
 }
 
 #[test]
-fn main_window_can_only_read_application_version() {
+fn main_window_only_has_declared_application_permissions() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let config: Value =
         serde_json::from_str(&fs::read_to_string(root.join("tauri.conf.json")).unwrap()).unwrap();
@@ -37,7 +37,7 @@ fn main_window_can_only_read_application_version() {
     assert_eq!(capability["windows"], serde_json::json!(["main"]));
     assert_eq!(
         capability["permissions"],
-        serde_json::json!(["core:app:allow-version"])
+        serde_json::json!(["core:app:allow-version", "allow-diagnose-tex"])
     );
     assert!(capability.get("remote").is_none());
 }
