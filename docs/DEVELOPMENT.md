@@ -109,10 +109,14 @@ T01の検証ではフロントビルド、Cargoチェック、開発起動と実
 cargo run --manifest-path src-tauri/Cargo.toml --locked --example diagnose_tex
 ```
 
-T05の現在の検証環境はTeX Live 2026basic。LuaLaTeX・LuaTeX-ja・Harano Ajiは検出できたが、`tlmgr info --only-installed latexmk`で`installed: No`を確認。GUIに近い`PATH=/usr/bin:/bin`でも診断はLuaLaTeXを検出し、不足依存をlatexmkだけと報告する。実日本語PDFの生成とGUIからの診断成功は未確認のため、T05を完了にはしない。
+T05はTeX Live 2026basic＋latexmk 4.88で検証済み。ユーザーの管理者操作でlatexmkを追加後、GUIに近いPATH=/usr/bin:/binで実診断がpdfValidated=trueを返した。制限されたsandboxでフォントキャッシュに書き込めない場合は通常の開発環境で実行する。
 
-必要な追加はシステムTeXへのlatexmkパッケージ（[CTANのlatexmk](https://ctan.org/pkg/latexmk?lang=en)）。追加はユーザー許可済みだが、root所有のTeXに対するsudoが管理者パスワードを要求したため、ユーザーのターミナルで以下を実行してから再検証する。診断のRust結合テストはテスト専用の実行ファイルを使うため、実TeX成功の検証には数えない。
+実macOS WebViewの確認用exampleも追加した。実際の同梱React画面の診断ボタンを押し、実IPC・実TeX・成功表示まで確認する。タイムアウトや失敗表示は終了コード1。テスト用scriptはexampleだけに含み、本番アプリには組み込まない。T09のWebdriverIOによる編集からプレビューまでのE2Eは別途実装する。
 
 ```sh
-sudo /Library/TeX/texbin/tlmgr --repository https://mirror.ctan.org/systems/texlive/tlnet install latexmk
+pnpm build
+cargo build --manifest-path src-tauri/Cargo.toml --locked --example gui_diagnostics --features tauri/custom-protocol
+env PATH=/usr/bin:/bin src-tauri/target/debug/examples/gui_diagnostics
 ```
+
+実行結果はGUI_DIAGNOSTICS: PASS。通常のアプリと同じmain capabilityを使い、検証結果の通知用URLはnavigation callbackで捕捉して外部通信を防ぐ。画面の紙面・見た目の目視確認を代替するものではない。

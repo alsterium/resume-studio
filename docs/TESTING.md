@@ -67,7 +67,7 @@ macOS先行でも、純粋なフロント処理とTeXテンプレートはLinux 
 
 T02でLint・整形・型チェック・フロントビルドをpackage scriptsへ対応付けた。T04で`pnpm test:integration`（Vitest/Testing Library）と`pnpm rust:test`（Cargo）を追加し、`pnpm check`へ組み込んだ。UIは書類切り替えとIPC失敗、Rustの`configuration` targetは実設定ファイルのメタデータと権限を確認する。IPC mockのUIテストで実WebView動作は保証しない。重要ロジックのUnit・実TeX・E2Eと以下の専用Cargo test targetは後続で追加する。
 
-T05の`diagnostics` targetは実ファイル・テスト用実行プログラムを使い、依存不足、日本語／空白パス、一時ディレクトリの後始末、失敗・不正PDFを検証する。processモジュールのUnitテストは実プロセスでタイムアウト時の子プロセス停止と大量ログの上限を確認する。UI結合は依存不足→再確認成功とIPC失敗の回復を確認する。実環境はlatexmk未導入のため、これらの成功を実日本語PDF生成の成功と扱わない。
+T05の`diagnostics` targetは実ファイル・テスト用実行プログラムを使い、依存不足、日本語／空白パス、一時ディレクトリの後始末、失敗・不正PDFを検証する。processモジュールのUnitテストは実プロセスでタイムアウト時の子プロセス停止と大量ログの上限を確認する。UI結合は依存不足→再確認成功とIPC失敗の回復を確認する。テスト用実行プログラムの成功を実TeX成功と扱わない。latexmk 4.88導入後、最小PATHでの実診断とgui_diagnostics exampleの実macOS WebView→実IPC→日本語PDF→成功表示を別途確認済み（docs/DEVELOPMENT.md）。
 
 ```sh
 pnpm lint             # oxlint
