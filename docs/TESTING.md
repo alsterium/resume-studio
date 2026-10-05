@@ -61,7 +61,7 @@ macOS先行でも、純粋なフロント処理とTeXテンプレートはLinux 
 
 ## 6. 開発コマンドの契約
 
-実装時にpackage scriptsとCargo taskへ対応付ける。以下は予定コマンドであり、現時点では実行できない。
+T02でLint・整形・型チェック・フロントビルドをpackage scriptsへ対応付けた。`pnpm check`でそれらと台帳テストを一括実行できる。アプリの結合・Unit・E2Eと以下の専用Cargo test targetは後続で追加する。
 
 ```sh
 pnpm lint             # oxlint

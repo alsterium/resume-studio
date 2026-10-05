@@ -1,0 +1,7 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "react", "jsx-a11y", "oxc"],
+  "categories": { "correctness": "error" },
+  "env": { "browser": true, "es2022": true },
+  "overrides": [{ "files": ["vite.config.ts"], "env": { "node": true } }]
+}

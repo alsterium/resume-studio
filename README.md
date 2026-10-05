@@ -15,6 +15,8 @@ pnpm tauri dev
 
 `pnpm dev`はブラウザ用、`pnpm build`はフロントの型チェックと本番ビルド。対応範囲と検証済み環境は[開発規約](docs/DEVELOPMENT.md#アプリの開発環境)を参照。
 
+品質チェックは`pnpm check`。TS/RustのLint・整形・型チェックと台帳ツールのテストを実行する。
+
 開発は [開発規約](docs/DEVELOPMENT.md) に沿って進め、[JSONL台帳](tasks/tasks.jsonl) でタスクを管理する。[HTMLダッシュボード](tools/dashboard/index.html) で進捗を閲覧できる。起動手順は開発規約を参照。
 
 ## ドキュメント

@@ -67,8 +67,28 @@ T01ではTauri 2＋React＋TypeScript＋Viteの初期画面を追加する。MVP
 
 初回は`pnpm install --frozen-lockfile`、開発起動は`pnpm tauri dev`。Rust依存はCargo.lockで固定し、初回コンパイル時に取得する。ブラウザのみの画面確認は`pnpm dev`、フロントの型チェックと本番ビルドは`pnpm build`。TauriとViteを別々に起動する必要はない。
 
-Rustの型チェックは`cargo check --locked --all-targets`、書式確認は`cargo fmt --all --check`を`src-tauri`で実行する。フロントLint・整形のコマンドはT02で整備する。初期画面での書類切り替えは編集内容の保存を伴わない。現在はファイル・shell等のIPC機能を公開していない。必要な権限は機能を追加するタスクで宣言する。
+初期画面での書類切り替えは編集内容の保存を伴わない。現在はファイル・shell等のIPC機能を公開していない。必要な権限は機能を追加するタスクで宣言する。
 
 T01の検証ではフロントビルド、Cargoチェック、開発起動と実macOSの1200×800ウィンドウ生成を確認。Browserプラグイン内の参照先不整合と画面収録・アクセシビリティ権限不足により、画面の目視と操作確認は未実施。macOSのWebView操作を含む自動テストはT09、結合テスト基盤はT04で追加する。
 
 設定は[TauriのVite連携](https://v2.tauri.app/start/frontend/vite/)と[macOS bundle設定](https://v2.tauri.app/distribute/macos-application-bundle/)を参考にする。最低OS 12.0は本プロジェクトの設定値であり、その版での動作保証は実機検証後に確定する。
+
+## 品質チェック
+
+リポジトリルートから`pnpm check`で以下を一括実行する。個別実行も可能。
+
+| コマンド | 内容 |
+| --- | --- |
+| `pnpm lint` | Oxlint 1.87.0、TS・React・アクセシビリティ等のcorrectnessルール、警告も失敗 |
+| `pnpm format:check` / `pnpm format` | Oxfmt 0.72.0による書式確認／適用 |
+| `pnpm typecheck` | tscによる独立した型チェック |
+| `pnpm rust:format:check` / `pnpm rust:format` | rustfmtによる書式確認／適用 |
+| `pnpm rust:check` | Cargoの全target型チェック（locked） |
+| `pnpm rust:lint` | Clippy、全target、警告も失敗（locked） |
+| `pnpm test:tasks` | JSONL・ダッシュボード・localhost HTTPの6テスト |
+
+フロントLint対象は`src`とVite設定。Oxfmt対象は同じアプリソースとHTML・TS・npm・Tauri・Oxc設定。既存の設計文書、JSONL台帳、独立したダッシュボードは一括整形対象に含めない。後続のフロントテスト追加時には対象を広げる。ダッシュボードは`test:tasks`で検証する。
+
+`pnpm build`は型チェック後に本番bundleを生成する。`pnpm check`はファイルの書き換えを行わない。HTTP結合テストは127.0.0.1への待受を必要とするため、待受を禁止したsandboxでは通常の開発環境で実行する。テストをskipして成功扱いにしない。
+
+設定は[Oxlint設定資料](https://oxc.rs/docs/guide/usage/linter/config)と[Oxfmt CLI](https://oxc.rs/docs/guide/usage/formatter/cli.html)を参照。Oxlintの成功でTypeScript型チェックを代替しない。
