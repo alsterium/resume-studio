@@ -7,7 +7,7 @@
 | フィールド | 規則 |
 | --- | --- |
 | id / title | 一意で安定したID / タスク名 |
-| milestone | M0〜M6。追加する場合はロードマップと同期 |
+| milestone | M0〜M6はアプリ実装、DEVは開発補助ツール。追加する場合はロードマップと同期 |
 | status | todo / in_progress / blocked / done |
 | dependsOn | 依存タスクIDの配列。不存在・循環は禁止 |
 | acceptance | レビューで確認できる完了条件 |
@@ -31,20 +31,22 @@
 
 ## HTMLダッシュボード
 
-リポジトリルートで以下を実行する（Python 3を使用）。
+リポジトリルートで以下を実行する（Node.js 22を使用、追加パッケージ不要）。
 
 ```sh
-python3 -m http.server 8000 --bind 127.0.0.1
+node tools/dashboard/server.mjs
 ```
 
 [ダッシュボード](http://127.0.0.1:8000/tools/dashboard/) を開く。HTMLが `tasks/tasks.jsonl` をfetchし、全体・マイルストーンの完了数、状態、依存、完了条件、検証証跡を表示する。検索と状態・マイルストーンの絞り込みを組み合わせられる。「台帳を再読み込み」で変更を反映する。自動監視・書き戻しは行わない。
+
+別のポートを使う場合は `node tools/dashboard/server.mjs 8001`。Ctrl+Cで終了する。サーバーは127.0.0.1で待ち受け、ダッシュボードのHTML・JavaScriptとJSONL台帳だけを配信する。作業ディレクトリによらずスクリプトの位置から資源を読み込む。
 
 サーバーなしでも [index.html](../tools/dashboard/index.html) を直接開き、「JSONLファイルを選択」で台帳を読み込める。ファイル変更後は再選択する。外部CDN・ネットワーク依存はない。不正データの場合はエラーを表示し、前回の正常データを維持する。
 
 進捗率は完了件数÷総件数であり、工数・納期の推定ではない。画面で編集せずJSONLを更新するため、Gitで変更をレビューできる。
 
 ```sh
-node --test tools/tests/tasks.test.mjs
+node --test tools/tests/*.test.mjs
 ```
 
-上記は台帳の整合性、依存、完了証跡、検索を検証する。Node.js 22で動作確認。アプリの実装タスクと独立した開発補助ツールで、将来のCIへ組み込む対象とする。
+上記は台帳の整合性、依存、完了証跡、検索とHTTP配信を検証する。Node.js 22で動作確認。アプリの実装タスクと独立した開発補助ツールで、将来のCIへ組み込む対象とする。

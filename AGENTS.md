@@ -2,6 +2,8 @@
 
 このリポジトリのタスク管理には、`tasks/tasks.jsonl` と `tools/dashboard/index.html` のタスク管理ツールを使用する。別の進捗台帳を作らず、この台帳を更新してダッシュボードで確認する。
 
+開発補助ツールはNode.jsで実装・起動する。ダッシュボードの起動は `node tools/dashboard/server.mjs` を使用する。
+
 - 開始前に `docs/DEVELOPMENT.md`、`tasks/tasks.jsonl` と対象マイルストーンの設計・テスト方針を読む。
 - タスクの進捗の正本は `tasks/tasks.jsonl`。実装ロードマップは目的・完了条件の説明として扱う。両者の範囲を変更する場合は同じ変更で同期する。
 - 未完了の依存がないタスクを選び、実装前に `in_progress` にして担当と更新日を記録する。
