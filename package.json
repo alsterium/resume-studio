@@ -21,7 +21,7 @@
     "test:integration": "vitest run",
     "rust:test": "cargo test --manifest-path src-tauri/Cargo.toml --locked",
     "test:tex": "cargo test --manifest-path src-tauri/Cargo.toml --locked --features real-tex --test real_tex",
-    "build:e2e": "pnpm build && cargo build --manifest-path src-tauri/Cargo.toml --locked --features desktop-e2e,tauri/custom-protocol",
+    "build:e2e": "tauri build --debug --features desktop-e2e",
     "test:e2e": "node tools/desktop-e2e.mjs"
   },
   "dependencies": {

@@ -152,6 +152,6 @@ pnpm build:e2e
 pnpm test:e2e
 ```
 
-最初のコマンドは同梱フロントとdesktop-e2e featureのテスト用バイナリを作る。2つ目はNode.jsで専用アプリを起動し、WebdriverIOから本文入力→実IPC→実TeX→PDF描画と倍率変更を確認する。要素入力と倍率用DOMイベントの制限は[ADR 0004](adr/0004-desktop-e2e.md)に記録した。終了時にセッションとアプリを停止する。実TeX環境とmacOSのWebViewが必要で、通常CIのブラウザ内mockテストとは別に報告する。
+最初のコマンドは同梱フロントとdesktop-e2e featureのテスト用.app bundleを作る。2つ目はNode.jsでbundle内の専用アプリを最小PATHで起動し、WebdriverIOから本文入力→実IPC→実TeX→PDF描画と倍率変更を確認する。生成PDFから氏名・本文も文字抽出する。要素入力と倍率用DOMイベントの制限は[ADR 0004](adr/0004-desktop-e2e.md)に記録した。終了時にセッションとアプリを停止する。実TeX環境とmacOSのWebViewが必要で、通常CIのブラウザ内mockテストとは別に報告する。
 
 E2E後に本番アプリを作るときは通常のpnpm tauri buildを使う。desktop-e2e featureを渡さない。WebDriverプラグインは既定の依存グラフに含まれず、通常のcapabilityを増やさない。

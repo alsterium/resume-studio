@@ -13,9 +13,14 @@ server.listen(0, "127.0.0.1");
 await once(server, "listening");
 const { port } = server.address();
 await new Promise((resolve) => server.close(resolve));
-const binary = fileURLToPath(new URL("../src-tauri/target/debug/resume-studio", import.meta.url));
+const binary = fileURLToPath(
+  new URL(
+    "../src-tauri/target/debug/bundle/macos/Resume Studio.app/Contents/MacOS/resume-studio",
+    import.meta.url,
+  ),
+);
 const app = spawn(binary, [], {
-  env: { ...process.env, TAURI_WEBDRIVER_PORT: String(port) },
+  env: { ...process.env, PATH: "/usr/bin:/bin", TAURI_WEBDRIVER_PORT: String(port) },
   stdio: ["ignore", "pipe", "pipe"],
 });
 let output = "";
@@ -61,15 +66,17 @@ try {
   const text = await browser.$('[aria-label="本文"]').getText();
   assert.ok(text.includes("架空の職務内容"), `Input was lost: ${text}`);
   await browser.$("button=PDF更新").click();
-  await browser.waitUntil(
-    async () =>
-      await browser.execute(() => {
-        const alert = document.querySelector('[role="alert"]');
-        if (alert) throw new Error(alert.textContent);
-        return document.querySelector("canvas")?.dataset.renderedPage === "1";
-      }),
-    { timeout: 90000, timeoutMsg: "Real TeX PDF did not render" },
-  );
+  const renderDeadline = Date.now() + 90000;
+  for (;;) {
+    const state = await browser.execute(() => ({
+      error: document.querySelector('[role="alert"]')?.textContent,
+      ready: document.querySelector("canvas")?.dataset.renderedPage === "1",
+    }));
+    if (state.error) throw new Error(state.error.slice(0, 2000));
+    if (state.ready) break;
+    if (Date.now() >= renderDeadline) throw new Error("Real TeX PDF did not render");
+    await delay(200);
+  }
   const first = await browser.execute(() => {
     const canvas = document.querySelector("canvas");
     const data = canvas.getContext("2d").getImageData(0, 0, canvas.width, canvas.height).data;
@@ -79,6 +86,29 @@ try {
     return { dark, width: canvas.width };
   });
   assert.ok(first.dark > 20, "PDF canvas is blank");
+  // The dedicated process has generated exactly one PDF, whose first result ID is 1.
+  // Read the actual Rust result; do not substitute a PDF fixture for the UI generation.
+  const pdfBytes = await browser.executeAsync((done) => {
+    window.__TAURI_INTERNALS__
+      .invoke("read_pdf", { resultId: "1" })
+      .then((buffer) => done({ bytes: Array.from(new Uint8Array(buffer)) }))
+      .catch((error) => done({ error: String(error) }));
+  });
+  assert.equal(pdfBytes.error, undefined);
+  const { getDocument } = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  const pdfTask = getDocument({ data: new Uint8Array(pdfBytes.bytes), useWasm: false });
+  try {
+    const pdf = await pdfTask.promise;
+    const contents = await (await pdf.getPage(1)).getTextContent();
+    const extracted = contents.items
+      .map((item) => item.str ?? "")
+      .join("")
+      .replace(/\s+/gu, "");
+    assert.ok(extracted.includes("架空山田"), "Generated PDF lost the name");
+    assert.ok(extracted.includes("架空の職務内容"), "Generated PDF lost the body");
+  } finally {
+    await pdfTask.destroy();
+  }
   // The embedded driver's option click does not dispatch select change in WKWebView.
   // Drive the native value setter and DOM event; the PDF renderer remains real.
   await browser.execute(() => {
@@ -94,7 +124,9 @@ try {
     { timeout: 30000 },
   );
   assert.ok((await browser.execute(() => document.querySelector("canvas").width)) > first.width);
-  console.log("DESKTOP_E2E: PASS (WebDriver input → real IPC → real TeX → PDF canvas → zoom)");
+  console.log(
+    "DESKTOP_E2E: PASS (app bundle → WebDriver input → real TeX → PDF text/canvas → zoom)",
+  );
 } finally {
   try {
     if (browser) await browser.deleteSession();
