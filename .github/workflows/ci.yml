@@ -77,7 +77,7 @@ jobs:
           sudo installer -pkg "$RUNNER_TEMP/basictex.pkg" -target /
           sudo /Library/TeX/texbin/tlmgr option repository https://ctan.math.illinois.edu/systems/texlive/tlnet
           sudo /Library/TeX/texbin/tlmgr update --self
-          sudo /Library/TeX/texbin/tlmgr install latexmk luatexja haranoaji
+          sudo /Library/TeX/texbin/tlmgr install latexmk luatexja haranoaji regexpatch
           /Library/TeX/texbin/latexmk --version
           /Library/TeX/texbin/lualatex --version
       - name: Check test feature and build embedded WebDriver app
