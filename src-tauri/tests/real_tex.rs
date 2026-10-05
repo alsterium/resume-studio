@@ -5,6 +5,44 @@ use resume_studio_lib::{
 use std::fs;
 
 #[test]
+fn rich_japanese_body_compiles_with_marks_breaks_and_nested_lists() {
+    let draft = Draft {
+        name: "架空 山田".into(),
+        body: String::new(),
+        rich_body: Some(
+            serde_json::from_str(include_str!("../../tests/fixtures/rich-body.json")).unwrap(),
+        ),
+    };
+    let bundle = generate(&draft).unwrap();
+    let artifact =
+        compile(&TexRuntime::discover(), &bundle).expect("real rich body TeX compilation");
+    assert!(
+        !artifact.log.contains("Missing character:"),
+        "{}",
+        artifact.log
+    );
+    assert!(!artifact.log.contains("Overfull"), "{}", artifact.log);
+    #[cfg(target_os = "macos")]
+    {
+        let dir = tempfile::tempdir().unwrap();
+        let pdf = dir.path().join("rich.pdf");
+        fs::write(&pdf, artifact.bytes).unwrap();
+        let output = std::process::Command::new("/usr/bin/swift").args(["-e", "import Foundation; import PDFKit; print(PDFDocument(url: URL(fileURLWithPath: CommandLine.arguments[1]))!.string ?? \"\")", &pdf.to_string_lossy()]).output().unwrap();
+        assert!(output.status.success());
+        let text = String::from_utf8(output.stdout).unwrap();
+        for expected in [
+            "太字の日本語 & %",
+            "斜体の本文",
+            "箇条書きの業務",
+            "番号付きの実績",
+            "2.",
+        ] {
+            assert!(text.contains(expected), "missing {expected}: {text}");
+        }
+    }
+}
+
+#[test]
 fn fictional_japanese_and_special_characters_compile_with_real_tex() {
     let draft: Draft =
         serde_json::from_str(include_str!("../../tests/fixtures/japanese-content.json")).unwrap();

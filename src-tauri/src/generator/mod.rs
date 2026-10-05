@@ -1,10 +1,13 @@
 use serde::{Deserialize, Serialize};
+pub mod body;
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Draft {
     pub name: String,
     pub body: String,
+    #[serde(rename = "richBody")]
+    pub rich_body: Option<body::BodyNode>,
 }
 
 #[derive(Debug, Serialize)]
@@ -54,6 +57,14 @@ pub fn generate(draft: &Draft) -> Result<GeneratedBundle, String> {
         .split('\n')
         .map(|line| format!("{}\\par\n", escape_text(line)))
         .collect::<String>();
+    let paragraphs = if let Some(rich) = &draft.rich_body {
+        body::render_body(rich)?
+    } else {
+        paragraphs
+    };
+    if paragraphs.len() > 256 * 1024 {
+        return Err("本文がサイズ上限を超えています。".into());
+    }
     Ok(GeneratedBundle {
         main_tex: include_str!("../../templates/draft/main.tex").into(),
         content_tex: format!("\\section*{{{}}}\n{}", escape_text(&draft.name), paragraphs),
@@ -78,6 +89,7 @@ mod tests {
         let bundle = generate(&Draft {
             name: "架空 山田".into(),
             body: "\\input{secret}\r\n次の段落\r終わり".into(),
+            rich_body: None,
         })
         .unwrap();
         assert!(bundle
@@ -92,18 +104,22 @@ mod tests {
             Draft {
                 name: "x".repeat(1025),
                 body: String::new(),
+                rich_body: None,
             },
             Draft {
                 name: "架空".into(),
                 body: "x".repeat(65537),
+                rich_body: None,
             },
             Draft {
                 name: "名\n前".into(),
                 body: String::new(),
+                rich_body: None,
             },
             Draft {
                 name: "架空".into(),
                 body: "\0".into(),
+                rich_body: None,
             },
         ] {
             assert!(generate(&draft).is_err());

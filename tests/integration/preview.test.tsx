@@ -32,7 +32,16 @@ test("入力をIPCで生成し、結果IDから読込・ページ移動・拡大
   const user = userEvent.setup();
   mockIPC((command, args) => {
     if (command === "generate_draft") {
-      expect(args).toEqual({ draft: { name: "架空 山田", body: "日本語 & %" } });
+      expect(args).toEqual({
+        draft: {
+          name: "架空 山田",
+          body: "",
+          richBody: {
+            type: "doc",
+            content: [{ type: "paragraph", content: [{ type: "text", text: "日本語 & %" }] }],
+          },
+        },
+      });
       return { resultId: "42" };
     }
     if (command === "read_pdf") {

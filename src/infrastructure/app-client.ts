@@ -1,5 +1,6 @@
 import { getVersion } from "@tauri-apps/api/app";
 import { invoke } from "@tauri-apps/api/core";
+import type { JSONContent } from "@tiptap/core";
 
 export interface TexDiagnostics {
   tools: { name: string; path: string | null; version: string | null }[];
@@ -11,7 +12,11 @@ export interface TexDiagnostics {
 export interface AppClient {
   getAppVersion(): Promise<string>;
   diagnoseTex(): Promise<TexDiagnostics>;
-  generateDraft(draft: { name: string; body: string }): Promise<{ resultId: string }>;
+  generateDraft(draft: {
+    name: string;
+    body: string;
+    richBody?: JSONContent;
+  }): Promise<{ resultId: string }>;
   readPdf(resultId: string): Promise<Uint8Array>;
 }
 

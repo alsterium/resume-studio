@@ -2,7 +2,7 @@
 
 日本語の履歴書・職務経歴書を編集し、JSONプロジェクトからLaTeXとPDFを生成するローカルデスクトップアプリ。
 
-Tauri 2＋Reactの初期画面、TeX環境診断、TS/RustのCIを実装済み。書類の切り替えとTeX依存の確認ができる。編集、JSON保存、書類のTeX・PDF生成は後続タスクで追加する。[GitHub Actions](https://github.com/alsterium/resume-studio/actions/runs/37335662197)でTS/Linux・Rust/macOSのチェックとテストの成功を確認済み。
+Tauri 2＋Reactの初期画面、本文WYSIWYG編集、TeX環境診断、下書きPDF生成・プレビューを実装済み。太字・斜体・リストをTeXへ変換し、アプリ内でページ移動と拡大ができる。正式な書類編集・JSONプロジェクト保存・提出用テンプレートは後続タスクで追加する。[GitHub Actions](https://github.com/alsterium/resume-studio/actions)でTS/Linux・Rust/macOSのチェックとテストを行う。
 
 ## 開発起動
 

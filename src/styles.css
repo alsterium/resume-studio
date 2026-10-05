@@ -110,6 +110,28 @@ button:disabled {
   display: block;
   background: white;
 }
+.editor-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.editor-toolbar button {
+  padding: 8px 12px;
+}
+.body-editor .tiptap {
+  background: white;
+  border: 1px solid #bdcdc2;
+  border-radius: 6px;
+  min-height: 240px;
+  padding: 12px;
+}
+.body-editor .tiptap:focus {
+  outline: 3px solid #d68b36;
+}
+.body-editor .tiptap p {
+  margin: 0 0 12px;
+}
 @media (max-width: 850px) {
   .draft-workspace {
     grid-template-columns: 1fr;

@@ -22,7 +22,7 @@
       const canvas = document.querySelector("canvas");
       if (stage === 0 && button("PDF更新")) {
         setValue(document.querySelector(".draft-editor input"), HTMLInputElement.prototype, "架空 山田", "input");
-        setValue(document.querySelector("textarea"), HTMLTextAreaElement.prototype, Array.from({ length: 180 }, (_, i) => `架空の職務内容 ${i + 1} 日本語と記号 & % _ # $ { } ~ ^ \\`).join("\n"), "input");
+        document.querySelector(".tiptap").editor.commands.setContent({ type: "doc", content: Array.from({ length: 180 }, (_, i) => ({ type: "paragraph", content: [{ type: "text", text: `架空の職務内容 ${i + 1} 日本語と記号 & % _ # $ { } ~ ^ \\` }] })) });
         stage = 1;
       } else if (stage === 1) {
         button("PDF更新").click();

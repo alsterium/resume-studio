@@ -1,0 +1,39 @@
+{
+  "type": "doc",
+  "content": [
+    {
+      "type": "paragraph",
+      "content": [
+        { "type": "text", "text": "太字の日本語 & %", "marks": [{ "type": "bold" }] },
+        { "type": "hardBreak" },
+        { "type": "text", "text": "斜体の本文", "marks": [{ "type": "italic" }] }
+      ]
+    },
+    {
+      "type": "bulletList",
+      "content": [
+        {
+          "type": "listItem",
+          "content": [
+            { "type": "paragraph", "content": [{ "type": "text", "text": "箇条書きの業務" }] },
+            {
+              "type": "orderedList",
+              "attrs": { "start": 2, "type": null },
+              "content": [
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [{ "type": "text", "text": "番号付きの実績" }]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -4,7 +4,12 @@ use resume_studio_lib::{commands, compiler::results::PdfStore};
 use tauri::{WebviewUrl, WebviewWindowBuilder};
 
 fn main() {
-    let preview = std::env::var("RESUME_STUDIO_PROBE").as_deref() == Ok("preview");
+    let probe = std::env::var("RESUME_STUDIO_PROBE").unwrap_or_default();
+    let script = match probe.as_str() {
+        "preview" => include_str!("gui_preview.js"),
+        "editor" => include_str!("gui_editor.js"),
+        _ => include_str!("gui_diagnostics.js"),
+    };
     let mut context = tauri::generate_context!();
     context.config_mut().app.windows.clear();
     tauri::Builder::default()
@@ -24,6 +29,9 @@ fn main() {
                     // Intercept the sentinel locally; no request reaches this host.
                     if url.host_str() == Some("diagnostic-probe.invalid") {
                         let success = url.path() == "/success";
+                        if !success {
+                            eprintln!("PROBE_FAILURE: {}", url.query().unwrap_or_default());
+                        }
                         println!("GUI_DIAGNOSTICS: {}", if success { "PASS" } else { "FAIL" });
                         navigation_handle.exit(if success { 0 } else { 1 });
                         return false;
@@ -34,13 +42,7 @@ fn main() {
                     if payload.event() != tauri::webview::PageLoadEvent::Finished {
                         return;
                     }
-                    window
-                        .eval(if preview {
-                            include_str!("gui_preview.js")
-                        } else {
-                            include_str!("gui_diagnostics.js")
-                        })
-                        .expect("probe script");
+                    window.eval(script).expect("probe script");
                 })
                 .build()?;
             std::thread::spawn(move || {

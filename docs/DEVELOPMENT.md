@@ -136,3 +136,11 @@ env PATH=/usr/bin:/bin RESUME_STUDIO_PROBE=preview src-tauri/target/debug/exampl
 ```
 
 GUI_DIAGNOSTICS: PASSを確認済み。exampleは本番と同じcommands・PdfStore・capabilityを使用する。UI結合テストではPDF.js境界をmockし、入力→生成→結果読取、倍率・移動、失敗時のPDF保持を検証する。実描画は上のネイティブ検証で別途確認する。
+
+## 本文WYSIWYG編集
+
+T08の本文エディタはTiptap 3.31.4。doc・paragraph・text・hardBreak・bulletList・orderedList・listItem、bold・italicだけを有効にする。太字／斜体、2種類のリスト、本文Undo/Redoを提供する。DraftはrichBodyのJSONをRustへ渡し、段落・リスト・markをTeXへ変換する。対応外node/mark/属性、制御文字、要素数・深さ・全本文のサイズ超過は生成を拒否する。番号付きリストは開始番号を保持し、混在する箇条書きとは独立したカウンタを使う。正式SchemaとTS/Rust契約はT10、完全なvisitor仕様のテスト拡充はT16で行う。
+
+実TiptapでJSON取得→クリア→再投入を確認し、書式付き日本語fixtureの実PDF生成・文字抽出も確認した。RESUME_STUDIO_PROBE=editorのネイティブ検証はツールバー・JSON往復・合成compositionイベント・実PDF描画を確認する。合成compositionをOSの日本語IME検証の代わりにはしない。
+
+実IMEの受け入れ確認は、pnpm tauri devの本文欄で日本語IMEの変換・候補選択・Enterによる確定・続きの入力を行う。確定時の消失・二重入力・余計な改行がないことと、PDF更新で確定した日本語が表示されることを確認してT08を完了する。現在は実IME確認待ち。
