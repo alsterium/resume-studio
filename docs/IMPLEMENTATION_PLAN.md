@@ -15,9 +15,11 @@ M0 → M1で「入力→TeX→実PDF表示」を動かし、M2以降で書類の
 | T01 基盤構築 | Tauri 2＋React＋TypeScript＋ViteがmacOSで起動。最低OS、CPU、Node/pnpm/Rust版を記録 |
 | T02 開発コマンド | Oxlint、Oxfmt、tsc、rustfmt、Clippy、cargo checkをローカルで実行可能 |
 | T03 CI基盤 | GitHub ActionsでTS/Rustチェックと最小テストを実行。lockfile、toolchain、Actions版を固定 |
-| T04 テスト基盤 | Vitest/Testing Library、Rust結合テスト、架空fixture、型付きIPC adapterを準備 |
+| T04 テスト基盤 | Vitest/Testing Library、Rust結合テスト、架空fixture、型付きIPC adapterを準備。T02のローカル品質コマンドへ依存 |
 
 完了判定：空アプリが起動し、GitHubで必須チェックが成功する。検証なしに依存の最新版を羅列せず、互換性を確認した版を固定する。
+
+T03のworkflow実装とGitHubでの実行確認を区別する。remote未設定の間はT03を未完了として保持する。T04はT02のローカル品質コマンドだけで実装・検証できるため、依存をT02へ調整して進める。GitHub必須チェック成功のM0受け入れ条件は維持する。
 
 ## M1：最大リスクを解消する縦切り
 

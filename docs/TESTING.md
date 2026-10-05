@@ -43,6 +43,10 @@ PDFのバイナリsnapshotは使わない。生成日時・内部ID・TeX版で�
 
 ## 5. CIジョブ
 
+`.github/workflows/ci.yml`にfrontend-quality、rust-quality、required-checksを実装。前者はLinuxでTS品質ゲート・台帳ツールの最小結合テスト・Vite build、後者はmacOSでRust品質ゲート・cargo testを実行する。全依存ジョブがsuccessのときだけrequired-checksを成功にする。Actionsは公式リリースのcommit SHA、Node/pnpm/Rustはリポジトリの固定版を使用する。workflow構文はactionlint 1.7.12で検証する。
+
+GitHub remote未設定のため、ホスト上の実行は未確認。T03はその確認まで未完了。下表の実TeX・デスクトップジョブはT09・T25で拡充する。
+
 | ジョブ | runner | チェック内容 |
 | --- | --- | --- |
 | frontend-quality | Linux | 固定pnpm＋frozen lockfile、Oxlint、Oxfmt、tsc、UI結合・重要Unit、Vite build |
