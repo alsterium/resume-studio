@@ -1,21 +1,20 @@
 //! Native WebView smoke test of the bundled React UI and real TeX IPC.
 //! Run after `pnpm build`; this example is not shipped in the application.
-use resume_studio_lib::compiler::diagnostics::{diagnose, TexDiagnostics, TexRuntime};
+use resume_studio_lib::{commands, compiler::results::PdfStore};
 use tauri::{WebviewUrl, WebviewWindowBuilder};
 
-#[tauri::command]
-async fn diagnose_tex() -> Result<TexDiagnostics, String> {
-    tauri::async_runtime::spawn_blocking(|| diagnose(&TexRuntime::discover()))
-        .await
-        .map_err(|error| error.to_string())
-}
-
 fn main() {
+    let preview = std::env::var("RESUME_STUDIO_PROBE").as_deref() == Ok("preview");
     let mut context = tauri::generate_context!();
     context.config_mut().app.windows.clear();
     tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![diagnose_tex])
-        .setup(|app| {
+        .manage(PdfStore::default())
+        .invoke_handler(tauri::generate_handler![
+            commands::diagnose_tex,
+            commands::generate_draft,
+            commands::read_pdf
+        ])
+        .setup(move |app| {
             let handle = app.handle().clone();
             let navigation_handle = handle.clone();
             WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
@@ -31,12 +30,16 @@ fn main() {
                     }
                     true
                 })
-                .on_page_load(|window, payload| {
+                .on_page_load(move |window, payload| {
                     if payload.event() != tauri::webview::PageLoadEvent::Finished {
                         return;
                     }
                     window
-                        .eval(include_str!("gui_diagnostics.js"))
+                        .eval(if preview {
+                            include_str!("gui_preview.js")
+                        } else {
+                            include_str!("gui_diagnostics.js")
+                        })
                         .expect("probe script");
                 })
                 .build()?;

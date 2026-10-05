@@ -37,7 +37,11 @@ fn main_window_only_has_declared_application_permissions() {
     assert_eq!(capability["windows"], serde_json::json!(["main"]));
     assert_eq!(
         capability["permissions"],
-        serde_json::json!(["core:app:allow-version", "allow-diagnose-tex"])
+        serde_json::json!([
+            "core:app:allow-version",
+            "allow-diagnose-tex",
+            "allow-draft-preview"
+        ])
     );
     assert!(capability.get("remote").is_none());
 }

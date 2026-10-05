@@ -120,3 +120,19 @@ env PATH=/usr/bin:/bin src-tauri/target/debug/examples/gui_diagnostics
 ```
 
 実行結果はGUI_DIAGNOSTICS: PASS。通常のアプリと同じmain capabilityを使い、検証結果の通知用URLはnavigation callbackで捕捉して外部通信を防ぐ。画面の紙面・見た目の目視確認を代替するものではない。
+
+## 下書きPDFプレビュー
+
+T07では氏名・本文を入力し「PDF更新」でRustのgenerate_draftを実行する。Rustが最大4件の成功PDFをメモリに保持し、結果IDからread_pdfのバイナリIPCで取得する。任意パスの読取や任意TeX入力は公開しない。編集後はPDFに「更新前の内容」と表示し、再生成に失敗しても成功PDFを維持する。正式モデルとジョブのリビジョン照合は後続で拡張する。
+
+PDF.js 6.4.299とworkerをViteで同梱する。外部CDNを利用せず、Uint8Arrayを渡して描画する。倍率50〜200%、前／次のページに対応。CSPは同梱workerとPDF内フォント用のblob/dataのみ追加する。Wasm画像デコードは現時点で無効にし、写真実装時に検証する。
+
+以下は実macOS WebViewで180行の架空日本語を入力→実TeX→複数ページPDF描画→150%拡大→2ページ目描画を確認する。canvasの描画ピクセルも検査する。
+
+```sh
+pnpm build
+cargo build --manifest-path src-tauri/Cargo.toml --locked --example gui_diagnostics --features tauri/custom-protocol
+env PATH=/usr/bin:/bin RESUME_STUDIO_PROBE=preview src-tauri/target/debug/examples/gui_diagnostics
+```
+
+GUI_DIAGNOSTICS: PASSを確認済み。exampleは本番と同じcommands・PdfStore・capabilityを使用する。UI結合テストではPDF.js境界をmockし、入力→生成→結果読取、倍率・移動、失敗時のPDF保持を検証する。実描画は上のネイティブ検証で別途確認する。

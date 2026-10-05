@@ -11,9 +11,13 @@ export interface TexDiagnostics {
 export interface AppClient {
   getAppVersion(): Promise<string>;
   diagnoseTex(): Promise<TexDiagnostics>;
+  generateDraft(draft: { name: string; body: string }): Promise<{ resultId: string }>;
+  readPdf(resultId: string): Promise<Uint8Array>;
 }
 
 export const tauriClient: AppClient = {
   getAppVersion: getVersion,
   diagnoseTex: () => invoke<TexDiagnostics>("diagnose_tex"),
+  generateDraft: (draft) => invoke("generate_draft", { draft }),
+  readPdf: async (resultId) => new Uint8Array(await invoke<ArrayBuffer>("read_pdf", { resultId })),
 };

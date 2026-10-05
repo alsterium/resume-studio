@@ -60,7 +60,60 @@ button:focus-visible {
   border: 1px solid #dce5dc;
   border-radius: 12px;
   padding: 32px;
-  min-height: 220px;
+}
+.draft-workspace {
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) minmax(300px, 1.4fr);
+  gap: 24px;
+  margin: 24px 0;
+}
+.draft-editor label {
+  display: grid;
+  gap: 8px;
+  margin: 16px 0;
+}
+input,
+textarea,
+select {
+  font: inherit;
+  padding: 10px;
+  border: 1px solid #bdcdc2;
+  border-radius: 6px;
+}
+textarea {
+  resize: vertical;
+}
+button:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+.preview-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.preview-controls button {
+  padding: 8px;
+}
+.pdf-preview {
+  min-width: 0;
+}
+.pdf-paper {
+  overflow: auto;
+  max-height: 720px;
+  background: #e5e9e4;
+  margin-top: 12px;
+  padding: 12px;
+}
+.pdf-paper canvas {
+  display: block;
+  background: white;
+}
+@media (max-width: 850px) {
+  .draft-workspace {
+    grid-template-columns: 1fr;
+  }
 }
 @media (max-width: 600px) {
   .workspace {

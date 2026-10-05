@@ -1,0 +1,4 @@
+[[permission]]
+identifier = "allow-draft-preview"
+description = "検証済みの氏名・本文から生成し、管理されたPDF結果を読み取る"
+commands.allow = ["generate_draft", "read_pdf"]
