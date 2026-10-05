@@ -4,6 +4,8 @@
 
 現段階の成果物は設計ドキュメント。アプリケーション、TeXテンプレート、CIは未実装。
 
+開発は [開発規約](docs/DEVELOPMENT.md) に沿って進め、[JSONL台帳](tasks/tasks.jsonl) でタスクを管理する。[HTMLダッシュボード](tools/dashboard/index.html) で進捗を閲覧できる。起動手順は開発規約を参照。
+
 ## ドキュメント
 
 1. [PRD](docs/PRD.md)：目的、MVP、受け入れ条件
