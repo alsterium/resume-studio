@@ -60,6 +60,14 @@ try {
     capabilities: { browserName: "wry" },
   });
   await browser.$(".draft-editor input").waitForExist({ timeout: 30000 });
+  await browser.execute(() => {
+    window.__e2eConsoleFailures = [];
+    const original = console.error.bind(console);
+    console.error = (...args) => {
+      window.__e2eConsoleFailures.push(args.map(String).join(" ").slice(0, 2000));
+      original(...args);
+    };
+  });
   await browser.$(".draft-editor input").setValue("架空 山田");
   await browser.$('[aria-label="本文"]').click();
   await browser.$('[aria-label="本文"]').addValue("架空の職務内容 & % _ # $ { } ~ ^ \\ 日本語");
@@ -69,10 +77,12 @@ try {
   const renderDeadline = Date.now() + 90000;
   for (;;) {
     const state = await browser.execute(() => ({
-      error: document.querySelector('[role="alert"]')?.textContent,
+      failure: document.querySelector('[role="alert"]')?.textContent,
+      diagnostics: window.__e2eConsoleFailures,
       ready: document.querySelector("canvas")?.dataset.renderedPage === "1",
     }));
-    if (state.error) throw new Error(state.error.slice(0, 2000));
+    if (state.failure)
+      throw new Error(`${state.failure.slice(0, 2000)}\n${state.diagnostics.slice(-4).join("\n")}`);
     if (state.ready) break;
     if (Date.now() >= renderDeadline) throw new Error("Real TeX PDF did not render");
     await delay(200);
@@ -92,9 +102,9 @@ try {
     window.__TAURI_INTERNALS__
       .invoke("read_pdf", { resultId: "1" })
       .then((buffer) => done({ bytes: Array.from(new Uint8Array(buffer)) }))
-      .catch((error) => done({ error: String(error) }));
+      .catch((error) => done({ failure: String(error) }));
   });
-  assert.equal(pdfBytes.error, undefined);
+  assert.equal(pdfBytes.failure, undefined);
   const { getDocument } = await import("pdfjs-dist/legacy/build/pdf.mjs");
   const pdfTask = getDocument({ data: new Uint8Array(pdfBytes.bytes), useWasm: false });
   try {

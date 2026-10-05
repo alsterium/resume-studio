@@ -19,8 +19,11 @@ export function PdfPreview({ bytes }: { bytes: Uint8Array }) {
         const pdf = await task.promise;
         if (active) setDocument(pdf);
       })
-      .catch(() => {
-        if (active) setError("PDFを読み込めませんでした。もう一度生成してください。");
+      .catch((failure: unknown) => {
+        if (active) {
+          console.error("PDF load failed", failure);
+          setError("PDFを読み込めませんでした。もう一度生成してください。");
+        }
       });
     return () => {
       active = false;
@@ -44,8 +47,11 @@ export function PdfPreview({ bytes }: { bytes: Uint8Array }) {
         await task.promise;
         if (active) setRendered({ page, scale });
       })
-      .catch(() => {
-        if (active) setError("PDFのページを表示できませんでした。");
+      .catch((failure: unknown) => {
+        if (active) {
+          console.error("PDF page render failed", failure);
+          setError("PDFのページを表示できませんでした。");
+        }
       });
     return () => {
       active = false;
