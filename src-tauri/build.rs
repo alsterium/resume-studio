@@ -6,6 +6,7 @@ fn main() {
             "read_pdf",
             "open_project",
             "save_project",
+            "import_photo",
             "request_app_close",
             "finish_app_close",
         ]),

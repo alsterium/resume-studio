@@ -42,6 +42,7 @@ fn main_window_only_has_declared_application_permissions() {
             "allow-diagnose-tex",
             "allow-draft-preview",
             "allow-project-files",
+            "allow-project-photo",
             "allow-project-close",
             "core:event:allow-listen",
             "core:event:allow-unlisten"

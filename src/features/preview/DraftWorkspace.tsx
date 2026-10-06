@@ -3,7 +3,7 @@ import type { AppClient, SavedProject } from "../../infrastructure/app-client";
 import { PdfPreview } from "./PdfPreview";
 import { BodyEditor } from "../../editor/BodyEditor";
 import type { JSONContent } from "@tiptap/core";
-import { newProject } from "../../domain/new-project";
+import { createId, newProject } from "../../domain/new-project";
 import type { BodyDoc } from "../../domain/project";
 import { beginSession, editSession, hasUnsavedChanges, recordSaved } from "../../domain/session";
 import { DiscardDialog } from "../files/DiscardDialog";
@@ -24,6 +24,7 @@ export function DraftWorkspace({ client }: { client: AppClient }) {
   const [fileMessage, setFileMessage] = useState<string | null>(null);
   const name = project.profile.name;
   const body = project.career.summary;
+  const photo = project.assets.find((asset) => asset.id === project.profile.photoAssetId);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pdf, setPdf] = useState<{
@@ -97,6 +98,51 @@ export function DraftWorkspace({ client }: { client: AppClient }) {
       setFileBusy(false);
     }
     return false;
+  }
+
+  async function importPhoto() {
+    if (!photo && project.assets.length >= 4) {
+      setError("写真は4枚以内にしてください。不要な写真を削除してから取り込んでください。");
+      return;
+    }
+    setFileBusy(true);
+    setError(null);
+    try {
+      const imported = await client.importPhoto();
+      if (imported) {
+        const id = createId("photo");
+        setSession((current) =>
+          editSession(current, {
+            ...current.project,
+            profile: { ...current.project.profile, photoAssetId: id },
+            assets: [
+              ...current.project.assets.filter(
+                (asset) => asset.id !== current.project.profile.photoAssetId,
+              ),
+              { id, mediaType: imported.mediaType, base64: imported.base64 },
+            ],
+          }),
+        );
+        setFileMessage("写真を取り込みました。");
+      }
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : String(failure));
+    } finally {
+      setFileBusy(false);
+    }
+  }
+
+  function removePhoto() {
+    setSession((current) =>
+      editSession(current, {
+        ...current.project,
+        profile: { ...current.project.profile, photoAssetId: null },
+        assets: current.project.assets.filter(
+          (asset) => asset.id !== current.project.profile.photoAssetId,
+        ),
+      }),
+    );
+    setFileMessage(null);
   }
 
   function resetProject() {
@@ -219,6 +265,60 @@ export function DraftWorkspace({ client }: { client: AppClient }) {
             }}
           />
         </label>
+        <div aria-label="証明写真">
+          {project.assets.length > 0 && (
+            <label>
+              保存済み写真
+              <select
+                disabled={fileBusy || pending !== null}
+                value={project.profile.photoAssetId ?? ""}
+                onChange={(event) => {
+                  const photoAssetId = event.target.value || null;
+                  setSession((current) =>
+                    editSession(current, {
+                      ...current.project,
+                      profile: { ...current.project.profile, photoAssetId },
+                    }),
+                  );
+                  setFileMessage(null);
+                }}
+              >
+                <option value="">写真なし</option>
+                {project.assets.map((asset, index) => (
+                  <option key={asset.id} value={asset.id}>
+                    写真 {index + 1}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          {photo ? (
+            <img
+              src={`data:${photo.mediaType};base64,${photo.base64}`}
+              alt="取り込んだ証明写真"
+              width={90}
+              height={120}
+              style={{ objectFit: "contain" }}
+            />
+          ) : (
+            <p>写真なし</p>
+          )}
+          <button
+            type="button"
+            disabled={fileBusy || pending !== null}
+            onClick={() => void importPhoto()}
+          >
+            写真を取り込む
+          </button>
+          <button
+            type="button"
+            disabled={!photo || fileBusy || pending !== null}
+            onClick={removePhoto}
+          >
+            写真を削除
+          </button>
+          <p>JPEG／PNG、5MiB以内。縦横比を保ち最大600×800pxへ調整します。</p>
+        </div>
         <p>本文</p>
         <BodyEditor
           key={editorKey}

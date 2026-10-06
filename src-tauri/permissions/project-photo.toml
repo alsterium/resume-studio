@@ -1,0 +1,4 @@
+[[permission]]
+identifier = "allow-project-photo"
+description = "選択したJPEG/PNG写真の検証・正規化・埋込データ取得を許可する"
+commands.allow = ["import_photo"]

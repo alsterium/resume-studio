@@ -172,3 +172,11 @@ T12は編集revisionと保存成功revisionを分離する。UI結合では保�
 native closeは[WindowEvent::CloseRequested](https://docs.rs/tauri/latest/tauri/enum.WindowEvent.html)、quitは[RunEvent::ExitRequested](https://docs.rs/tauri/latest/tauri/enum.RunEvent.html)をRustで阻止する。WebViewはイベントのlisten/unlistenと用途別request_app_close/finish_app_closeだけを使用する。汎用window destroyやprocess exit IPCを許可しない。
 
 desktop-e2eは実IPCでwindow.closeを要求して確認画面のキャンセル・入力保持を検証し、終了ボタンからapp.exitの阻止と確認画面を検証する。最後に保存して続行で実JSONの更新と所有アプリの終了コード0を確認する。ここはnativeイベントとRust処理を代替しない。UI結合のdialog.showModal/closeはjsdomにないため最小adapterで代替し、実WebViewのmodal表示はE2Eで確認する。OSのタイトルバー・Cmd+QとIME操作の組合せは最終手動受け入れで補完する。
+
+## 写真の取り込みと資源展開
+
+T13はimage 0.25.10（default featureなし、JPEG/PNGのみ）とbase64 0.22.1を固定する。[ImageReader](https://docs.rs/image/0.25.10/image/struct.ImageReader.html)のlimitsと[ImageDecoder](https://docs.rs/image/0.25.10/image/trait.ImageDecoder.html)の寸法・出力容量・orientationを使用する。画像をデコードして向きを適用し、縮小後の画素だけを再エンコードする。[写真の契約](PROJECT_JSON.md#写真)を参照する。
+
+Rust photos結合テストは実PNG/JPEGの取り込み、透過、90度Exif回転と再取り込み時の二重回転防止、縮小、原本保持、JSON移動と元画像削除後の復元、固定名資源展開、既存資源保持を検証する。破損・不正形式・MIME不一致・base64不正・5MiB超・1辺8192px超・1600万画素超を拒否する。全項目fixtureの古い1px PNGは実体検証で破損が判明したため、Nodeで生成した正常な3×4px架空パターンへ置き換えた。
+
+UI結合は実TiptapとIPC adapterを通し、取り込み・置換・選択・削除・写真付きJSON保存・読み込み・キャンセル・失敗時保持を確認する。desktop-e2eの写真pickerだけはRESUME_STUDIO_E2E_PHOTOの一時パスへ代替する。実IPCで写真を取り込み、画像のnaturalWidth/Heightと描画完了を確認する。実JSON保存→正常終了→JSONだけ移動／元画像削除→別プロセスで再起動→写真／本文を復元→実TeX／PDF→保存後正常終了まで通す。写真のPDF配置と画像を含むPDF.js描画はT18・T20で検証する。native picker自体の実操作は最終手動受け入れに含める。

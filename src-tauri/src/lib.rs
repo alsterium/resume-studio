@@ -16,6 +16,7 @@ pub fn run() {
             commands::read_pdf,
             commands::files::open_project,
             commands::files::save_project,
+            commands::photos::import_photo,
             commands::close::request_app_close,
             commands::close::finish_app_close
         ])

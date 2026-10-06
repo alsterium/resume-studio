@@ -13,6 +13,13 @@ export interface OpenedProject extends SavedProject {
   project: Project;
 }
 
+export interface ImportedPhoto {
+  mediaType: "image/jpeg" | "image/png";
+  base64: string;
+  width: number;
+  height: number;
+}
+
 export interface TexDiagnostics {
   tools: { name: string; path: string | null; version: string | null }[];
   missingDependencies: string[];
@@ -21,6 +28,7 @@ export interface TexDiagnostics {
 }
 
 export interface AppClient {
+  importPhoto(): Promise<ImportedPhoto | null>;
   onCloseRequested(handler: () => void): Promise<() => void>;
   requestClose(): Promise<void>;
   finishClose(): Promise<void>;
@@ -41,6 +49,7 @@ export interface AppClient {
 }
 
 export const tauriClient: AppClient = {
+  importPhoto: () => invoke("import_photo"),
   onCloseRequested: (handler) => listen("resume-studio:request-close", handler),
   requestClose: () => invoke("request_app_close", { quit: true }),
   finishClose: () => invoke("finish_app_close"),

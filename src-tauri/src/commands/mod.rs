@@ -1,6 +1,7 @@
 use crate::compiler::diagnostics::{diagnose, TexDiagnostics, TexRuntime};
 pub mod close;
 pub mod files;
+pub mod photos;
 use crate::{
     compiler::{compile::compile, results::PdfStore},
     generator::{generate, Draft},

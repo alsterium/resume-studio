@@ -8,6 +8,7 @@ use std::{
     path::Path,
 };
 use tempfile::NamedTempFile;
+pub mod photos;
 
 /// Boundary for injecting a replacement failure after a real temporary write.
 pub trait CommitFile {

@@ -127,6 +127,7 @@ fn validate_semantics(project: &Project) -> Result<(), String> {
         if asset.base64.len() / 4 * 3 - padding > MAX_IMAGE_BYTES {
             return Err("写真は1枚5MiB以内にしてください。".into());
         }
+        crate::storage::photos::validate_asset(asset)?;
     }
     if let Some(id) = &project.profile.photo_asset_id {
         if !project.assets.iter().any(|asset| &asset.id == id) {

@@ -25,7 +25,15 @@ schemaVersionは1のみ。未知の項目・node・mark・属性も拒否し、�
 | 写真 | JPEG/PNG、4枚まで、base64デコード後1枚5MiB |
 | 案件URL | http/https、ホスト必須、2,048文字。空文字・省略可 |
 
-photoAssetIdがnullでなければassets内のIDを参照する。写真実体のMIME・画像寸法・向きの検証と取り込みはT13で追加する。v1の容量検証だけで画像としての妥当性を保証しない。
+photoAssetIdがnullでなければassets内のIDを参照する。Rustはbase64を厳密にデコードし、実体が指定MIMEのJPEG/PNGであることと画像を最後までデコードできることを検証する。1辺8192px、1600万画素、デコード出力128MiBを上限とし、decoderにも寸法・allocation limitを設定する。フロントは構造・容量を検証し、画像実体の最終検証はRustが行う。
+
+## 写真
+
+「写真を取り込む」でnative pickerを開く。原本は5MiB以内のJPEG/PNG。画像の向きをメタデータから適用し、縦横比を維持して最大600×800pxへ縮小する。小さい写真を拡大しない。画素から再エンコードし、元のExif等のメタデータを保存しない。JPEGは品質90、PNGは8bit RGBAとして透過を維持する。取り込み元へ書き込まない。
+
+正規化した画像はbase64としてJSONへ埋め込む。現在の写真の置換は古い参照資源を除去し、新しいIDへ切り替える。「写真を削除」は選択写真と埋込を除去する。「保存済み写真」ではJSONに含まれる最大4枚から表示写真を選べる。取り込みのキャンセル・失敗では現在の写真と入力を保持する。写真の変更も未保存revisionを増やす。画面は縦横比を保って30×40mm相当の枠へ表示する。
+
+生成用の資源準備は画像を再検証・正規化し、photo-1.png/jpg〜photo-4.png/jpgの固定名へ対応付ける。asset IDや入力ファイル名を出力パスへ使わない。資源の展開は新しい生成ディレクトリでcreate_newを使い、既存ファイルを上書きしない。T13は資源準備・実FS展開を実装し、正式GeneratedBundleへの接続はT17、履歴書PDFでの配置はT18で行う。下書きPDFには写真を配置しない。
 
 フロントはAjv 8.20.0でSchemaをNode側で事前コンパイルする。`pnpm generate:schemas`の生成先は.gitignore対象の.generated。build・typecheck・test:integration・test:unitで自動実行し、生成物を手編集しない。ブラウザ内でevalやFunctionを使わない。Rustはjsonschema 0.58.5（外部HTTP・ファイル参照featureなし）で同梱Schemaを検証後、serde型へ変換し、日付・期間・ID参照・本文容量を検証する。
 
