@@ -87,6 +87,7 @@ T01の検証ではフロントビルド、Cargoチェック、開発起動と実
 | `pnpm rust:lint` | Clippy、全target、警告も失敗（locked） |
 | `pnpm test:tasks` | JSONL・ダッシュボード・localhost HTTPの6テスト |
 | `pnpm test:integration` | Vitest＋Testing Library、UIとTauri adapterの結合テスト |
+| `pnpm test:unit` | Vitest、日付・年齢等の重要な純粋ロジック |
 | `pnpm rust:test` | cargo test、実設定ファイルの結合テスト |
 
 フロントLint対象は`src`・`tests`とVite/Vitest設定。Oxfmt対象は同じアプリ・テストソースとHTML・TS・npm・Tauri・Oxc設定。既存の設計文書、JSONL台帳、独立したダッシュボードは一括整形対象に含めない。ダッシュボードは`test:tasks`で検証する。

@@ -88,7 +88,7 @@ JSONは唯一の編集データ。生成TeX、PDF、絶対パス、コンパイ�
 ```
 
 - 学歴・職歴は`id`、`yearMonth`、`text`を持つ順序付き配列。資格も同じ形式。
-- `profile`には`addressKana`、任意の`genderLabel`、任意の`alternateContact`を追加する。別連絡先は郵便番号・住所・ふりがな・電話・メール。年齢は書類日付と生年月日から算出し、保存しない。
+- `profile`には`addressKana`、任意の`genderLabel`、任意の`alternateContact`を追加する。別連絡先は郵便番号・住所・ふりがな・電話・メール。年齢は書類日付と生年月日から算出し、保存しない。日付はタイムゾーン・システム時計を使わずグレゴリオ暦の実在日（0001〜9999年）を検証する。誕生日当日から年齢を増やし、2月29日生まれの平年の境界は3月1日とする。空・不正・書類日付より未来の生年月日は年齢を表示しない。
 - `career.positions`は会社単位。`id/companyName/startYearMonth/endYearMonth/role/companyOverview/projects`を持ち、終了年月nullは在籍中。会社概要は事業内容・資本金表示・従業員数表示などの任意項目。
 - `projects`は順序付き案件配列。`id/name/startYearMonth/endYearMonth/overview/phases/responsibilities/achievements/teamSize/languages/technologies/url`。概要・業務・実績は本文AST、フェーズ・言語・技術は文字列配列、規模は表示用文字列、URLは任意のhttp/https文字列。終了年月nullは進行中。
 - スキルは`id/name/experienceLabel/description`。資格は`resume.qualifications`を職務経歴書からも参照する。実装時の正式Schemaにこれらを含め、上の例は追加任意項目を省略した最小サンプルとして扱う。

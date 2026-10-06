@@ -1,0 +1,32 @@
+{
+  "valid": ["0001-01-01", "2000-02-29", "2024-02-29", "2026-10-06", "9999-12-31"],
+  "invalid": [
+    "",
+    "2026-2-01",
+    "2026-02-29",
+    "1900-02-29",
+    "0000-01-01",
+    "2026-00-01",
+    "2026-13-01",
+    "2026-01-00",
+    "2026-04-31",
+    "2026-10-06T00:00:00Z",
+    "２０２６-１０-０６",
+    "2026-10-06\n"
+  ],
+  "validYearMonth": ["0001-01", "2026-10", "9999-12"],
+  "invalidYearMonth": ["0000-01", "2026-00", "2026-13", "2026-1", "2026-10-01"],
+  "ages": [
+    { "birthDate": "1990-10-06", "documentDate": "2026-10-05", "expected": 35 },
+    { "birthDate": "1990-10-06", "documentDate": "2026-10-06", "expected": 36 },
+    { "birthDate": "1990-10-06", "documentDate": "2026-10-07", "expected": 36 },
+    { "birthDate": "2000-02-29", "documentDate": "2026-02-28", "expected": 25 },
+    { "birthDate": "2000-02-29", "documentDate": "2026-03-01", "expected": 26 },
+    { "birthDate": "2000-02-29", "documentDate": "2024-02-29", "expected": 24 },
+    { "birthDate": "2026-10-06", "documentDate": "2026-10-06", "expected": 0 },
+    { "birthDate": "2026-10-07", "documentDate": "2026-10-06", "expected": null },
+    { "birthDate": "2026-02-29", "documentDate": "2026-10-06", "expected": null },
+    { "birthDate": "", "documentDate": "2026-10-06", "expected": null },
+    { "birthDate": "1990-10-06", "documentDate": "broken", "expected": null }
+  ]
+}

@@ -17,12 +17,13 @@
     "rust:check": "cargo check --manifest-path src-tauri/Cargo.toml --locked --all-targets",
     "rust:lint": "cargo clippy --manifest-path src-tauri/Cargo.toml --locked --all-targets -- -D warnings",
     "test:tasks": "node --test tools/tests/*.test.mjs",
-    "check": "pnpm lint && pnpm format:check && pnpm typecheck && pnpm rust:format:check && pnpm rust:check && pnpm rust:lint && pnpm test:tasks && pnpm test:integration && pnpm rust:test",
-    "test:integration": "vitest run",
+    "check": "pnpm lint && pnpm format:check && pnpm typecheck && pnpm rust:format:check && pnpm rust:check && pnpm rust:lint && pnpm test:tasks && pnpm test:integration && pnpm test:unit && pnpm rust:test",
+    "test:integration": "vitest run tests/integration",
     "rust:test": "cargo test --manifest-path src-tauri/Cargo.toml --locked",
     "test:tex": "cargo test --manifest-path src-tauri/Cargo.toml --locked --features real-tex --test real_tex",
     "build:e2e": "tauri build --debug --features desktop-e2e",
-    "test:e2e": "node tools/desktop-e2e.mjs"
+    "test:e2e": "node tools/desktop-e2e.mjs",
+    "test:unit": "vitest run tests/unit"
   },
   "dependencies": {
     "@tauri-apps/api": "2.12.1",

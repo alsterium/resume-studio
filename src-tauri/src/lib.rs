@@ -16,4 +16,5 @@ pub fn run() {
 }
 pub mod commands;
 pub mod compiler;
+pub mod domain;
 pub mod generator;

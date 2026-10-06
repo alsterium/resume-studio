@@ -35,6 +35,7 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test:tasks
       - run: pnpm test:integration
+      - run: pnpm test:unit
       - run: pnpm build
 
   rust-quality:
