@@ -33,6 +33,8 @@ T03は[GitHub Actions実行37335662197](https://github.com/alsterium/resume-stud
 
 完了判定：編集した架空の日本語氏名・本文がPDFに表示される。開発起動とbundle起動の両方で確認する。採用ライブラリとTeX依存をADRに記録する。
 
+T09は[実行37391539408](https://github.com/alsterium/resume-studio/actions/runs/37391539408)でmacOSの実WebView・実TeX・PDF文字抽出と描画・拡大、本番依存からのテストサーバー除外を確認した。T08の実IMEユーザー確認と合わせてM1を完了した。
+
 ## M2：JSON契約と永続化
 
 | タスク | 成果物・完了条件 |

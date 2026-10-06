@@ -1,6 +1,6 @@
 # ADR 0004: macOSデスクトップE2E
 
-状態: 採用（2026-10-06、ホストCIの実行確認中）
+状態: 採用（2026-10-06、[ホストCI全必須チェック成功](https://github.com/alsterium/resume-studio/actions/runs/37391539408)）
 
 [Tauri公式資料](https://v2.tauri.app/develop/tests/webdriver/)のembedded方式を採用する。WebdriverIO 9.30.1のstandalone clientがtauri-plugin-wdio-webdriver 1.4.0のW3C serverへ接続する。単一の既知バイナリをテストするため、CLI/serviceの自動検出や追加のexecute/mockプラグインは不要。Node.jsのtools/desktop-e2e.mjsが空きポートの選択、子プロセスの起動、期限付きready待機、セッション削除、子プロセスの終了を担う。
 
