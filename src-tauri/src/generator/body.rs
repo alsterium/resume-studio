@@ -1,4 +1,4 @@
-use super::escape_text;
+use super::{breakable_text, has_long_ascii_run};
 use serde::{Deserialize, Serialize};
 
 pub const MAX_RENDERED_BODY_BYTES: usize = 2 * 1024 * 1024;
@@ -63,6 +63,22 @@ mod tests {
         ] {
             assert_eq!(render(json!({"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"日本語","marks":marks}]}]})).unwrap(), format!("\\leavevmode{{}}{expected}\\par\n"));
         }
+    }
+
+    #[test]
+    fn long_ascii_runs_across_marks_wrap_without_losing_marks_or_text() {
+        let tex = render(
+            json!({"type":"doc","content":[{"type":"paragraph","content":[
+                {"type":"text","text":"WWWWWW","marks":[{"type":"bold"}]},
+                {"type":"text","text":"WWWWWW","marks":[{"type":"italic"}]}
+            ]}]}),
+        )
+        .unwrap();
+        assert_eq!(tex.matches("\\allowbreak{}").count(), 12);
+        assert_eq!(
+            tex.replace("\\allowbreak{}", "").replace("%\n", ""),
+            "\\leavevmode{}\\textbf{WWWWWW}\\textit{WWWWWW}\\par\n"
+        );
     }
 
     #[test]
@@ -216,6 +232,7 @@ pub fn render_body(root: &BodyNode) -> Result<String, String> {
         lists: usize,
         enumerations: usize,
         budget: &mut (usize, usize),
+        ascii_breaks: bool,
     ) -> Result<String, String> {
         let invalid = || "本文の構造または書式が対応範囲外です。".to_string();
         if depth > 16 || budget.0 == 0 {
@@ -254,7 +271,7 @@ pub fn render_body(root: &BodyNode) -> Result<String, String> {
                 return Err(invalid());
             }
             budget.1 -= text.len();
-            let mut rendered = escape_text(text);
+            let mut rendered = breakable_text(text, ascii_breaks);
             let mut seen = Vec::new();
             for mark in &node.marks {
                 if seen.contains(&mark.kind.as_str()) {
@@ -284,18 +301,33 @@ pub fn render_body(root: &BodyNode) -> Result<String, String> {
         {
             return Err(invalid());
         }
+        // Marks can split a single long word into many adjacent text nodes.
+        // Detect runs across the paragraph, then retain each node's marks.
+        let ascii_breaks = node.kind == "paragraph"
+            && has_long_ascii_run(
+                &node
+                    .content
+                    .iter()
+                    .map(|child| child.text.as_deref().unwrap_or("\n"))
+                    .collect::<String>(),
+            );
         let children = node
             .content
             .iter()
-            .map(|child| {
-                visit(
+            .map(|child| -> Result<String, String> {
+                let mut rendered = visit(
                     child,
                     &node.kind,
                     depth + 1,
                     lists + usize::from(list),
                     enumerations + usize::from(node.kind == "orderedList"),
                     budget,
-                )
+                    ascii_breaks,
+                )?;
+                if ascii_breaks && child.kind == "text" {
+                    rendered.push_str("%\n");
+                }
+                Ok(rendered)
             })
             .collect::<Result<Vec<_>, _>>()?
             .join("");
@@ -312,7 +344,7 @@ pub fn render_body(root: &BodyNode) -> Result<String, String> {
             _ => Err(invalid()),
         }
     }
-    let rendered = visit(root, "", 0, 0, 0, &mut (10000, 65536))?;
+    let rendered = visit(root, "", 0, 0, 0, &mut (10000, 65536), false)?;
     if rendered.len() > MAX_RENDERED_BODY_BYTES {
         return Err("変換後の本文がサイズ上限を超えています。".into());
     }

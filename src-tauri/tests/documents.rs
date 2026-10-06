@@ -13,6 +13,7 @@ fn formal_documents_preserve_fields_and_export_owned_resources() {
     let project = parse_project(include_bytes!("../../tests/fixtures/project-full.json")).unwrap();
     for kind in [DocumentKind::Resume, DocumentKind::Career] {
         let bundle = generate_project(&project, kind).unwrap();
+        let displayed = bundle.content_tex.replace("\\allowbreak{}", "");
         let repeated = generate_project(&project, kind).unwrap();
         assert_eq!(bundle.content_tex, repeated.content_tex);
         assert_eq!(bundle.main_tex, repeated.main_tex);
@@ -45,7 +46,7 @@ fn formal_documents_preserve_fields_and_export_owned_resources() {
                     &project.profile.phone,
                     &project.profile.email,
                 ] {
-                    assert!(bundle.content_tex.contains(value), "missing {value}");
+                    assert!(displayed.contains(value), "missing {value}");
                 }
                 assert!(bundle
                     .content_tex
@@ -69,7 +70,7 @@ fn formal_documents_preserve_fields_and_export_owned_resources() {
                     "架空の実務経験",
                     "在籍中",
                 ] {
-                    assert!(bundle.content_tex.contains(value), "missing {value}");
+                    assert!(displayed.contains(value), "missing {value}");
                 }
                 assert!(bundle
                     .content_tex
@@ -132,7 +133,15 @@ fn every_body_and_optional_field_is_escaped_once_and_order_is_preserved() {
     let project = parse_project(&serde_json::to_vec(&value).unwrap()).unwrap();
     let escaped = resume_studio_lib::generator::escape_text(special);
     let resume = generate_project(&project, DocumentKind::Resume).unwrap();
-    assert_eq!(resume.content_tex.matches(&escaped).count(), 3);
+    assert_eq!(
+        resume
+            .content_tex
+            .replace("\\allowbreak{}", "")
+            .replace("%\n", "")
+            .matches(&escaped)
+            .count(),
+        3
+    );
     assert!(
         resume.content_tex.find("架空大学 卒業").unwrap()
             < resume.content_tex.find("順序二番目").unwrap()
@@ -141,7 +150,15 @@ fn every_body_and_optional_field_is_escaped_once_and_order_is_preserved() {
     assert!(resume.content_tex.contains("任意"));
     assert!(resume.content_tex.contains("架空の連絡先"));
     let career = generate_project(&project, DocumentKind::Career).unwrap();
-    assert_eq!(career.content_tex.matches(&escaped).count(), 6);
+    assert_eq!(
+        career
+            .content_tex
+            .replace("\\allowbreak{}", "")
+            .replace("%\n", "")
+            .matches(&escaped)
+            .count(),
+        6
+    );
     for label in ["プロジェクト概要", "業務内容", "実績・取り組み", "自己PR"] {
         assert!(career.content_tex.contains(label));
     }

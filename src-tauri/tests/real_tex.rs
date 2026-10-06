@@ -283,7 +283,9 @@ let pages = (0..<document.pageCount).map { index -> [String: Any] in
     let page = document.page(at: index)!
     let size = page.bounds(for: .mediaBox).size
     let urls = page.annotations.compactMap { ($0.action as? PDFActionURL)?.url?.absoluteString }
-    return ["text": page.string ?? "", "width": size.width, "height": size.height, "urls": urls]
+    let left = page.selection(for: CGRect(x: 0, y: 0, width: size.width / 2, height: size.height))?.string ?? ""
+    let right = page.selection(for: CGRect(x: size.width / 2, y: 0, width: size.width / 2, height: size.height))?.string ?? ""
+    return ["text": page.string ?? "", "leftText": left, "rightText": right, "width": size.width, "height": size.height, "urls": urls]
 }
 print(String(data: try! JSONSerialization.data(withJSONObject: pages), encoding: .utf8)!)
 "#,
@@ -305,6 +307,425 @@ fn assert_a4(pages: &[serde_json::Value]) {
         assert!((page["width"].as_f64().unwrap() - 595.276).abs() < 0.1);
         assert!((page["height"].as_f64().unwrap() - 841.89).abs() < 0.1);
     }
+}
+
+#[test]
+#[cfg(target_os = "macos")]
+fn maximum_fixed_fields_wrap_and_resume_moves_oversized_contacts_to_continuations() {
+    use resume_studio_lib::{
+        domain::validation::parse_project,
+        generator::{documents::generate_project, templates::DocumentKind},
+    };
+    let mut value: serde_json::Value =
+        serde_json::from_str(include_str!("../../tests/fixtures/project-full.json")).unwrap();
+    let maximum = |marker: &str| {
+        format!(
+            "{marker}{}END{marker}",
+            "W".repeat(1024 - marker.len() * 2 - 3)
+        )
+    };
+    let mut resume_fields = Vec::new();
+    for (i, key) in [
+        "name",
+        "nameKana",
+        "postalCode",
+        "address",
+        "addressKana",
+        "phone",
+        "email",
+        "genderLabel",
+    ]
+    .iter()
+    .enumerate()
+    {
+        let text = maximum(&format!("PROFILE{i}"));
+        value["profile"][key] = serde_json::json!(text);
+        resume_fields.push(text);
+    }
+    for (i, key) in ["postalCode", "address", "addressKana", "phone", "email"]
+        .iter()
+        .enumerate()
+    {
+        let text = maximum(&format!("CONTACT{i}"));
+        value["profile"]["alternateContact"][key] = serde_json::json!(text);
+        resume_fields.push(text);
+    }
+    for (i, key) in ["education", "employment", "qualifications"]
+        .iter()
+        .enumerate()
+    {
+        let text = maximum(&format!("HISTORY{i}"));
+        value["resume"][key][0]["text"] = serde_json::json!(text);
+        resume_fields.push(text);
+    }
+    let mut career_fields = vec![
+        resume_fields[0].clone(),
+        resume_fields.last().unwrap().clone(),
+    ];
+    for (i, key) in ["name", "experienceLabel", "description"]
+        .iter()
+        .enumerate()
+    {
+        let text = maximum(&format!("SKILL{i}"));
+        value["career"]["skills"][0][key] = serde_json::json!(text);
+        career_fields.push(text);
+    }
+    // A long Japanese company name makes the gray heading tall as well.
+    let company = format!("{}COMPANYTAIL", "架".repeat(1013));
+    value["career"]["positions"][0]["companyName"] = serde_json::json!(company);
+    career_fields.push(company);
+    for (i, key) in ["business", "capital", "employees"].iter().enumerate() {
+        let text = maximum(&format!("COMPANY{i}"));
+        value["career"]["positions"][0]["companyOverview"][key] = serde_json::json!(text);
+        career_fields.push(text);
+    }
+    let role = maximum("ROLE");
+    value["career"]["positions"][0]["role"] = serde_json::json!(role);
+    career_fields.push(role);
+    for (i, key) in ["name", "teamSize"].iter().enumerate() {
+        let text = maximum(&format!("PROJECT{i}"));
+        value["career"]["positions"][0]["projects"][0][key] = serde_json::json!(text);
+        career_fields.push(text);
+    }
+    for (i, key) in ["phases", "languages", "technologies"].iter().enumerate() {
+        let text = maximum(&format!("ARRAY{i}"));
+        value["career"]["positions"][0]["projects"][0][key] = serde_json::json!([text]);
+        career_fields.push(text);
+    }
+    value["career"]["positions"][0]["projects"][0]["responsibilities"] = serde_json::json!({
+        "type":"doc", "content":[{"type":"paragraph","content":(0..1024).map(|i|
+            serde_json::json!({"type":"text","text":"W","marks":[{"type":if i%2==0 {"bold"} else {"italic"}}]})
+        ).collect::<Vec<_>>()}]
+    });
+    career_fields.push("W".repeat(1024));
+    let url_prefix = "https://example.com/";
+    let url_tail = "?tail=ENDMAXURL";
+    let url = format!(
+        "{url_prefix}{}{url_tail}",
+        "W".repeat(2048 - url_prefix.len() - url_tail.len())
+    );
+    assert_eq!(url.len(), 2048);
+    value["career"]["positions"][0]["projects"][0]["url"] = serde_json::json!(url);
+    career_fields.push(url);
+    let project = parse_project(&serde_json::to_vec(&value).unwrap()).unwrap();
+    for (kind, fields) in [
+        (DocumentKind::Resume, resume_fields),
+        (DocumentKind::Career, career_fields),
+    ] {
+        let bundle = generate_project(&project, kind).unwrap();
+        let artifact = compile(&TexRuntime::discover(), &bundle).unwrap();
+        save_layout_qa(
+            &format!("maximum-fields-{kind:?}"),
+            &bundle,
+            &artifact.bytes,
+        );
+        assert!(!artifact.log.contains("Overfull"), "{}", artifact.log);
+        assert!(
+            !artifact.log.contains("Missing character:"),
+            "{}",
+            artifact.log
+        );
+        let pages = inspected_pdf_pages(&artifact.bytes);
+        assert_a4(&pages);
+        let text = pages
+            .iter()
+            .map(|p| p["text"].as_str().unwrap())
+            .collect::<String>()
+            .split_whitespace()
+            .collect::<String>()
+            .replace("履歴書（続紙）2026年10月6日現在", "")
+            .replace("基本情報・連絡先（続き）", "")
+            .replace("年月学歴・職歴（続き）", "")
+            .replace("年月免許・資格（続き）", "");
+        for field in fields {
+            // Base page 2 also contains qualifications and body frames. Remove
+            // those unrelated regions before joining a history row across pages.
+            let table_text = if kind == DocumentKind::Resume && field.starts_with("HISTORY") {
+                let (title, next) = if field.starts_with("HISTORY2") {
+                    ("免許・資格", "志望動機・特技・アピールポイントなど")
+                } else {
+                    ("学歴・職歴", "免許・資格")
+                };
+                pages
+                    .iter()
+                    .filter_map(|p| {
+                        let page = p["text"]
+                            .as_str()
+                            .unwrap()
+                            .split_whitespace()
+                            .collect::<String>();
+                        page.split_once(title).map(|(_, body)| {
+                            body.strip_prefix("（続き）")
+                                .unwrap_or(body)
+                                .trim_start_matches("年月")
+                                .split(next)
+                                .next()
+                                .unwrap()
+                                .replace("年月", "")
+                        })
+                    })
+                    .collect::<String>()
+            } else if kind == DocumentKind::Career
+                && (field.starts_with("SKILL") || field.starts_with("HISTORY2"))
+            {
+                // PDFKit interleaves the two skill cells in page.string. Read
+                // each physical column separately to compare its full value.
+                let column = if field.starts_with("SKILL2") {
+                    "rightText"
+                } else {
+                    "leftText"
+                };
+                pages
+                    .iter()
+                    .map(|p| p[column].as_str().unwrap())
+                    .collect::<String>()
+                    .split_whitespace()
+                    .collect::<String>()
+            } else {
+                text.clone()
+            };
+            if !table_text.contains(&field) {
+                let marker: String = field.chars().take(8).collect();
+                let actual = table_text
+                    .split_once(&marker)
+                    .map(|(_, rest)| format!("{marker}{rest}"))
+                    .unwrap_or_default();
+                let mismatch = field
+                    .chars()
+                    .zip(actual.chars())
+                    .position(|(a, b)| a != b)
+                    .unwrap_or(actual.chars().count());
+                panic!(
+                    "missing {marker}: mismatch at {mismatch}, nearby {}",
+                    actual
+                        .chars()
+                        .skip(mismatch.saturating_sub(30))
+                        .take(120)
+                        .collect::<String>()
+                );
+            }
+        }
+        if kind == DocumentKind::Resume {
+            assert!(pages.len() > 2);
+            assert!(pages[0]["text"].as_str().unwrap().contains("続紙に全文"));
+        }
+    }
+}
+
+#[test]
+#[cfg(target_os = "macos")]
+fn maximum_body_bytes_preserve_the_complete_text_in_both_documents() {
+    use resume_studio_lib::{
+        domain::validation::parse_project,
+        generator::{documents::generate_project, templates::DocumentKind},
+    };
+    for (name, text) in [
+        ("japanese", format!("{}ENDMAXBODY", "境".repeat(21842))),
+        (
+            "ascii",
+            format!("{}ENDMAXASCII", "W".repeat(65536 - "ENDMAXASCII".len())),
+        ),
+    ] {
+        assert_eq!(text.len(), 65536);
+        let mut value: serde_json::Value =
+            serde_json::from_str(include_str!("../../tests/fixtures/project-empty.json")).unwrap();
+        let body = serde_json::json!({"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":text}]}]});
+        value["resume"]["motivation"] = body.clone();
+        value["career"]["summary"] = body;
+        let project = parse_project(&serde_json::to_vec(&value).unwrap()).unwrap();
+        for kind in [DocumentKind::Resume, DocumentKind::Career] {
+            let bundle = generate_project(&project, kind).unwrap();
+            let artifact = compile(&TexRuntime::discover(), &bundle).unwrap();
+            save_layout_qa(
+                &format!("maximum-body-{name}-{kind:?}"),
+                &bundle,
+                &artifact.bytes,
+            );
+            assert!(!artifact.log.contains("Overfull"), "{}", artifact.log);
+            assert!(
+                !artifact.log.contains("Missing character:"),
+                "{}",
+                artifact.log
+            );
+            let pages = inspected_pdf_pages(&artifact.bytes);
+            assert_a4(&pages);
+            assert!(pages.len() > 2);
+            let mut extracted = String::new();
+            for page in pages {
+                let page_text = page["text"]
+                    .as_str()
+                    .unwrap()
+                    .split_whitespace()
+                    .collect::<String>();
+                if kind == DocumentKind::Resume {
+                    if let Some((_, body)) =
+                        page_text.split_once("志望動機・特技・アピールポイントなど")
+                    {
+                        extracted.push_str(
+                            body.strip_prefix("（続き）")
+                                .unwrap_or(body)
+                                .split("本人希望欄")
+                                .next()
+                                .unwrap(),
+                        );
+                    }
+                } else {
+                    extracted.push_str(&page_text);
+                }
+            }
+            assert!(extracted.contains(&text), "maximum body lost text");
+        }
+    }
+}
+
+#[test]
+#[cfg(target_os = "macos")]
+fn real_photos_keep_their_aspect_ratio_inside_the_resume_frame() {
+    use base64::{engine::general_purpose::STANDARD, Engine};
+    use image::{DynamicImage, ImageFormat, Rgba, RgbaImage};
+    use resume_studio_lib::{
+        domain::{project::Asset, validation::parse_project},
+        generator::{documents::generate_project, templates::DocumentKind},
+    };
+    use std::io::Cursor;
+    for (width, height, format) in [
+        (0, 0, ImageFormat::Png),
+        (900, 1200, ImageFormat::Png),
+        (900, 900, ImageFormat::Png),
+        (900, 600, ImageFormat::Jpeg),
+    ] {
+        let mut project =
+            parse_project(include_bytes!("../../tests/fixtures/project-full.json")).unwrap();
+        project.assets.clear();
+        project.profile.photo_asset_id = None;
+        if width > 0 {
+            let picture = DynamicImage::ImageRgba8(RgbaImage::from_pixel(
+                width,
+                height,
+                Rgba([240, 30, 30, 180]),
+            ));
+            let picture = if format == ImageFormat::Jpeg {
+                DynamicImage::ImageRgb8(picture.to_rgb8())
+            } else {
+                picture
+            };
+            let mut output = Cursor::new(Vec::new());
+            picture.write_to(&mut output, format).unwrap();
+            project.assets.push(Asset {
+                id: "photo-shape".into(),
+                media_type: if format == ImageFormat::Png {
+                    "image/png"
+                } else {
+                    "image/jpeg"
+                }
+                .into(),
+                base64: STANDARD.encode(output.into_inner()),
+            });
+            project.profile.photo_asset_id = Some("photo-shape".into());
+        }
+        let bundle = generate_project(&project, DocumentKind::Resume).unwrap();
+        let artifact = compile(&TexRuntime::discover(), &bundle).unwrap();
+        save_layout_qa(
+            &format!("photo-{width}-{height}-{format:?}"),
+            &bundle,
+            &artifact.bytes,
+        );
+        assert!(!artifact.log.contains("Overfull"), "{}", artifact.log);
+        assert!(
+            !artifact.log.contains("Missing character:"),
+            "{}",
+            artifact.log
+        );
+        let pages = inspected_pdf_pages(&artifact.bytes);
+        assert_eq!(pages.len(), 2);
+        assert_a4(&pages);
+        let bounds = photo_pixel_bounds(&artifact.bytes);
+        if width == 0 {
+            assert!(
+                bounds.is_none(),
+                "unselected photo must leave an empty frame"
+            );
+        } else {
+            let [left, top, right, bottom] = bounds.unwrap();
+            assert!(
+                left >= 160.0 && right <= 194.0 && top >= 25.0 && bottom <= 85.0,
+                "photo outside frame: {bounds:?}"
+            );
+            let expected_height = if height > width {
+                39.9
+            } else {
+                30.0 * f64::from(height) / f64::from(width)
+            };
+            let expected_width = expected_height * f64::from(width) / f64::from(height);
+            assert!(
+                (right - left - expected_width).abs() < 0.6,
+                "wrong photo width: {bounds:?}"
+            );
+            assert!(
+                (bottom - top - expected_height).abs() < 0.6,
+                "wrong photo height: {bounds:?}"
+            );
+        }
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn save_layout_qa(name: &str, bundle: &resume_studio_lib::generator::GeneratedBundle, pdf: &[u8]) {
+    if let Some(root) = std::env::var_os("RESUME_STUDIO_PDF_QA_DIR") {
+        let root = std::path::PathBuf::from(root);
+        fs::create_dir_all(&root).unwrap();
+        let directory = root.join(name);
+        fs::create_dir(&directory)
+            .expect("QA directory must be new; never overwrite earlier artifacts");
+        resume_studio_lib::generator::bundle::write_bundle(&directory, bundle).unwrap();
+        fs::write(directory.join("main.pdf"), pdf).unwrap();
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn photo_pixel_bounds(bytes: &[u8]) -> Option<[f64; 4]> {
+    let directory = tempfile::tempdir().unwrap();
+    let pdf = directory.path().join("main.pdf");
+    let png = directory.path().join("page.png");
+    let script = directory.path().join("raster.swift");
+    fs::write(&pdf, bytes).unwrap();
+    fs::write(&script, r#"import Foundation
+import PDFKit
+import AppKit
+let page = PDFDocument(url: URL(fileURLWithPath: CommandLine.arguments[1]))!.page(at: 0)!
+let size = page.bounds(for: .mediaBox).size
+let image = page.thumbnail(of: NSSize(width: size.width * 1.5, height: size.height * 1.5), for: .mediaBox)
+let bitmap = NSBitmapImageRep(data: image.tiffRepresentation!)!
+try bitmap.representation(using: .png, properties: [:])!.write(to: URL(fileURLWithPath: CommandLine.arguments[2]))
+"#).unwrap();
+    let output = std::process::Command::new("/usr/bin/swift")
+        .arg(script)
+        .arg(pdf)
+        .arg(&png)
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let image = image::open(png).unwrap().to_rgb8();
+    let mut bounds = None;
+    let scale = 210.0 / f64::from(image.width());
+    for (x, y, pixel) in image.enumerate_pixels() {
+        if pixel[0] > 180
+            && pixel[0].saturating_sub(pixel[1]) > 80
+            && pixel[0].saturating_sub(pixel[2]) > 80
+        {
+            let point = [f64::from(x) * scale, f64::from(y) * scale];
+            let rect = bounds.get_or_insert([point[0], point[1], point[0], point[1]]);
+            rect[0] = rect[0].min(point[0]);
+            rect[1] = rect[1].min(point[1]);
+            rect[2] = rect[2].max(point[0]);
+            rect[3] = rect[3].max(point[1]);
+        }
+    }
+    bounds
 }
 
 #[test]

@@ -13,6 +13,9 @@
 \newbox\rs@qualifications
 \newbox\rs@motivation
 \newbox\rs@preferences
+\newbox\rs@metadata
+\newbox\rs@profile
+\newbox\rs@contact
 \newbox\rs@slice
 \newbox\rs@frame
 \newdimen\rs@width
@@ -41,25 +44,46 @@
   \raggedright\leftskip=2mm\rightskip=2mm\parindent=0pt #2\par}}
 \newcommand{\rs@dottedRule}{\hbox to\hsize{\leaders\hbox{\rule{.6pt}{.3pt}\hskip1pt}\hfill}}
 \newcommand{\ResumePhoto}[1]{\includegraphics[width=30mm,height=39.9mm,keepaspectratio]{#1}}
+\newcommand{\rs@appendMetadata}[2]{%
+  \global\setbox\rs@metadata=\vbox{\unvbox\rs@metadata
+    \hsize=\dimexpr\rs@width-4mm\relax\linewidth=\hsize
+    \leftskip=0pt\rightskip=0pt\fontsize{10.5pt}{17pt}\selectfont
+    \textbf{#1}\par\nobreak #2\par\vspace{3mm}}}
 \newcommand{\ResumeProfile}[6]{%
+  \setbox\rs@profile=\vbox{\hsize=\dimexpr\textwidth-39mm-2\fboxrule\relax
+    \rs@cell{\hsize}{\small ふりがな\quad #1}\rs@dottedRule
+    \rs@cell{\hsize}{\vspace{3mm}氏名\par\vspace{1mm}
+      {\fontsize{23pt}{29pt}\selectfont #2}\par\vspace{3mm}}%
+    \hrule height.3pt
+    \rs@cell{\hsize}{\vspace{1mm}#3 生\quad #4\quad #5\vspace{1mm}}}%
+  % Oversized fixed fields move in full to a readable continuation region.
+  \ifdim\dimexpr\ht\rs@profile+\dp\rs@profile\relax>80mm
+    \rs@appendMetadata{基本情報}{ふりがな\quad #1\par 氏名\quad #2\par
+      生年月日\quad #3\quad #4\par 任意の性別表示\quad #5}%
+    \setbox\rs@profile=\vbox{\hsize=\dimexpr\textwidth-39mm-2\fboxrule\relax
+      \rs@cell{\hsize}{\vspace{4mm}基本情報\par
+        この欄に収まらないため、続紙に全文を記載しています。\vspace{4mm}}}%
+  \fi
   \noindent\hbox to\textwidth{%
     \vtop{\vskip0pt\hsize=\dimexpr\textwidth-39mm\relax
-      \fbox{\vbox{\hsize=\dimexpr\textwidth-39mm-2\fboxrule\relax
-        \rs@cell{\hsize}{\small ふりがな\quad #1}\rs@dottedRule
-        \rs@cell{\hsize}{\vspace{3mm}氏名\par\vspace{1mm}
-          {\fontsize{23pt}{29pt}\selectfont #2}\par\vspace{3mm}}%
-        \hrule height.3pt
-        \rs@cell{\hsize}{\vspace{1mm}#3 生\quad #4\quad #5\vspace{1mm}}}}}%
+      \fbox{\box\rs@profile}}%
     \hfill\vtop{\vskip0pt\hsize=32mm\fbox{\vbox to40mm{\hsize=30mm
       \vfil\hbox to30mm{\hfil #6\hfil}\vfil}}}}\par\vspace{3mm}}
 \newcommand{\ResumeContact}[6]{%
-  \noindent\fbox{\hbox to\rs@width{%
+  \setbox\rs@contact=\vbox{\noindent\fbox{\hbox to\rs@width{%
     \vtop{\vskip0pt\hsize=.73\rs@width
       \rs@cell{\hsize}{\small ふりがな\quad #4}\rs@dottedRule
       \rs@cell{\hsize}{\vspace{1mm}#1\quad 〒#2\par #3\vspace{1mm}}}%
     \vrule width.3pt
     \vtop{\vskip0pt\hsize=\dimexpr.27\rs@width-.3pt\relax
-      \rs@cell{\hsize}{\small 電話\par #5\par メール\par #6}}}}\par}
+      \rs@cell{\hsize}{\small 電話\par #5\par メール\par #6}}}}\par}%
+  \ifdim\dimexpr\ht\rs@contact+\dp\rs@contact\relax>55mm
+    \rs@appendMetadata{#1}{住所ふりがな\quad #4\par 郵便番号\quad #2\par
+      住所\quad #3\par 電話\quad #5\par メール\quad #6}%
+    \noindent\fbox{\vbox{\hsize=\rs@width
+      \rs@cell{\hsize}{\vspace{2mm}#1\par
+        この欄に収まらないため、続紙に全文を記載しています。\vspace{2mm}}}}\par
+  \else\unvbox\rs@contact\fi}
 % Each history paragraph remains a vertical list of individual lines. TeX may
 % split a multi-line row; an oversized row is never an indivisible table cell.
 \newcommand{\rs@row}[3]{%
@@ -104,9 +128,14 @@
 % rows, so both base pages retain their form even for an empty project.
 \newcommand{\rs@split}[2]{%
   \splittopskip=\topskip\splitmaxdepth=0pt
-  \ifdim\dimexpr\ht#1+\dp#1\relax>#2\relax
+  % Natural lists may exceed maxdimen. Read their dimensions via Lua without
+  % feeding an oversized dimension through TeX's dimension scanner.
+  \ifnum\directlua{local b=tex.box[\number#1];
+    tex.sprint(b and b.height+b.depth>\number\dimexpr#2\relax\space and 1 or 0)}=1
     \setbox\rs@slice=\vsplit#1 to#2\relax
   \else\setbox\rs@slice=\box#1\fi}
+\newcommand{\rs@remaining}[1]{\directlua{local b=tex.box[\number#1];
+  tex.sprint(b and b.height+b.depth>0 and 1 or 0)}}
 \newcommand{\rs@vertical}[2]{\hbox to0pt{\kern#1\vrule width.3pt height#2 depth0pt\hss}}
 \newcommand{\rs@dottedVertical}[2]{\hbox to0pt{\kern#1\vbox to#2{%
   \leaders\vbox to1.2mm{\vfil\hrule width.3pt height.6pt\vfil}\vfill}\hss}}
@@ -124,16 +153,16 @@
 \newcommand{\rs@bodyFrame}[4]{%
   \rs@split{#1}{#2}%
   \noindent\fbox{\vbox{\hsize=\rs@width
-    \rs@cell{\hsize}{\small #3\par #4}\hrule height.3pt
+    \rs@cell{\hsize}{\small #3\par #4\vspace{1mm}}\hrule height.3pt
     \hbox{\hskip2mm\vbox to#2{\hsize=\dimexpr\rs@width-4mm\relax
       \unvbox\rs@slice\vfil}\hskip2mm}}}\par}
 \newcommand{\rs@continueTable}[2]{%
-  \loop\ifdim\dimexpr\ht#1+\dp#1\relax>0pt
+  \loop\ifnum\rs@remaining{#1}=1
     \newpage\rs@continuationHeader
     \rs@table{#1}{235mm}{#2（続き）}%
   \repeat}
 \newcommand{\rs@continueBody}[2]{%
-  \loop\ifdim\dimexpr\ht#1+\dp#1\relax>0pt
+  \loop\ifnum\rs@remaining{#1}=1
     \newpage\rs@continuationHeader
     \rs@bodyFrame{#1}{225mm}{#2（続き）}{}%
   \repeat}
@@ -149,6 +178,7 @@
   \rs@table{\rs@qualifications}{\ResumeQualificationHeight}{免許・資格}\vspace{3mm}
   \rs@bodyFrame{\rs@motivation}{\ResumeMotivationHeight}{志望動機・特技・アピールポイントなど}{}\vspace{3mm}
   \rs@bodyFrame{\rs@preferences}{\ResumePreferenceHeight}{本人希望欄}{（給与・職種・勤務時間・勤務地などについての希望があれば記入）}%
+  \rs@continueBody{\rs@metadata}{基本情報・連絡先}%
   \rs@continueTable{\rs@history}{学歴・職歴}%
   \rs@continueTable{\rs@qualifications}{免許・資格}%
   \rs@continueBody{\rs@motivation}{志望動機・特技・アピールポイントなど}%

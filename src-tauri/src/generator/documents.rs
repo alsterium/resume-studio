@@ -1,7 +1,7 @@
 use super::{
     body::render_body,
     bundle::BundleResource,
-    escape_text,
+    display_text, escape_text,
     templates::{resolve, DocumentKind},
     GeneratedBundle,
 };
@@ -39,21 +39,21 @@ fn field(output: &mut String, title: &str, value: &str) {
         command(
             output,
             "CareerField",
-            &[escape_text(title), escape_text(value)],
+            &[display_text(title), display_text(value)],
         );
     }
 }
 fn history(output: &mut String, title: &str, rows: &[HistoryRow]) {
-    command(output, "ResumeHistoryBegin", &[escape_text(title)]);
+    command(output, "ResumeHistoryBegin", &[display_text(title)]);
     for row in rows {
         let (year, month) = row.year_month.split_once('-').unwrap_or(("", ""));
         command(
             output,
             "ResumeHistoryRow",
             &[
-                escape_text(year),
-                escape_text(month),
-                escape_text(&row.text),
+                display_text(year),
+                display_text(month),
+                display_text(&row.text),
             ],
         );
     }
@@ -64,12 +64,12 @@ fn contact(output: &mut String, title: &str, contact: &Contact) {
         output,
         "ResumeContact",
         &[
-            escape_text(title),
-            escape_text(&contact.postal_code),
-            escape_text(&contact.address),
-            escape_text(&contact.address_kana),
-            escape_text(&contact.phone),
-            escape_text(&contact.email),
+            display_text(title),
+            display_text(&contact.postal_code),
+            display_text(&contact.address),
+            display_text(&contact.address_kana),
+            display_text(&contact.phone),
+            display_text(&contact.email),
         ],
     );
 }
@@ -111,7 +111,7 @@ fn render(model: &DocumentModel<'_>) -> Result<String, String> {
             command(
                 &mut output,
                 "ResumeHeader",
-                &[escape_text(&document_date(model.date))],
+                &[display_text(&document_date(model.date))],
             );
             let age = age_on_date(&model.profile.birth_date, model.date)
                 .map(|age| format!("満{age}歳"))
@@ -125,11 +125,11 @@ fn render(model: &DocumentModel<'_>) -> Result<String, String> {
                 &mut output,
                 "ResumeProfile",
                 &[
-                    escape_text(&model.profile.name_kana),
-                    escape_text(&model.profile.name),
-                    escape_text(&document_date(&model.profile.birth_date)),
+                    display_text(&model.profile.name_kana),
+                    display_text(&model.profile.name),
+                    display_text(&document_date(&model.profile.birth_date)),
                     age,
-                    escape_text(model.profile.gender_label.as_deref().unwrap_or_default()),
+                    display_text(model.profile.gender_label.as_deref().unwrap_or_default()),
                     photo,
                 ],
             );
@@ -181,8 +181,8 @@ fn render(model: &DocumentModel<'_>) -> Result<String, String> {
                 &mut output,
                 "CareerHeader",
                 &[
-                    escape_text(&document_date(model.date)),
-                    escape_text(&model.profile.name),
+                    display_text(&document_date(model.date)),
+                    display_text(&model.profile.name),
                 ],
             );
             command(&mut output, "CareerSection", &["経歴要約".into()]);
@@ -201,7 +201,7 @@ fn render(model: &DocumentModel<'_>) -> Result<String, String> {
                 command(
                     &mut output,
                     "CareerSkill",
-                    &[escape_text(&label), escape_text(&skill.description)],
+                    &[display_text(&label), display_text(&skill.description)],
                 );
             }
             for qualification in model.qualifications {
@@ -209,8 +209,8 @@ fn render(model: &DocumentModel<'_>) -> Result<String, String> {
                     &mut output,
                     "CareerSkill",
                     &[
-                        escape_text(&qualification.text),
-                        escape_text(&qualification.year_month),
+                        display_text(&qualification.text),
+                        display_text(&qualification.year_month),
                     ],
                 );
             }
@@ -220,8 +220,8 @@ fn render(model: &DocumentModel<'_>) -> Result<String, String> {
                     &mut output,
                     "CareerCompany",
                     &[
-                        escape_text(&position.company_name),
-                        escape_text(&period(
+                        display_text(&position.company_name),
+                        display_text(&period(
                             &position.start_year_month,
                             position.end_year_month.as_deref(),
                             "在籍中",
@@ -246,8 +246,8 @@ fn render(model: &DocumentModel<'_>) -> Result<String, String> {
                         &mut output,
                         "CareerProject",
                         &[
-                            escape_text(&item.name),
-                            escape_text(&period(
+                            display_text(&item.name),
+                            display_text(&period(
                                 &item.start_year_month,
                                 item.end_year_month.as_deref(),
                                 "進行中",
@@ -270,7 +270,7 @@ fn render(model: &DocumentModel<'_>) -> Result<String, String> {
                             command(
                                 &mut output,
                                 "CareerBody",
-                                &[escape_text(label), render_body(body)?],
+                                &[display_text(label), render_body(body)?],
                             );
                         }
                     }

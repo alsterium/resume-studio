@@ -214,3 +214,7 @@ T16はRustの共通visitorを両書類の本文変換の正本とする。許可
 T17では「履歴書PDF更新」「職務経歴書PDF更新」が正式Project全項目をRustのgenerate_documentへ渡す。テンプレート一覧はlist_templatesで取得し、非対応ID／版を維持したまま明示選択で変更できる。生成失敗で最後の成功PDFを維持し、生成時revisionと編集revisionが異なれば古い内容と表示する。ジョブと書類別結果の管理はT21で拡張する。初期の「PDF更新」（氏名と職務要約だけの下書き）は検証経路として暫定的に残す。
 
 生成ファイル・版解決・制限・単体コンパイル手順は[GENERATED_TEX.md](GENERATED_TEX.md)。T17の紙面は初期流し込み版で、参考帳票の組版はT18／T19。PDF再生成時に前のloading taskのdestroyと次の生成が重なり、共有workerでPDFWorker.createが失敗することを実E2Eで再現した。runtimeが同梱PDFWorkerを所有し、各loading taskは書類のtransportだけを後始末する構成へ修正した。workerをtaskの所有物にしないため、前のPDFのdestroyが次のworkerを破棄しない。E2Eは下書き→写真付き履歴書→職務経歴書の連続生成を通してこの回帰も検証する。
+
+## 紙面の検証と画像化
+
+実TeXによる紙面の上限検証と目視QAは[GENERATED_TEX.md](GENERATED_TEX.md#t20の検証マトリクスと目視qa)の手順を使用する。検証用PDFを残す環境変数はreal-tex結合テストだけが参照し、通常アプリには含めない。Node起動の`pnpm pdf:render`はmacOS PDFKitで全ページPNGと一覧を作る。

@@ -52,11 +52,12 @@
     \raggedright #2\par}
   % Bound each row fragment so a long skill cell can cross pages too.
   \loop
-    \cr@reserve{2\baselineskip}
     \cr@split{\cr@left}{\cr@leftSlice}\cr@split{\cr@right}{\cr@rightSlice}
+    % Let the page builder break between bounded fragments. Forcing newpage
+    % here can observe the preceding page while its output is still pending.
     \noindent\hbox to\linewidth{%
       \vtop{\vskip0pt\hsize=.48\linewidth\unvbox\cr@leftSlice}\hfil
-      {\color[gray]{.25}\vtop{\vskip0pt\hsize=.48\linewidth\unvbox\cr@rightSlice}}}\par
+      {\color[gray]{.25}\vtop{\vskip0pt\hsize=.48\linewidth\unvbox\cr@rightSlice}}}\par\penalty0
   \ifdim\dimexpr\ht\cr@left+\dp\cr@left+\ht\cr@right+\dp\cr@right\relax>0pt
   \repeat
   \cr@dottedRule\endgroup}

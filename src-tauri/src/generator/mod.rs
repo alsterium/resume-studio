@@ -44,6 +44,38 @@ pub fn escape_text(text: &str) -> String {
     result
 }
 
+pub(crate) fn has_long_ascii_run(text: &str) -> bool {
+    let mut length = 0;
+    text.chars().any(|c| {
+        length = if c.is_ascii_graphic() { length + 1 } else { 0 };
+        // Twelve wide Latin glyphs can exceed a narrow contact column.
+        length >= 12
+    })
+}
+
+pub(crate) fn display_text(text: &str) -> String {
+    breakable_text(text, has_long_ascii_run(text))
+}
+
+pub(crate) fn breakable_text(text: &str, breaks: bool) -> String {
+    if !breaks {
+        return escape_text(text);
+    }
+    let mut result = String::new();
+    for (index, c) in text.chars().enumerate() {
+        if index > 0 && index % 128 == 0 {
+            // TeX input buffers are bounded. A comment joins source lines
+            // without inserting a displayed space or changing the paragraph.
+            result.push_str("%\n");
+        }
+        result.push_str(&escape_text(&c.to_string()));
+        if c.is_ascii_graphic() {
+            result.push_str("\\allowbreak{}");
+        }
+    }
+    result
+}
+
 pub fn generate(draft: &Draft) -> Result<GeneratedBundle, String> {
     if draft.name.len() > 1024 || draft.body.len() > 64 * 1024 {
         return Err("氏名または本文がサイズ上限を超えています。".into());
@@ -79,6 +111,31 @@ pub fn generate(draft: &Draft) -> Result<GeneratedBundle, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn display_breaks_preserve_short_text_and_escape_long_runs_once() {
+        assert_eq!(display_text("架空 Rust 2026"), "架空 Rust 2026");
+        assert_eq!(display_text(&"W".repeat(11)), "W".repeat(11));
+        assert_eq!(
+            display_text(&"W".repeat(12))
+                .matches("\\allowbreak{}")
+                .count(),
+            12
+        );
+        let value = r"\input{private}&%_";
+        assert_eq!(
+            display_text(value).replace("\\allowbreak{}", ""),
+            escape_text(value)
+        );
+        assert!(!display_text(value).contains(r"\input{"));
+        let long = "W".repeat(65536);
+        let source = display_text(&long);
+        assert!(source.lines().all(|line| line.len() < 4096));
+        assert_eq!(
+            source.replace("\\allowbreak{}", "").replace("%\n", ""),
+            long
+        );
+    }
 
     #[test]
     fn escapes_every_tex_special_character_once() {
