@@ -1,6 +1,7 @@
+use super::cancellation::Cancellation;
 use std::{
     io::{self, Read},
-    process::{Command, Stdio},
+    process::{Child, Command, Stdio},
     thread,
     time::{Duration, Instant},
 };
@@ -10,6 +11,7 @@ const LOG_LIMIT: usize = 64 * 1024;
 pub struct ProcessOutput {
     pub success: bool,
     pub timed_out: bool,
+    pub cancelled: bool,
     pub stdout: String,
     pub stderr: String,
 }
@@ -28,45 +30,90 @@ fn drain(mut reader: impl Read) -> io::Result<String> {
     Ok(String::from_utf8_lossy(&kept).into_owned())
 }
 
-pub fn run(mut command: Command, timeout: Duration) -> io::Result<ProcessOutput> {
+struct OwnedChild {
+    child: Child,
+    stopped: bool,
+}
+impl OwnedChild {
+    fn stop(&mut self) {
+        if self.stopped {
+            return;
+        }
+        self.stopped = true;
+        #[cfg(unix)]
+        // Only the process group created for this command is addressed.
+        unsafe {
+            libc::kill(-(self.child.id() as i32), libc::SIGKILL);
+        }
+        let _ = self.child.kill();
+        let _ = self.child.wait();
+    }
+}
+impl Drop for OwnedChild {
+    fn drop(&mut self) {
+        self.stop();
+    }
+}
+
+pub fn run(command: Command, timeout: Duration) -> io::Result<ProcessOutput> {
+    run_cancellable(command, timeout, &Cancellation::default())
+}
+
+pub fn run_cancellable(
+    mut command: Command,
+    timeout: Duration,
+    cancellation: &Cancellation,
+) -> io::Result<ProcessOutput> {
+    if cancellation.is_cancelled() {
+        return Ok(ProcessOutput {
+            success: false,
+            timed_out: false,
+            cancelled: true,
+            stdout: String::new(),
+            stderr: String::new(),
+        });
+    }
     #[cfg(unix)]
     {
         use std::os::unix::process::CommandExt;
         command.process_group(0);
     }
-    let mut child = command
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()?;
-    let stdout = child.stdout.take().expect("piped stdout");
-    let stderr = child.stderr.take().expect("piped stderr");
+    let mut child = OwnedChild {
+        child: command
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()?,
+        stopped: false,
+    };
+    let stdout = child.child.stdout.take().expect("piped stdout");
+    let stderr = child.child.stderr.take().expect("piped stderr");
     let out = thread::spawn(move || drain(stdout));
     let err = thread::spawn(move || drain(stderr));
     let started = Instant::now();
-    let (status, timed_out) = loop {
-        if let Some(status) = child.try_wait()? {
-            break (status, false);
+    let (success, timed_out, cancelled) = loop {
+        let cancelled = cancellation.is_cancelled();
+        let timed_out = started.elapsed() >= timeout;
+        if cancelled || timed_out {
+            break (false, !cancelled && timed_out, cancelled);
         }
-        if started.elapsed() >= timeout {
-            #[cfg(unix)]
-            // Each command owns a fresh process group; stop TeX descendants as well.
-            unsafe {
-                libc::kill(-(child.id() as i32), libc::SIGKILL);
-            }
-            let _ = child.kill();
-            break (child.wait()?, true);
+        if let Some(status) = child.child.try_wait()? {
+            break (status.success(), false, false);
         }
         thread::sleep(Duration::from_millis(20));
     };
+    // Stop descendants even when the parent has exited, before joining readers
+    // whose pipes could otherwise be held open indefinitely by a descendant.
+    child.stop();
     let join = |handle: thread::JoinHandle<io::Result<String>>| {
         handle
             .join()
             .map_err(|_| io::Error::other("log reader panicked"))?
     };
     Ok(ProcessOutput {
-        success: status.success(),
+        success,
         timed_out,
+        cancelled,
         stdout: join(out)?,
         stderr: join(err)?,
     })
@@ -75,6 +122,17 @@ pub fn run(mut command: Command, timeout: Duration) -> io::Result<ProcessOutput>
 #[cfg(all(test, unix))]
 mod tests {
     use super::*;
+
+    #[test]
+    fn exited_parent_does_not_leave_a_descendant_holding_output_pipes() {
+        let mut command = Command::new("/bin/sh");
+        command.args(["-c", "sleep 30 & exit 0"]);
+        let started = Instant::now();
+        let output = run(command, Duration::from_secs(3)).unwrap();
+        assert!(output.success);
+        assert!(!output.timed_out && !output.cancelled);
+        assert!(started.elapsed() < Duration::from_secs(2));
+    }
 
     #[test]
     fn timeout_stops_descendants_that_hold_the_output_pipes() {

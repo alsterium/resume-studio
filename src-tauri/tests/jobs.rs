@@ -5,6 +5,105 @@ use std::{
 };
 
 #[test]
+fn cancelling_a_waiting_job_releases_it_without_waiting_for_the_active_worker() {
+    let jobs = GenerationJobs::default();
+    let (started, start) = mpsc::channel();
+    let (release, released) = mpsc::channel();
+    let active_jobs = jobs.clone();
+    let active = tauri::async_runtime::spawn(async move {
+        active_jobs
+            .execute(
+                |_| {},
+                move |_| {
+                    started.send(()).unwrap();
+                    released.recv_timeout(Duration::from_secs(5)).unwrap();
+                    Ok(())
+                },
+            )
+            .await
+    });
+    start.recv_timeout(Duration::from_secs(5)).unwrap();
+    let (queued, queue) = mpsc::channel();
+    let waiting_jobs = jobs.clone();
+    let waiting = tauri::async_runtime::spawn(async move {
+        waiting_jobs
+            .execute_cancellable(
+                "waiting-job".into(),
+                move |phase| {
+                    if phase == JobPhase::Queued {
+                        queued.send(()).unwrap();
+                    }
+                },
+                |_, _| panic!("cancelled job must not start"),
+            )
+            .await
+    });
+    queue.recv_timeout(Duration::from_secs(5)).unwrap();
+    let before = std::time::Instant::now();
+    assert!(jobs.cancel("waiting-job").unwrap());
+    let result: Result<(), String> = tauri::async_runtime::block_on(waiting).unwrap();
+    assert!(result.unwrap_err().contains("CANCELED"));
+    assert!(before.elapsed() < Duration::from_secs(1));
+    assert!(!jobs.cancel("waiting-job").unwrap());
+    release.send(()).unwrap();
+    tauri::async_runtime::block_on(active).unwrap().unwrap();
+}
+
+#[test]
+fn running_cancellation_rejects_duplicate_ids_and_allows_a_fresh_retry() {
+    let jobs = GenerationJobs::default();
+    for invalid in ["", "../escape", "job_name"] {
+        assert!(tauri::async_runtime::block_on(jobs.execute_cancellable(
+            invalid.into(),
+            |_| {},
+            |_, _| Ok(())
+        ))
+        .is_err());
+    }
+    let (started, start) = mpsc::channel();
+    let running_jobs = jobs.clone();
+    let running = tauri::async_runtime::spawn(async move {
+        running_jobs
+            .execute_cancellable(
+                "running-job".into(),
+                |_| {},
+                move |_, token| {
+                    started.send(()).unwrap();
+                    let before = std::time::Instant::now();
+                    while !token.is_cancelled() {
+                        assert!(before.elapsed() < Duration::from_secs(5));
+                        std::thread::sleep(Duration::from_millis(5));
+                    }
+                    Ok(42)
+                },
+            )
+            .await
+    });
+    start.recv_timeout(Duration::from_secs(5)).unwrap();
+    assert!(tauri::async_runtime::block_on(jobs.execute_cancellable(
+        "running-job".into(),
+        |_| {},
+        |_, _| Ok(())
+    ))
+    .unwrap_err()
+    .contains("実行中"));
+    assert!(jobs.cancel("running-job").unwrap());
+    assert!(tauri::async_runtime::block_on(running)
+        .unwrap()
+        .unwrap_err()
+        .contains("CANCELED"));
+    assert!(!jobs.cancel("running-job").unwrap());
+    assert_eq!(
+        tauri::async_runtime::block_on(jobs.execute_cancellable(
+            "running-job".into(),
+            |_| {},
+            |_, _| Ok(42)
+        )),
+        Ok(42)
+    );
+}
+
+#[test]
 fn concurrent_jobs_wait_for_the_active_worker_and_recover_after_failure() {
     let jobs = GenerationJobs::default();
     let trace = Arc::new(Mutex::new(Vec::new()));

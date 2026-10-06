@@ -26,7 +26,7 @@ type Preview = {
   revision: number;
   document?: string;
 };
-const phases: Record<JobPhase | "reading", string> = {
+const phases: Record<JobPhase | "reading" | "cancelling", string> = {
   queued: "生成待ち",
   validating: "入力を確認中",
   generating: "書類を準備中",
@@ -34,6 +34,8 @@ const phases: Record<JobPhase | "reading", string> = {
   reading: "PDFを読み込み中",
   succeeded: "生成完了",
   failed: "生成失敗",
+  cancelled: "生成をキャンセルしました",
+  cancelling: "生成を停止中",
 };
 
 export function DraftWorkspace({
@@ -61,7 +63,13 @@ export function DraftWorkspace({
   const [error, setError] = useState<string | null>(null);
   const [draftPdf, setDraftPdf] = useState<Preview | null>(null);
   const [documentPdfs, setDocumentPdfs] = useState<Partial<Record<DocumentKind, Preview>>>({});
-  const [job, setJob] = useState<{ document: string; phase: JobPhase | "reading" } | null>(null);
+  const [job, setJob] = useState<{
+    document: string;
+    phase: JobPhase | "reading" | "cancelling";
+  } | null>(null);
+  const activeJob = useRef<string | null>(null);
+  const [cancelling, setCancelling] = useState(false);
+  const cancellationRequested = useRef(false);
   const jobRunning = useRef(false);
   const generation = useRef(0);
   const mounted = useRef(true);
@@ -274,6 +282,10 @@ export function DraftWorkspace({
     const kind = selectedKind;
     const label = document;
     const generationId = ++generation.current;
+    const jobId = createId("job");
+    activeJob.current = jobId;
+    cancellationRequested.current = false;
+    setCancelling(false);
     let receivingProgress = true;
     const showPhase = (phase: JobPhase | "reading") => {
       if (mounted.current && generation.current === generationId)
@@ -288,14 +300,17 @@ export function DraftWorkspace({
         kind,
         snapshot.revision,
         (phase) => {
-          if (receivingProgress && phase !== "succeeded") showPhase(phase);
+          if (receivingProgress && !cancellationRequested.current && phase !== "succeeded")
+            showPhase(phase);
         },
+        jobId,
       );
       receivingProgress = false;
       if (
         result.projectId !== snapshot.project.projectId ||
         result.revision !== snapshot.revision ||
-        result.kind !== kind
+        result.kind !== kind ||
+        result.jobId !== jobId
       )
         throw new Error("生成結果と編集中の書類が一致しません。もう一度生成してください。");
       showPhase("reading");
@@ -320,13 +335,37 @@ export function DraftWorkspace({
       }
     } catch (failure) {
       if (mounted.current) {
-        showPhase("failed");
-        setError(failure instanceof Error ? failure.message : String(failure));
+        const message = failure instanceof Error ? failure.message : String(failure);
+        const cancelled = message.startsWith("PDF生成をキャンセルしました。 (CANCELED)");
+        showPhase(cancelled ? "cancelled" : "failed");
+        if (!cancelled) setError(message);
       }
     } finally {
       receivingProgress = false;
       jobRunning.current = false;
+      activeJob.current = null;
+      setCancelling(false);
       if (mounted.current) setBusy(false);
+    }
+  }
+
+  async function cancelGeneration() {
+    const jobId = activeJob.current;
+    const previous = job;
+    if (!jobId || cancellationRequested.current) return;
+    cancellationRequested.current = true;
+    setCancelling(true);
+    setError(null);
+    setJob((current) => (current ? { ...current, phase: "cancelling" } : current));
+    try {
+      await client.cancelGeneration(jobId);
+    } catch (failure) {
+      if (mounted.current && activeJob.current === jobId) {
+        cancellationRequested.current = false;
+        setCancelling(false);
+        setJob(previous);
+        setError(failure instanceof Error ? failure.message : String(failure));
+      }
     }
   }
 
@@ -516,6 +555,11 @@ export function DraftWorkspace({
           {busy ? "PDF生成中…" : "PDF更新"}
         </button>
         {error && !pending && <p role="alert">{error}</p>}
+        {busy && activeJob.current && (
+          <button type="button" disabled={cancelling} onClick={() => void cancelGeneration()}>
+            生成をキャンセル
+          </button>
+        )}
         {job && (
           <output aria-label="生成状態" aria-live="polite">
             {job.document}：{phases[job.phase]}

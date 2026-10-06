@@ -1,6 +1,7 @@
 use super::{
+    cancellation::{Cancellation, CANCELLED},
     diagnostics::{DiagnosticFailure, TexRuntime},
-    process::run,
+    process::run_cancellable,
 };
 use crate::generator::GeneratedBundle;
 use std::{fs, time::Duration};
@@ -14,6 +15,28 @@ pub fn compile(
     runtime: &TexRuntime,
     bundle: &GeneratedBundle,
 ) -> Result<PdfArtifact, DiagnosticFailure> {
+    compile_with_control(
+        runtime,
+        bundle,
+        &Cancellation::default(),
+        Duration::from_secs(60),
+    )
+}
+
+pub fn compile_with_control(
+    runtime: &TexRuntime,
+    bundle: &GeneratedBundle,
+    cancellation: &Cancellation,
+    timeout: Duration,
+) -> Result<PdfArtifact, DiagnosticFailure> {
+    let cancelled = || DiagnosticFailure {
+        code: "CANCELED".into(),
+        message: CANCELLED.into(),
+        log: String::new(),
+    };
+    if cancellation.is_cancelled() {
+        return Err(cancelled());
+    }
     let io_error = |err: std::io::Error| DiagnosticFailure {
         code: "IO_ERROR".into(),
         message: "PDF生成用のファイルを準備できませんでした。".into(),
@@ -39,8 +62,11 @@ pub fn compile(
         "-no-shell-escape",
         "main.tex",
     ]);
-    let output = run(command, Duration::from_secs(60)).map_err(io_error)?;
+    let output = run_cancellable(command, timeout, cancellation).map_err(io_error)?;
     let log = format!("{}\n{}", output.stdout, output.stderr);
+    if output.cancelled {
+        return Err(cancelled());
+    }
     if output.timed_out || !output.success {
         return Err(DiagnosticFailure {
             code: if output.timed_out {
@@ -68,6 +94,9 @@ pub fn compile(
             message: "有効なPDFが生成されませんでした。".into(),
             log,
         });
+    }
+    if cancellation.is_cancelled() {
+        return Err(cancelled());
     }
     Ok(PdfArtifact { bytes, log })
 }

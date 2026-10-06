@@ -15,6 +15,7 @@ pub fn run() {
             commands::diagnose_tex,
             commands::generate_draft,
             commands::documents::generate_document,
+            commands::documents::cancel_generation,
             commands::documents::list_templates,
             commands::read_pdf,
             commands::files::open_project,

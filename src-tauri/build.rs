@@ -4,6 +4,7 @@ fn main() {
             "diagnose_tex",
             "generate_draft",
             "generate_document",
+            "cancel_generation",
             "list_templates",
             "read_pdf",
             "open_project",

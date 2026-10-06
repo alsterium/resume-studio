@@ -9,6 +9,73 @@ import { PdfPreview } from "../../src/features/preview/PdfPreview";
 import { tauriClient } from "../../src/infrastructure/app-client";
 import fullProject from "../fixtures/project-full.json";
 
+test("待機中と実行中の生成を停止し、後始末の完了まで待って成功PDFを保持する", async () => {
+  const user = userEvent.setup();
+  let reject: ((reason: string) => void) | undefined;
+  let pending = false;
+  let phase: JobPhase = "queued";
+  let jobId = "";
+  let cancelFails = false;
+  mockIPC((command, rawArgs) => {
+    const args = rawArgs as Record<string, unknown>;
+    if (command === "generate_document") {
+      jobId = args.jobId as string;
+      (args.progress as Channel<JobPhase>).onmessage(phase);
+      if (pending)
+        return new Promise((_, fail) => {
+          reject = fail;
+        });
+      return {
+        resultId: jobId,
+        jobId,
+        kind: args.kind,
+        revision: args.revision,
+        projectId: (args.project as typeof fullProject).projectId,
+      };
+    }
+    if (command === "cancel_generation") {
+      expect(args.jobId).toBe(jobId);
+      if (cancelFails) throw "停止要求に失敗";
+      return true;
+    }
+    if (command === "read_pdf") return new Uint8Array([37, 80, 68, 70, 45]).buffer;
+    throw new Error(command);
+  });
+  render(<DraftWorkspace client={tauriClient} />);
+  await user.click(screen.getByRole("button", { name: "履歴書PDF更新" }));
+  await screen.findByLabelText("生成されたPDFページ");
+  for (const waiting of [true, false]) {
+    const canvas = screen.getByLabelText("生成されたPDFページ");
+    pending = true;
+    phase = waiting ? "queued" : "compiling";
+    await user.click(screen.getByRole("button", { name: "履歴書PDF更新" }));
+    expect(screen.getByLabelText("生成状態")).toHaveTextContent(
+      waiting ? "生成待ち" : "PDFを生成中",
+    );
+    if (waiting) {
+      cancelFails = true;
+      await user.click(screen.getByRole("button", { name: "生成をキャンセル" }));
+      expect(await screen.findByRole("alert")).toHaveTextContent("停止要求に失敗");
+      expect(screen.getByRole("button", { name: "生成をキャンセル" })).toBeEnabled();
+      cancelFails = false;
+    }
+    await user.click(screen.getByRole("button", { name: "生成をキャンセル" }));
+    expect(screen.getByRole("button", { name: "生成をキャンセル" })).toBeDisabled();
+    expect(screen.getByLabelText("生成状態")).toHaveTextContent("生成を停止中");
+    expect(screen.getByRole("button", { name: "新規" })).toBeDisabled();
+    await user.type(screen.getByLabelText("氏名"), "追記");
+    await act(async () => {
+      reject?.("PDF生成をキャンセルしました。 (CANCELED)");
+    });
+    expect(screen.getByLabelText("生成状態")).toHaveTextContent("生成をキャンセルしました");
+    expect(screen.getByLabelText("生成されたPDFページ")).toBe(canvas);
+    expect(screen.getByRole("button", { name: "履歴書PDF更新" })).toBeEnabled();
+    pending = false;
+    await user.click(screen.getByRole("button", { name: "履歴書PDF更新" }));
+    await waitFor(() => expect(screen.getByLabelText("生成状態")).toHaveTextContent("生成完了"));
+  }
+});
+
 test("生成中も編集と書類切替ができ、書類別PDFと古いrevisionを保持する", async () => {
   const user = userEvent.setup();
   let complete: ((result: GeneratedDocument) => void) | undefined;
@@ -23,6 +90,7 @@ test("生成中も編集と書類切替ができ、書類別PDFと古いrevision
         resultId: args?.kind === "resume" ? "resume" : "career",
         kind: args?.kind as GeneratedDocument["kind"],
         revision: args?.revision as number,
+        jobId: args?.jobId as string,
         projectId: (args?.project as typeof fullProject)?.projectId,
       };
       progress.onmessage("compiling");
@@ -90,6 +158,7 @@ test("別プロジェクト・revision・書類種別の生成結果を表示せ
         resultId: "saved",
         kind: args?.kind,
         revision: args?.revision,
+        jobId: args?.jobId,
         projectId: (args?.project as typeof fullProject)?.projectId,
       };
       if (mode === "project") result.projectId = "different-project";
@@ -176,6 +245,7 @@ test("版付きテンプレートを明示選択し、書類全項目の生成�
         resultId: "formal",
         projectId: project.projectId,
         revision: args?.revision,
+        jobId: args?.jobId,
         kind: "resume",
       };
     }
@@ -223,6 +293,7 @@ test("職務経歴書の生成では選択中の書類種別をIPCへ渡す", as
         resultId: "career",
         projectId: (args?.project as typeof fullProject)?.projectId,
         revision: args?.revision,
+        jobId: args?.jobId,
         kind: "career",
       };
     }

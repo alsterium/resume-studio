@@ -1,3 +1,4 @@
+pub mod cancellation;
 pub mod compile;
 pub mod diagnostics;
 pub mod jobs;

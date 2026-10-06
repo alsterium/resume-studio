@@ -1,4 +1,4 @@
 [[permission]]
 identifier = "allow-document-generation"
-description = "同梱テンプレート一覧の取得と正式Projectからの書類PDF生成"
-commands.allow = ["list_templates", "generate_document"]
+description = "同梱テンプレート一覧の取得と正式Projectからの書類PDF生成・ジョブIDによる停止"
+commands.allow = ["list_templates", "generate_document", "cancel_generation"]

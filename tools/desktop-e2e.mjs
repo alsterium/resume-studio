@@ -499,6 +499,51 @@ try {
       { timeout: 10000 },
     );
   }
+  // Observe the real Channel stage before cancelling through the actual UI.
+  // Cancelled generation must not replace the last successfully rendered PDF.
+  await browser.execute(() => {
+    document.querySelector("canvas").dataset.cancelProof = "previous-success";
+    window.__e2eCancelStages = [];
+    const observer = new MutationObserver(() => {
+      const state = document.querySelector('[aria-label="生成状態"]');
+      if (!state) return;
+      window.__e2eCancelStages.push(state.textContent);
+      if (state.textContent.includes("PDFを生成中")) {
+        observer.disconnect();
+        Array.from(document.querySelectorAll("button"))
+          .find((button) => button.textContent === "生成をキャンセル")
+          .click();
+      }
+    });
+    observer.observe(document.querySelector(".draft-editor"), {
+      childList: true,
+      characterData: true,
+      subtree: true,
+    });
+    Array.from(document.querySelectorAll("button"))
+      .find((button) => button.textContent === "職務経歴書PDF更新")
+      .click();
+  });
+  await browser
+    .waitUntil(
+      async () =>
+        (await browser.$('[aria-label="生成状態"]').getText()).includes("生成をキャンセルしました"),
+      { timeout: 10000 },
+    )
+    .catch(async (failure) => {
+      const state = await browser.execute(() => ({
+        stages: window.__e2eCancelStages,
+        error: document.querySelector('[role="alert"]')?.textContent,
+        failures: window.__e2eConsoleFailures.slice(-4),
+      }));
+      throw new Error(`${failure.message}: ${JSON.stringify(state)}`);
+    });
+  assert.equal(
+    await browser.execute(() => document.querySelector("canvas")?.dataset.cancelProof),
+    "previous-success",
+  );
+  assert.ok(await browser.$("button=職務経歴書PDF更新").isEnabled());
+  assert.equal(await browser.$('[role="alert"]').isExisting(), false);
   await browser.$(".draft-editor input").setValue("架空 終了確認");
   const closeRequest = await browser.executeAsync((done) => {
     window.__TAURI_INTERNALS__

@@ -34,12 +34,14 @@ export type JobPhase =
   | "generating"
   | "compiling"
   | "succeeded"
-  | "failed";
+  | "failed"
+  | "cancelled";
 export interface GeneratedDocument {
   resultId: string;
   projectId: string;
   revision: number;
   kind: DocumentKind;
+  jobId: string;
 }
 export interface TemplateManifest {
   id: string;
@@ -59,7 +61,9 @@ export interface AppClient {
     kind: DocumentKind,
     revision: number,
     onProgress: (phase: JobPhase) => void,
+    jobId: string,
   ): Promise<GeneratedDocument>;
+  cancelGeneration(jobId: string): Promise<boolean>;
   importPhoto(): Promise<ImportedPhoto | null>;
   onCloseRequested(handler: () => void): Promise<() => void>;
   requestClose(): Promise<void>;
@@ -82,7 +86,7 @@ export interface AppClient {
 
 export const tauriClient: AppClient = {
   listTemplates: () => invoke("list_templates"),
-  generateDocument: (project, kind, revision, onProgress) => {
+  generateDocument: (project, kind, revision, onProgress, jobId) => {
     const validated = validateProject(project);
     if (!Number.isSafeInteger(revision) || revision < 0)
       throw new Error("編集revisionを確認できませんでした。");
@@ -93,8 +97,10 @@ export const tauriClient: AppClient = {
       kind,
       revision,
       progress,
+      jobId,
     });
   },
+  cancelGeneration: (jobId) => invoke("cancel_generation", { jobId }),
   importPhoto: () => invoke("import_photo"),
   onCloseRequested: (handler) => listen("resume-studio:request-close", handler),
   requestClose: () => invoke("request_app_close", { quit: true }),
