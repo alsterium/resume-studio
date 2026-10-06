@@ -88,6 +88,8 @@ jobs:
           pnpm build:e2e
       - name: Run native WebView with real TeX
         run: pnpm test:e2e
+      - name: Verify body visitor with real TeX and PDF text extraction
+        run: pnpm test:tex
       - name: Verify production excludes the test server
         run: |
           cargo tree --manifest-path src-tauri/Cargo.toml --locked --edges normal --prefix none > "$RUNNER_TEMP/production-dependencies.txt"

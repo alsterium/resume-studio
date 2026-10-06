@@ -62,7 +62,7 @@ pub fn generate(draft: &Draft) -> Result<GeneratedBundle, String> {
     } else {
         paragraphs
     };
-    if paragraphs.len() > 256 * 1024 {
+    if paragraphs.len() > body::MAX_RENDERED_BODY_BYTES {
         return Err("本文がサイズ上限を超えています。".into());
     }
     Ok(GeneratedBundle {
