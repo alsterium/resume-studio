@@ -27,7 +27,21 @@ export interface TexDiagnostics {
   error: { code: string; message: string; log: string } | null;
 }
 
+export type DocumentKind = "resume" | "career";
+export interface TemplateManifest {
+  id: string;
+  version: string;
+  displayName: string;
+  documentKind: DocumentKind;
+  schemaVersions: number[];
+  engine: string;
+  packages: string[];
+  fonts: string[];
+}
+
 export interface AppClient {
+  listTemplates(): Promise<TemplateManifest[]>;
+  generateDocument(project: Project, kind: DocumentKind): Promise<{ resultId: string }>;
   importPhoto(): Promise<ImportedPhoto | null>;
   onCloseRequested(handler: () => void): Promise<() => void>;
   requestClose(): Promise<void>;
@@ -49,6 +63,9 @@ export interface AppClient {
 }
 
 export const tauriClient: AppClient = {
+  listTemplates: () => invoke("list_templates"),
+  generateDocument: (project, kind) =>
+    invoke("generate_document", { project: validateProject(project), kind }),
   importPhoto: () => invoke("import_photo"),
   onCloseRequested: (handler) => listen("resume-studio:request-close", handler),
   requestClose: () => invoke("request_app_close", { quit: true }),

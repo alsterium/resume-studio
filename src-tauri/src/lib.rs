@@ -13,6 +13,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::diagnose_tex,
             commands::generate_draft,
+            commands::documents::generate_document,
+            commands::documents::list_templates,
             commands::read_pdf,
             commands::files::open_project,
             commands::files::save_project,
@@ -31,6 +33,14 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("Resume Studioの起動に失敗しました")
         .run(|app, event| {
+            #[cfg(all(target_os = "macos", feature = "desktop-e2e"))]
+            if matches!(event, tauri::RunEvent::Ready) {
+                app.show().expect("E2Eアプリを表示できませんでした");
+                app.get_webview_window("main")
+                    .expect("E2Eメインウィンドウ")
+                    .set_focus()
+                    .expect("E2Eウィンドウをフォーカスできませんでした");
+            }
             if let tauri::RunEvent::ExitRequested { api, .. } = event {
                 if !app.state::<commands::close::CloseGuard>().permitted() {
                     api.prevent_exit();

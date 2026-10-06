@@ -324,11 +324,21 @@ try {
       failure: document.querySelector('[role="alert"]')?.textContent,
       diagnostics: window.__e2eConsoleFailures,
       ready: document.querySelector("canvas")?.dataset.renderedPage === "1",
+      pageStatus: document.querySelector('[aria-label="ページ番号"]')?.textContent,
+      visibility: document.visibilityState,
+      canvas: document.querySelector("canvas")
+        ? {
+            width: document.querySelector("canvas").width,
+            height: document.querySelector("canvas").height,
+            dataset: { ...document.querySelector("canvas").dataset },
+          }
+        : null,
     }));
     if (state.failure)
       throw new Error(`${state.failure.slice(0, 2000)}\n${state.diagnostics.slice(-4).join("\n")}`);
     if (state.ready) break;
-    if (Date.now() >= renderDeadline) throw new Error("Real TeX PDF did not render");
+    if (Date.now() >= renderDeadline)
+      throw new Error(`Real TeX PDF did not render\n${JSON.stringify(state)}`);
     await delay(200);
   }
   const first = await browser.execute(() => {
@@ -378,6 +388,77 @@ try {
     { timeout: 30000 },
   );
   assert.ok((await browser.execute(() => document.querySelector("canvas").width)) > first.width);
+  await browser.$("button=テンプレート一覧を確認").click();
+  await browser.waitUntil(
+    async () =>
+      await browser.execute(() =>
+        Array.from(document.querySelectorAll("label")).some(
+          (label) =>
+            label.textContent.includes("履歴書テンプレート") && label.querySelector("select"),
+        ),
+      ),
+    { timeout: 10000 },
+  );
+  for (const [label, resultId, expected] of [
+    ["履歴書", "2", ["架空大学卒業", "架空の志望動機末尾", "架空の希望末尾"]],
+    ["職務経歴書", "3", ["架空会社", "架空案件", "架空の業務末尾", "架空の自己PR末尾"]],
+  ]) {
+    if (label === "職務経歴書") await browser.$("button=職務経歴書").click();
+    await browser.$(`button=${label}PDF更新`).click();
+    const deadline = Date.now() + 90000;
+    for (;;) {
+      const state = await browser.execute(
+        (title) => ({
+          failure: document.querySelector('[role="alert"]')?.textContent,
+          diagnostics: window.__e2eConsoleFailures,
+          ready:
+            Array.from(document.querySelectorAll("output")).some(
+              (item) => item.textContent === `プレビュー：${title}`,
+            ) && document.querySelector("canvas")?.dataset.renderedPage === "1",
+        }),
+        label,
+      );
+      if (state.failure)
+        throw new Error(`${state.failure}\n${state.diagnostics.slice(-4).join("\n")}`);
+      if (state.ready) break;
+      if (Date.now() > deadline) throw new Error(`Formal ${label} PDF did not render`);
+      await delay(200);
+    }
+    if (label === "履歴書") {
+      const coloredPixels = await browser.execute(() => {
+        const canvas = document.querySelector("canvas");
+        const data = canvas.getContext("2d").getImageData(0, 0, canvas.width, canvas.height).data;
+        let count = 0;
+        for (let index = 0; index < data.length; index += 64) {
+          const channels = [data[index], data[index + 1], data[index + 2]];
+          if (data[index + 3] > 0 && Math.max(...channels) - Math.min(...channels) > 30) count++;
+        }
+        return count;
+      });
+      assert.ok(coloredPixels > 10, "Formal resume preview lost the embedded photo");
+    }
+    const formalBytes = await browser.executeAsync((id, done) => {
+      window.__TAURI_INTERNALS__
+        .invoke("read_pdf", { resultId: id })
+        .then((buffer) => done({ bytes: Array.from(new Uint8Array(buffer)) }))
+        .catch((failure) => done({ failure: String(failure) }));
+    }, resultId);
+    assert.equal(formalBytes.failure, undefined);
+    const task = getDocument({ data: new Uint8Array(formalBytes.bytes), useWasm: false });
+    try {
+      const pdf = await task.promise;
+      let text = "";
+      for (let page = 1; page <= pdf.numPages; page++) {
+        const content = await (await pdf.getPage(page)).getTextContent();
+        text += content.items.map((item) => item.str ?? "").join("");
+      }
+      text = text.replace(/\s+/gu, "");
+      for (const value of expected)
+        assert.ok(text.includes(value), `Formal ${label} PDF lost ${value}: ${text}`);
+    } finally {
+      await task.destroy();
+    }
+  }
   await browser.$(".draft-editor input").setValue("架空 終了確認");
   const closeRequest = await browser.executeAsync((done) => {
     window.__TAURI_INTERNALS__
@@ -412,7 +493,7 @@ try {
   await waitForExit();
   assert.equal(JSON.parse(await readFile(projectPath, "utf8")).profile.name, "架空 終了確認");
   console.log(
-    "DESKTOP_E2E: PASS (photo import → JSON save/move → restart/restore → TeX/PDF → guarded close/quit → save/exit; picker adapters)",
+    "DESKTOP_E2E: PASS (photo import → JSON save/move → restart/restore → draft/resume/career TeX/PDF and embedded photo → guarded close/quit → save/exit; picker adapters)",
   );
 } finally {
   try {

@@ -4,6 +4,81 @@ use resume_studio_lib::{
 };
 use std::fs;
 
+#[test]
+fn formal_documents_compile_from_exported_bundles_with_and_without_photos() {
+    use resume_studio_lib::{
+        domain::validation::parse_project,
+        generator::{bundle::write_bundle, documents::generate_project, templates::DocumentKind},
+    };
+    for fixture in [
+        include_bytes!("../../tests/fixtures/project-full.json").as_slice(),
+        include_bytes!("../../tests/fixtures/project-empty.json").as_slice(),
+    ] {
+        let project = parse_project(fixture).unwrap();
+        for kind in [DocumentKind::Resume, DocumentKind::Career] {
+            let bundle = generate_project(&project, kind).unwrap();
+            let artifact =
+                compile(&TexRuntime::discover(), &bundle).expect("formal document compilation");
+            assert!(
+                !artifact.log.contains("Missing character:"),
+                "{}",
+                artifact.log
+            );
+            let directory = tempfile::tempdir().unwrap();
+            write_bundle(directory.path(), &bundle).unwrap();
+            let output = std::process::Command::new("/Library/TeX/texbin/latexmk")
+                .current_dir(directory.path())
+                .args([
+                    "-norc",
+                    "-lualatex",
+                    "-interaction=nonstopmode",
+                    "-halt-on-error",
+                    "-latexoption=-no-shell-escape",
+                    "main.tex",
+                ])
+                .output()
+                .unwrap();
+            assert!(
+                output.status.success(),
+                "{}",
+                String::from_utf8_lossy(&output.stdout)
+            );
+            assert!(fs::read(directory.path().join("main.pdf"))
+                .unwrap()
+                .starts_with(b"%PDF-"));
+            #[cfg(target_os = "macos")]
+            {
+                let text = extracted_pdf_text(&artifact.bytes);
+                assert!(
+                    text.contains(if kind == DocumentKind::Resume {
+                        "履歴書"
+                    } else {
+                        "職務経歴書"
+                    }),
+                    "{text}"
+                );
+                if !project.profile.name.is_empty() {
+                    for value in [
+                        project.profile.name.as_str(),
+                        "架空資格",
+                        "太字の日本語 & %",
+                        "番号付きの実績",
+                    ] {
+                        assert!(text.contains(value), "missing {value}: {text}");
+                    }
+                    if kind == DocumentKind::Career {
+                        assert!(
+                            text.contains("https://example.com/project?a=1&b=2"),
+                            "{text}"
+                        );
+                        assert!(text.contains("架空の実務経験"), "{text}");
+                    }
+                }
+            }
+        }
+    }
+}
+
 #[cfg(target_os = "macos")]
 fn extracted_pdf_text(bytes: &[u8]) -> String {
     let dir = tempfile::tempdir().unwrap();

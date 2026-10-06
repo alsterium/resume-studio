@@ -1,0 +1,12 @@
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{career}[2026/10/06 Resume Studio career]
+\RequirePackage[margin=18mm]{geometry}
+\RequirePackage[hidelinks,unicode]{hyperref}
+\newcommand{\CareerHeader}[2]{\section*{職務経歴書}\hfill #1\par\hfill #2\par}
+\newcommand{\CareerSection}[1]{\section*{#1}}
+\newcommand{\CareerCompany}[2]{\subsection*{#1}\noindent #2\par}
+\newcommand{\CareerProject}[2]{\subsubsection*{#1}\noindent #2\par}
+\newcommand{\CareerField}[2]{\noindent\textbf{#1}：#2\par}
+\newcommand{\CareerBody}[2]{\paragraph*{#1}\mbox{}\par #2}
+\newcommand{\CareerSkill}[2]{\noindent\textbf{#1}\par #2\par}
+\newcommand{\CareerURL}[2]{\noindent\href{#1}{#2}\par}

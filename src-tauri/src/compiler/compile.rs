@@ -28,8 +28,7 @@ pub fn compile(
         .prefix("resume-studio-compile-")
         .tempdir()
         .map_err(io_error)?;
-    fs::write(dir.path().join("main.tex"), &bundle.main_tex).map_err(io_error)?;
-    fs::write(dir.path().join("content.tex"), &bundle.content_tex).map_err(io_error)?;
+    crate::generator::bundle::write_bundle(dir.path(), bundle).map_err(io_error)?;
     let mut command = runtime.command(latexmk);
     command.current_dir(dir.path()).args([
         "-norc",

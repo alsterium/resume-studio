@@ -18,6 +18,15 @@ pub struct BodyNode {
     attrs: Option<ListAttrs>,
 }
 
+impl BodyNode {
+    pub fn has_content(&self) -> bool {
+        matches!(
+            self.kind.as_str(),
+            "text" | "hardBreak" | "bulletList" | "orderedList"
+        ) || self.content.iter().any(Self::has_content)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

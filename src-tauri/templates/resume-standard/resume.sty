@@ -1,0 +1,12 @@
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{resume}[2026/10/06 Resume Studio resume]
+\RequirePackage[margin=18mm]{geometry}
+\RequirePackage{graphicx,longtable,array}
+\newcommand{\ResumeHeader}[1]{\section*{履歴書}\hfill #1 現在\par}
+\newcommand{\ResumeProfile}[6]{ふりがな：#1\par 氏名：#2\par 生年月日：#3\quad #4\quad #5\par #6\par}
+\newcommand{\ResumePhoto}[1]{\includegraphics[width=30mm,height=40mm,keepaspectratio]{#1}}
+\newcommand{\ResumeContact}[6]{\subsection*{#1}郵便番号：#2\par 住所：#3\par 住所ふりがな：#4\par 電話：#5\par メール：#6\par}
+\newcommand{\ResumeHistoryBegin}[1]{\subsection*{#1}\begin{longtable}{p{12mm}p{10mm}p{130mm}}年 & 月 & 内容\\\hline\endhead}
+\newcommand{\ResumeHistoryRow}[3]{#1 & #2 & #3\\}
+\newcommand{\ResumeHistoryEnd}{\end{longtable}}
+\newcommand{\ResumeBody}[2]{\subsection*{#1}#2}

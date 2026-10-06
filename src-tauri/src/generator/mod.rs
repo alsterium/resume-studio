@@ -1,5 +1,8 @@
 use serde::{Deserialize, Serialize};
 pub mod body;
+pub mod bundle;
+pub mod documents;
+pub mod templates;
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -15,6 +18,7 @@ pub struct Draft {
 pub struct GeneratedBundle {
     pub main_tex: String,
     pub content_tex: String,
+    pub resources: Vec<bundle::BundleResource>,
 }
 
 pub fn escape_text(text: &str) -> String {
@@ -68,6 +72,7 @@ pub fn generate(draft: &Draft) -> Result<GeneratedBundle, String> {
     Ok(GeneratedBundle {
         main_tex: include_str!("../../templates/draft/main.tex").into(),
         content_tex: format!("\\section*{{{}}}\n{}", escape_text(&draft.name), paragraphs),
+        resources: Vec::new(),
     })
 }
 

@@ -208,3 +208,9 @@ T16はRustの共通visitorを両書類の本文変換の正本とする。許可
 入力本文の64KiB/10,000 node制限とは別に、変換済み本文を2MiB以内に制限する。旧256KiB制限は64KiBの許可済み特殊文字がエスケープで膨らむと拒否していたため、全入力上限を収容する2MiBへ変更した。本文を切り捨てない。
 
 `tests/fixtures/body-visitor.json`と手書きの期待TeXを照合し、空段落、先頭改行、全特殊文字、複合mark、4階層の混在リスト、独立した番号開始と末尾目印をUnitで検証する。無効な親子関係・フィールド、空text、制御文字、64KiB/10,000 node境界、特殊文字の出力膨張も確認する。`pnpm test:tex`は実LuaLaTeXで4ケースを生成し、欠字/はみ出しログを検査し、macOSのPDFKitで日本語・文字・番号・末尾を抽出する。
+
+## 正式書類の生成とテンプレート選択
+
+T17では「履歴書PDF更新」「職務経歴書PDF更新」が正式Project全項目をRustのgenerate_documentへ渡す。テンプレート一覧はlist_templatesで取得し、非対応ID／版を維持したまま明示選択で変更できる。生成失敗で最後の成功PDFを維持し、生成時revisionと編集revisionが異なれば古い内容と表示する。ジョブと書類別結果の管理はT21で拡張する。初期の「PDF更新」（氏名と職務要約だけの下書き）は検証経路として暫定的に残す。
+
+生成ファイル・版解決・制限・単体コンパイル手順は[GENERATED_TEX.md](GENERATED_TEX.md)。T17の紙面は初期流し込み版で、参考帳票の組版はT18／T19。PDF再生成時に前のloading taskのdestroyと次の生成が重なり、共有workerでPDFWorker.createが失敗することを実E2Eで再現した。runtimeが同梱PDFWorkerを所有し、各loading taskは書類のtransportだけを後始末する構成へ修正した。workerをtaskの所有物にしないため、前のPDFのdestroyが次のworkerを破棄しない。E2Eは下書き→写真付き履歴書→職務経歴書の連続生成を通してこの回帰も検証する。

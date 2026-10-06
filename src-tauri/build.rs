@@ -3,6 +3,8 @@ fn main() {
         tauri_build::AppManifest::new().commands(&[
             "diagnose_tex",
             "generate_draft",
+            "generate_document",
+            "list_templates",
             "read_pdf",
             "open_project",
             "save_project",

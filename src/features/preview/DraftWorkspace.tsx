@@ -9,6 +9,7 @@ import { beginSession, editSession, hasUnsavedChanges, recordSaved } from "../..
 import { DiscardDialog } from "../files/DiscardDialog";
 import { HistoryEditor, ResumeEditor } from "../resume/ResumeEditor";
 import { CareerEditor } from "../career/CareerEditor";
+import { TemplatePicker } from "./TemplatePicker";
 
 type PendingAction = "new" | "open" | "close";
 
@@ -40,6 +41,8 @@ export function DraftWorkspace({
     bytes: Uint8Array;
     name: string;
     body: JSONContent;
+    revision?: number;
+    document?: string;
   } | null>(null);
 
   useEffect(() => {
@@ -215,6 +218,24 @@ export function DraftWorkspace({
     }
   }
 
+  async function updateDocument() {
+    const snapshot = session;
+    setBusy(true);
+    setError(null);
+    try {
+      const { resultId } = await client.generateDocument(
+        snapshot.project,
+        document === "履歴書" ? "resume" : "career",
+      );
+      const bytes = await client.readPdf(resultId);
+      setPdf({ id: resultId, bytes, name, body, revision: snapshot.revision, document });
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : String(failure));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <section aria-labelledby="draft-title" className="draft-workspace">
       <div className="draft-editor">
@@ -381,13 +402,33 @@ export function DraftWorkspace({
           }}
         />
         <p>免許・資格は両書類で共用します。</p>
+        <TemplatePicker
+          client={client}
+          project={project}
+          disabled={opening || pending !== null || busy}
+          onChange={(updated) => {
+            setSession((current) => editSession(current, updated));
+            setFileMessage(null);
+          }}
+        />
+        <button
+          type="button"
+          disabled={busy || fileBusy || pending !== null}
+          onClick={() => void updateDocument()}
+        >
+          {document}PDF更新
+        </button>
         <button type="button" disabled={busy || fileBusy} onClick={() => void updatePdf()}>
           {busy ? "PDF生成中…" : "PDF更新"}
         </button>
         {error && !pending && <p role="alert">{error}</p>}
-        {pdf && (pdf.name !== name || JSON.stringify(pdf.body) !== JSON.stringify(body)) && (
-          <output>PDFは更新前の内容です。</output>
-        )}
+        {pdf?.document && <output>プレビュー：{pdf.document}</output>}
+        {pdf &&
+          (pdf.revision !== undefined
+            ? pdf.revision !== session.revision
+            : pdf.name !== name || JSON.stringify(pdf.body) !== JSON.stringify(body)) && (
+            <output>PDFは更新前の内容です。</output>
+          )}
       </div>
       {pdf ? (
         <PdfPreview key={pdf.id} bytes={pdf.bytes} />

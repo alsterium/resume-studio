@@ -1,5 +1,6 @@
 use crate::compiler::diagnostics::{diagnose, TexDiagnostics, TexRuntime};
 pub mod close;
+pub mod documents;
 pub mod files;
 pub mod photos;
 use crate::{

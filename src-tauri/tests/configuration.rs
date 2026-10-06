@@ -41,6 +41,7 @@ fn main_window_only_has_declared_application_permissions() {
             "core:app:allow-version",
             "allow-diagnose-tex",
             "allow-draft-preview",
+            "allow-document-generation",
             "allow-project-files",
             "allow-project-photo",
             "allow-project-close",
