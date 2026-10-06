@@ -26,7 +26,18 @@ fn formal_documents_compile_from_exported_bundles_with_and_without_photos() {
             );
             let directory = tempfile::tempdir().unwrap();
             write_bundle(directory.path(), &bundle).unwrap();
-            let output = std::process::Command::new("/Library/TeX/texbin/latexmk")
+            let runtime = TexRuntime::discover();
+            let tool_directory = runtime.lualatex.as_ref().unwrap().parent().unwrap();
+            // latexmk launches lualatex by name. Exercise a GUI-like minimal PATH,
+            // adding only the discovered TeX directory rather than relying on a login shell.
+            let tool_path = std::env::join_paths([
+                tool_directory,
+                std::path::Path::new("/usr/bin"),
+                std::path::Path::new("/bin"),
+            ])
+            .unwrap();
+            let output = std::process::Command::new(runtime.latexmk.as_ref().unwrap())
+                .env("PATH", tool_path)
                 .current_dir(directory.path())
                 .args([
                     "-norc",
@@ -40,8 +51,10 @@ fn formal_documents_compile_from_exported_bundles_with_and_without_photos() {
                 .unwrap();
             assert!(
                 output.status.success(),
-                "{}",
-                String::from_utf8_lossy(&output.stdout)
+                "stdout: {}\nstderr: {}\nTeX log: {}",
+                String::from_utf8_lossy(&output.stdout),
+                String::from_utf8_lossy(&output.stderr),
+                fs::read_to_string(directory.path().join("main.log")).unwrap_or_default()
             );
             assert!(fs::read(directory.path().join("main.pdf"))
                 .unwrap()
