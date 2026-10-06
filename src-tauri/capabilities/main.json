@@ -1,7 +1,12 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "main",
-  "description": "メインウィンドウからアプリ版・TeX環境確認・下書きPDF生成と結果読取を行う",
+  "description": "メインウィンドウの診断・生成・選択したJSONプロジェクトの保存と読込",
   "windows": ["main"],
-  "permissions": ["core:app:allow-version", "allow-diagnose-tex", "allow-draft-preview"]
+  "permissions": [
+    "core:app:allow-version",
+    "allow-diagnose-tex",
+    "allow-draft-preview",
+    "allow-project-files"
+  ]
 }

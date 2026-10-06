@@ -1,0 +1,4 @@
+[[permission]]
+identifier = "allow-project-files"
+description = "ネイティブ選択したJSONプロジェクトの読込と原子的保存を許可する"
+commands.allow = ["open_project", "save_project"]

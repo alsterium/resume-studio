@@ -1,12 +1,19 @@
 import { useState } from "react";
-import type { AppClient } from "../../infrastructure/app-client";
+import type { AppClient, SavedProject } from "../../infrastructure/app-client";
 import { PdfPreview } from "./PdfPreview";
-import { BodyEditor, emptyBody } from "../../editor/BodyEditor";
+import { BodyEditor } from "../../editor/BodyEditor";
 import type { JSONContent } from "@tiptap/core";
+import { newProject } from "../../domain/new-project";
+import type { BodyDoc } from "../../domain/project";
 
 export function DraftWorkspace({ client }: { client: AppClient }) {
-  const [name, setName] = useState("");
-  const [body, setBody] = useState<JSONContent>(emptyBody);
+  const [project, setProject] = useState(newProject);
+  const [file, setFile] = useState<SavedProject | null>(null);
+  const [editorKey, setEditorKey] = useState(0);
+  const [fileBusy, setFileBusy] = useState(false);
+  const [fileMessage, setFileMessage] = useState<string | null>(null);
+  const name = project.profile.name;
+  const body = project.career.summary;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pdf, setPdf] = useState<{
@@ -15,6 +22,50 @@ export function DraftWorkspace({ client }: { client: AppClient }) {
     name: string;
     body: JSONContent;
   } | null>(null);
+
+  async function openProject() {
+    setFileBusy(true);
+    setError(null);
+    try {
+      const opened = await client.openProject();
+      if (opened) {
+        setProject(opened.project);
+        setFile({ fileId: opened.fileId, displayName: opened.displayName });
+        setEditorKey((key) => key + 1);
+        setPdf(null);
+        setFileMessage("JSONを読み込みました。");
+      }
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : String(failure));
+    } finally {
+      setFileBusy(false);
+    }
+  }
+
+  async function saveProject(saveAs: boolean) {
+    setFileBusy(true);
+    setError(null);
+    try {
+      const saved = await client.saveProject(project, file?.fileId ?? null, saveAs);
+      if (saved) {
+        setFile(saved);
+        setFileMessage("JSONを保存しました。");
+      }
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : String(failure));
+    } finally {
+      setFileBusy(false);
+    }
+  }
+
+  function resetProject() {
+    setProject(newProject());
+    setFile(null);
+    setPdf(null);
+    setError(null);
+    setFileMessage(null);
+    setEditorKey((key) => key + 1);
+  }
 
   async function updatePdf() {
     setBusy(true);
@@ -36,15 +87,44 @@ export function DraftWorkspace({ client }: { client: AppClient }) {
   return (
     <section aria-labelledby="draft-title" className="draft-workspace">
       <div className="draft-editor">
+        <div aria-label="プロジェクト操作">
+          <button type="button" disabled={fileBusy || busy} onClick={resetProject}>
+            新規
+          </button>
+          <button type="button" disabled={fileBusy || busy} onClick={() => void openProject()}>
+            開く
+          </button>
+          <button type="button" disabled={fileBusy} onClick={() => void saveProject(false)}>
+            保存
+          </button>
+          <button type="button" disabled={fileBusy} onClick={() => void saveProject(true)}>
+            名前を付けて保存
+          </button>
+        </div>
+        <output aria-label="プロジェクトファイル">{file?.displayName ?? "保存先未設定"}</output>
+        {fileMessage && <output>{fileMessage}</output>}
         <h2 id="draft-title">下書き</h2>
         <p>氏名と本文からPDFを生成できます。</p>
         <label>
           氏名
-          <input value={name} onChange={(event) => setName(event.target.value)} />
+          <input
+            value={name}
+            onChange={(event) => {
+              setProject({ ...project, profile: { ...project.profile, name: event.target.value } });
+              setFileMessage(null);
+            }}
+          />
         </label>
         <p>本文</p>
-        <BodyEditor onChange={setBody} />
-        <button type="button" disabled={busy} onClick={() => void updatePdf()}>
+        <BodyEditor
+          key={editorKey}
+          initialContent={body as JSONContent}
+          onChange={(content) => {
+            setProject({ ...project, career: { ...project.career, summary: content as BodyDoc } });
+            setFileMessage(null);
+          }}
+        />
+        <button type="button" disabled={busy || fileBusy} onClick={() => void updatePdf()}>
           {busy ? "PDF生成中…" : "PDF更新"}
         </button>
         {error && <p role="alert">{error}</p>}

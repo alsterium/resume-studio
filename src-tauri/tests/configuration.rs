@@ -40,7 +40,8 @@ fn main_window_only_has_declared_application_permissions() {
         serde_json::json!([
             "core:app:allow-version",
             "allow-diagnose-tex",
-            "allow-draft-preview"
+            "allow-draft-preview",
+            "allow-project-files"
         ])
     );
     assert!(capability.get("remote").is_none());

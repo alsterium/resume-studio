@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { createServer } from "node:net";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
 import { remote } from "webdriverio";
@@ -19,8 +22,15 @@ const binary = fileURLToPath(
     import.meta.url,
   ),
 );
+const projectDirectory = await mkdtemp(join(tmpdir(), "resume-studio-e2e-"));
+const projectPath = join(projectDirectory, "応募 書類.json");
 const app = spawn(binary, [], {
-  env: { ...process.env, PATH: "/usr/bin:/bin", TAURI_WEBDRIVER_PORT: String(port) },
+  env: {
+    ...process.env,
+    PATH: "/usr/bin:/bin",
+    TAURI_WEBDRIVER_PORT: String(port),
+    RESUME_STUDIO_E2E_PROJECT: projectPath,
+  },
   stdio: ["ignore", "pipe", "pipe"],
 });
 let output = "";
@@ -75,6 +85,25 @@ try {
   await browser.$('[aria-label="本文"]').addValue("架空の職務内容 & % _ # $ { } ~ ^ \\ 日本語");
   const text = await browser.$('[aria-label="本文"]').getText();
   assert.ok(text.includes("架空の職務内容"), `Input was lost: ${text}`);
+  // Replace only OS file selection; exercise real IPC, validation and atomic storage.
+  await browser.$("button=保存").click();
+  await browser.waitUntil(
+    async () =>
+      (await browser.$('[aria-label="プロジェクトファイル"]').getText()) === "応募 書類.json",
+    { timeout: 30000 },
+  );
+  const saved = JSON.parse(await readFile(projectPath, "utf8"));
+  assert.equal(saved.schemaVersion, 1);
+  assert.equal(saved.profile.name, "架空 山田");
+  assert.ok(JSON.stringify(saved.career.summary).includes("架空の職務内容"));
+  await browser.$("button=新規").click();
+  assert.equal(await browser.$(".draft-editor input").getValue(), "");
+  await browser.$("button=開く").click();
+  await browser.waitUntil(
+    async () => (await browser.$(".draft-editor input").getValue()) === "架空 山田",
+    { timeout: 30000 },
+  );
+  assert.ok((await browser.$('[aria-label="本文"]').getText()).includes("架空の職務内容"));
   await browser.$("button=PDF更新").click();
   const renderDeadline = Date.now() + 90000;
   for (;;) {
@@ -137,7 +166,7 @@ try {
   );
   assert.ok((await browser.execute(() => document.querySelector("canvas").width)) > first.width);
   console.log(
-    "DESKTOP_E2E: PASS (app bundle → WebDriver input → real TeX → PDF text/canvas → zoom)",
+    "DESKTOP_E2E: PASS (app bundle → input → real JSON save/open → real TeX → PDF text/canvas → zoom; picker adapter)",
   );
 } finally {
   try {
@@ -150,5 +179,6 @@ try {
       await exited;
       clearTimeout(timer);
     }
+    await rm(projectDirectory, { recursive: true, force: true });
   }
 }

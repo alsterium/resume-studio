@@ -1,4 +1,5 @@
 use crate::compiler::diagnostics::{diagnose, TexDiagnostics, TexRuntime};
+pub mod files;
 use crate::{
     compiler::{compile::compile, results::PdfStore},
     generator::{generate, Draft},

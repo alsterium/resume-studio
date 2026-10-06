@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "pnpm generate:schemas && vite",
     "build": "pnpm generate:schemas && tsc --noEmit && vite build",
     "preview": "vite preview",
     "tauri": "tauri",

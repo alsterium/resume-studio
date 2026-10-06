@@ -156,3 +156,11 @@ pnpm test:e2e
 最初のコマンドは同梱フロントとdesktop-e2e featureのテスト用.app bundleを作る。2つ目はNode.jsでbundle内の専用アプリを最小PATHで起動し、WebdriverIOから本文入力→実IPC→実TeX→PDF描画と倍率変更を確認する。生成PDFから氏名・本文も文字抽出する。要素入力と倍率用DOMイベントの制限は[ADR 0004](adr/0004-desktop-e2e.md)に記録した。終了時にセッションとアプリを停止する。実TeX環境とmacOSのWebViewが必要で、通常CIのブラウザ内mockテストとは別に報告する。
 
 E2E後に本番アプリを作るときは通常のpnpm tauri buildを使う。desktop-e2e featureを渡さない。WebDriverプラグインは既定の依存グラフに含まれず、通常のcapabilityを増やさない。
+
+## JSONプロジェクトのファイル操作
+
+T11の新規・開く・保存・名前を付けて保存は[Project JSON v1](PROJECT_JSON.md)を使用する。フロントの開発起動でもSchema validatorを事前生成する。tauri-plugin-dialog 2.8.1を固定し、[公式Rust API](https://v2.tauri.app/plugin/dialog/)を用途別コマンド内のblocking workerから呼ぶ。WebViewの権限はopen_project/save_projectだけで、dialog/fsの汎用権限を追加しない。
+
+UI結合テストは実TiptapとTauri mockIPCで復元・全項目保存・別名保存・キャンセル・失敗からの再試行を確認する。Rust storage結合テストは日本語／スペースを含む実パスで往復・移動・上書き・容量制限・既存権限維持を検証する。置換境界への失敗注入では実一時書込後の原本保持と後始末を確認する。
+
+desktop-e2eではNodeが所有する一時ディレクトリのJSONパスをRESUME_STUDIO_E2E_PROJECTへ渡す。desktop-e2e featureのRustだけがnative pickerをそのパスへ置き換える。UIの入力→実IPC→実JSON保存→新規→実JSON読み込み→実TeX→PDF描画を通す。本番ビルドはこの環境変数を解釈しない。native dialog自体の操作と終了・再起動を含む最終受け入れはT28で確認する。
