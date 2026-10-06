@@ -47,7 +47,7 @@ function ContactFields({
   );
 }
 
-function HistoryEditor({
+export function HistoryEditor({
   title,
   rows,
   disabled,
@@ -147,11 +147,13 @@ export function ResumeEditor({
   project,
   disabled,
   editorKey,
+  includeQualifications = true,
   onChange,
 }: {
   project: Project;
   disabled: boolean;
   editorKey: number;
+  includeQualifications?: boolean;
   onChange: (project: Project) => void;
 }) {
   const profile = project.profile;
@@ -263,15 +265,19 @@ export function ResumeEditor({
           ["employment", "職歴"],
           ["qualifications", "免許・資格"],
         ] as const
-      ).map(([key, title]) => (
-        <HistoryEditor
-          key={key}
-          title={title}
-          rows={project.resume[key]}
-          disabled={disabled}
-          onChange={(rows) => onChange({ ...project, resume: { ...project.resume, [key]: rows } })}
-        />
-      ))}
+      )
+        .filter(([key]) => includeQualifications || key !== "qualifications")
+        .map(([key, title]) => (
+          <HistoryEditor
+            key={key}
+            title={title}
+            rows={project.resume[key]}
+            disabled={disabled}
+            onChange={(rows) =>
+              onChange({ ...project, resume: { ...project.resume, [key]: rows } })
+            }
+          />
+        ))}
       {(
         [
           ["motivation", "志望動機・特技・アピールポイント"],

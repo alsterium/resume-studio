@@ -45,11 +45,10 @@ export function App({ client = tauriClient }: { client?: AppClient }) {
         ))}
       </nav>
       <section className="document-panel" aria-labelledby="document-title">
-        <p className="eyebrow">準備中</p>
         <h2 id="document-title">{document}</h2>
-        <p>下書きと全書類のJSONを保存・再開できます。提出用の編集項目は順次追加します。</p>
+        <p>両書類の編集内容と写真を、1つのJSONに保存・再開できます。</p>
       </section>
-      <DraftWorkspace client={client} />
+      <DraftWorkspace client={client} document={document} />
       <TexDiagnosticsPanel client={client} />
       <footer>
         <output>

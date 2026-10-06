@@ -7,11 +7,18 @@ import { createId, newProject } from "../../domain/new-project";
 import type { BodyDoc } from "../../domain/project";
 import { beginSession, editSession, hasUnsavedChanges, recordSaved } from "../../domain/session";
 import { DiscardDialog } from "../files/DiscardDialog";
-import { ResumeEditor } from "../resume/ResumeEditor";
+import { HistoryEditor, ResumeEditor } from "../resume/ResumeEditor";
+import { CareerEditor } from "../career/CareerEditor";
 
 type PendingAction = "new" | "open" | "close";
 
-export function DraftWorkspace({ client }: { client: AppClient }) {
+export function DraftWorkspace({
+  client,
+  document = "履歴書",
+}: {
+  client: AppClient;
+  document?: "履歴書" | "職務経歴書";
+}) {
   const [session, setSession] = useState(() => beginSession(newProject()));
   const project = session.project;
   const dirty = hasUnsavedChanges(session);
@@ -320,7 +327,7 @@ export function DraftWorkspace({ client }: { client: AppClient }) {
           </button>
           <p>JPEG／PNG、5MiB以内。縦横比を保ち最大600×800pxへ調整します。</p>
         </div>
-        <p>本文</p>
+        <p>職務要約</p>
         <BodyEditor
           key={editorKey}
           initialContent={body as JSONContent}
@@ -335,15 +342,45 @@ export function DraftWorkspace({ client }: { client: AppClient }) {
             setFileMessage(null);
           }}
         />
-        <ResumeEditor
-          project={project}
+        <div hidden={document !== "履歴書"}>
+          <ResumeEditor
+            project={project}
+            includeQualifications={false}
+            disabled={opening || pending !== null}
+            editorKey={editorKey}
+            onChange={(updated) => {
+              setSession((current) => editSession(current, updated));
+              setFileMessage(null);
+            }}
+          />
+        </div>
+        <div hidden={document !== "職務経歴書"}>
+          <CareerEditor
+            key={editorKey}
+            project={project}
+            disabled={opening || pending !== null}
+            editorKey={editorKey}
+            onChange={(updated) => {
+              setSession((current) => editSession(current, updated));
+              setFileMessage(null);
+            }}
+          />
+        </div>
+        <HistoryEditor
+          title="免許・資格"
+          rows={project.resume.qualifications}
           disabled={opening || pending !== null}
-          editorKey={editorKey}
-          onChange={(updated) => {
-            setSession((current) => editSession(current, updated));
+          onChange={(qualifications) => {
+            setSession((current) =>
+              editSession(current, {
+                ...current.project,
+                resume: { ...current.project.resume, qualifications },
+              }),
+            );
             setFileMessage(null);
           }}
         />
+        <p>免許・資格は両書類で共用します。</p>
         <button type="button" disabled={busy || fileBusy} onClick={() => void updatePdf()}>
           {busy ? "PDF生成中…" : "PDF更新"}
         </button>

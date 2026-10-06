@@ -135,6 +135,59 @@ try {
     .$('[role="textbox"][aria-label="志望動機・特技・アピールポイント"]')
     .addValue("架空の志望動機末尾");
   await browser.$('[role="textbox"][aria-label="本人希望欄"]').addValue("架空の希望末尾");
+  await browser.$("button=職務経歴書").click();
+  await browser.$("button=会社を追加").click();
+  await browser.execute(() => {
+    for (const [label, value] of [
+      ["会社名", "架空会社"],
+      ["役職・役割", "開発担当"],
+      ["会社開始年月", "2020-04"],
+      ["事業内容", "開発事業"],
+      ["資本金", "100万円"],
+      ["従業員数", "10名"],
+    ]) {
+      const input = Array.from(document.querySelectorAll("label"))
+        .find((item) => item.textContent.trim() === label)
+        .querySelector("input");
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(input, value);
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+  });
+  await browser.$("button=案件を追加").click();
+  await browser.execute(() => {
+    for (const [label, value] of [
+      ["案件名", "架空案件"],
+      ["案件開始年月", "2021-01"],
+      ["プロジェクト規模", "5名"],
+      ["案件URL（任意）", "https://example.invalid/case?q=1&x=2"],
+    ]) {
+      const input = Array.from(document.querySelectorAll("label"))
+        .find((item) => item.textContent.trim() === label)
+        .querySelector("input");
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(input, value);
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+  });
+  await browser.$('[role="textbox"][aria-label="業務内容"]').addValue("架空の業務末尾");
+  await browser.$('[role="textbox"][aria-label="自己PR"]').addValue("架空の自己PR末尾");
+  await browser.$("button=スキルを追加").click();
+  await browser.execute(() => {
+    for (const [label, value] of [
+      ["スキル 1 スキル名", "TypeScript"],
+      ["スキル 1 経験期間", "3年"],
+      ["スキル 1 説明", "架空スキル説明"],
+    ]) {
+      const input = Array.from(document.querySelectorAll("label"))
+        .find((item) => item.textContent.trim() === label)
+        .querySelector("input");
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(input, value);
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+  });
+  await browser.$("button=履歴書").click();
   await browser.$("button=写真を取り込む").click();
   await browser.waitUntil(
     async () =>
@@ -161,6 +214,19 @@ try {
   assert.equal(saved.resume.education[0].text, "架空大学 卒業");
   assert.ok(JSON.stringify(saved.resume.motivation).includes("架空の志望動機末尾"));
   assert.ok(JSON.stringify(saved.resume.preferences).includes("架空の希望末尾"));
+  assert.equal(saved.career.positions[0].companyName, "架空会社");
+  assert.equal(saved.career.positions[0].companyOverview.business, "開発事業");
+  assert.equal(saved.career.positions[0].projects[0].name, "架空案件");
+  assert.equal(saved.career.positions[0].projects[0].url, "https://example.invalid/case?q=1&x=2");
+  assert.equal(saved.career.positions[0].endYearMonth, null);
+  assert.equal(saved.career.positions[0].projects[0].endYearMonth, null);
+  assert.ok(
+    JSON.stringify(saved.career.positions[0].projects[0].responsibilities).includes(
+      "架空の業務末尾",
+    ),
+  );
+  assert.equal(saved.career.skills[0].experienceLabel, "3年");
+  assert.ok(JSON.stringify(saved.career.selfPromotion).includes("架空の自己PR末尾"));
   assert.ok(JSON.stringify(saved.career.summary).includes("架空の職務内容"));
   assert.ok(
     JSON.stringify(saved.career.summary).includes('"type":"bold"'),
@@ -228,6 +294,20 @@ try {
       "架空の希望末尾",
     ),
   );
+  await browser.$("button=職務経歴書").click();
+  const restoredCareer = await browser.execute(() => ({
+    company: document.querySelector('[aria-label="職務経歴書の編集"] input').value,
+    caseText: document.querySelector('[role="textbox"][aria-label="業務内容"]').textContent,
+    selfPromotion: document.querySelector('[role="textbox"][aria-label="自己PR"]').textContent,
+    skill: Array.from(document.querySelectorAll("label"))
+      .find((item) => item.textContent.trim() === "スキル 1 経験期間")
+      .querySelector("input").value,
+  }));
+  assert.equal(restoredCareer.company, "架空会社");
+  assert.ok(restoredCareer.caseText.includes("架空の業務末尾"));
+  assert.ok(restoredCareer.selfPromotion.includes("架空の自己PR末尾"));
+  assert.equal(restoredCareer.skill, "3年");
+  await browser.$("button=履歴書").click();
   await browser.execute(() => {
     delete Map.prototype.getOrInsertComputed;
     window.__e2eConsoleFailures = [];
