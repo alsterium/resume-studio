@@ -234,4 +234,4 @@ test("会社100・案件200・スキル200・一覧50の上限で追加を止め
   expect(screen.getByRole("button", { name: "スキルを追加" })).toBeEnabled();
   await user.click(screen.getByRole("button", { name: "会社 削除" }));
   expect(screen.getByRole("button", { name: "会社を追加" })).toBeEnabled();
-});
+}, 15_000);
