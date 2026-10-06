@@ -76,6 +76,17 @@ fn contact(output: &mut String, title: &str, contact: &Contact) {
 fn period(start: &str, end: Option<&str>, ongoing: &str) -> String {
     format!("{} ～ {}", start, end.unwrap_or(ongoing))
 }
+fn resume_date(value: &str) -> String {
+    let parts: Vec<_> = value.split('-').collect();
+    match parts.as_slice() {
+        [year, month, day] => format!(
+            "{year}年{}月{}日",
+            month.trim_start_matches('0'),
+            day.trim_start_matches('0')
+        ),
+        _ => value.to_owned(),
+    }
+}
 fn render_url(value: &str) -> Result<(String, String), String> {
     let url = url::Url::parse(value).map_err(|_| "案件URLが不正です。")?;
     if !matches!(url.scheme(), "http" | "https") || url.host_str().is_none() {
@@ -97,7 +108,11 @@ fn render(model: &DocumentModel<'_>) -> Result<String, String> {
     let mut output = String::new();
     match model.content {
         DocumentContent::Resume(resume) => {
-            command(&mut output, "ResumeHeader", &[escape_text(model.date)]);
+            command(
+                &mut output,
+                "ResumeHeader",
+                &[escape_text(&resume_date(model.date))],
+            );
             let age = age_on_date(&model.profile.birth_date, model.date)
                 .map(|age| format!("満{age}歳"))
                 .unwrap_or_default();
@@ -112,7 +127,7 @@ fn render(model: &DocumentModel<'_>) -> Result<String, String> {
                 &[
                     escape_text(&model.profile.name_kana),
                     escape_text(&model.profile.name),
-                    escape_text(&model.profile.birth_date),
+                    escape_text(&resume_date(&model.profile.birth_date)),
                     age,
                     escape_text(model.profile.gender_label.as_deref().unwrap_or_default()),
                     photo,
@@ -323,7 +338,14 @@ pub fn generate_project(project: &Project, kind: DocumentKind) -> Result<Generat
 
 #[cfg(test)]
 mod tests {
-    use super::render_url;
+    use super::{render_url, resume_date};
+
+    #[test]
+    fn resume_dates_keep_the_year_and_allow_an_empty_birth_date() {
+        assert_eq!(resume_date("2026-10-06"), "2026年10月6日");
+        assert_eq!(resume_date("0001-01-01"), "0001年1月1日");
+        assert_eq!(resume_date(""), "");
+    }
 
     #[test]
     fn urls_keep_click_targets_and_escape_breakable_labels() {

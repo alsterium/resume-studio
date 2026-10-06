@@ -5,6 +5,6 @@
   "documentKind": "resume",
   "schemaVersions": [1],
   "engine": "lualatex",
-  "packages": ["luatexja-preset", "graphicx", "longtable", "array", "geometry"],
+  "packages": ["luatexja-preset", "graphicx", "geometry"],
   "fonts": ["Harano Aji Mincho", "Harano Aji Gothic"]
 }

@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { mockIPC } from "@tauri-apps/api/mocks";
 import { expect, test, vi } from "vitest";
 import { DraftWorkspace } from "../../src/features/preview/DraftWorkspace";
+import { PdfPreview } from "../../src/features/preview/PdfPreview";
 import { tauriClient } from "../../src/infrastructure/app-client";
 import fullProject from "../fixtures/project-full.json";
 
@@ -74,6 +75,7 @@ test("版付きテンプレートを明示選択し、書類全項目の生成�
   const canvas = await screen.findByLabelText("生成されたPDFページ");
   expect(generated).toBe(true);
   expect(screen.getByText("プレビュー：履歴書")).toBeVisible();
+  expect(await screen.findByText(/続紙を含む3ページ/)).toBeVisible();
   await user.type(screen.getByLabelText("現住所・住所"), "追記");
   expect(screen.getByText("PDFは更新前の内容です。")).toBeVisible();
   fail = true;
@@ -95,6 +97,7 @@ test("職務経歴書の生成では選択中の書類種別をIPCへ渡す", as
   render(<DraftWorkspace client={tauriClient} document="職務経歴書" />);
   await user.click(screen.getByRole("button", { name: "職務経歴書PDF更新" }));
   expect(await screen.findByText("プレビュー：職務経歴書")).toBeVisible();
+  expect(screen.queryByText(/続紙を含む/)).not.toBeInTheDocument();
 });
 
 const renderer = vi.hoisted(() => ({ load: vi.fn(), page: vi.fn(), destroy: vi.fn() }));
@@ -104,7 +107,7 @@ vi.mock("../../src/infrastructure/pdf-runtime", () => ({
     return {
       destroy: renderer.destroy,
       promise: Promise.resolve({
-        numPages: 3,
+        numPages: bytes[0] === 2 ? 2 : 3,
         getPage: async (page: number) => {
           renderer.page(page);
           return {
@@ -119,6 +122,16 @@ vi.mock("../../src/infrastructure/pdf-runtime", () => ({
     };
   },
 }));
+
+test("通常2ページの履歴書には続紙警告を表示せず、超過PDFには表示する", async () => {
+  const { rerender } = render(
+    <PdfPreview key="normal" bytes={new Uint8Array([2])} standardPages={2} />,
+  );
+  await waitFor(() => expect(screen.getByLabelText("ページ番号")).toHaveTextContent("1 / 2"));
+  expect(screen.queryByText(/続紙を含む/)).not.toBeInTheDocument();
+  rerender(<PdfPreview key="overflow" bytes={new Uint8Array([3])} standardPages={2} />);
+  expect(await screen.findByText(/続紙を含む3ページ/)).toBeVisible();
+});
 
 test("入力をIPCで生成し、結果IDから読込・ページ移動・拡大を行う", async () => {
   const user = userEvent.setup();
@@ -147,6 +160,7 @@ test("入力をIPCで生成し、結果IDから読込・ページ移動・拡大
   await user.type(screen.getByLabelText("本文"), "日本語 & %");
   await user.click(screen.getByRole("button", { name: "PDF更新" }));
   expect(await screen.findByLabelText("ページ番号")).toHaveTextContent("1 / 3");
+  expect(screen.queryByText(/続紙を含む/)).not.toBeInTheDocument();
   await waitFor(() =>
     expect(screen.getByLabelText("生成されたPDFページ")).toHaveAttribute("data-rendered-page", "1"),
   );

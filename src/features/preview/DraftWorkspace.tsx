@@ -431,7 +431,11 @@ export function DraftWorkspace({
           )}
       </div>
       {pdf ? (
-        <PdfPreview key={pdf.id} bytes={pdf.bytes} />
+        <PdfPreview
+          key={pdf.id}
+          bytes={pdf.bytes}
+          standardPages={pdf.document === "履歴書" ? 2 : undefined}
+        />
       ) : (
         <p className="preview-empty">「PDF更新」でプレビューを表示します。</p>
       )}

@@ -1,7 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import type { PDFDocumentProxy, RenderTask } from "pdfjs-dist";
 
-export function PdfPreview({ bytes }: { bytes: Uint8Array }) {
+export function PdfPreview({
+  bytes,
+  standardPages,
+}: {
+  bytes: Uint8Array;
+  standardPages?: number;
+}) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const [document, setDocument] = useState<PDFDocumentProxy | null>(null);
   const [page, setPage] = useState(1);
@@ -86,6 +92,12 @@ export function PdfPreview({ bytes }: { bytes: Uint8Array }) {
           </select>
         </label>
       </div>
+      {document && standardPages !== undefined && document.numPages > standardPages && (
+        <output>
+          履歴書は通常の{standardPages}ページを超え、続紙を含む{document.numPages}ページです。
+          全ページの内容と改ページ位置を確認してください。
+        </output>
+      )}
       {error && <p role="alert">{error}</p>}
       <div className="pdf-paper">
         <canvas

@@ -63,11 +63,13 @@ fn formal_documents_compile_from_exported_bundles_with_and_without_photos() {
             {
                 let text = extracted_pdf_text(&artifact.bytes);
                 assert!(
-                    text.contains(if kind == DocumentKind::Resume {
-                        "履歴書"
-                    } else {
-                        "職務経歴書"
-                    }),
+                    text.split_whitespace().collect::<String>().contains(
+                        if kind == DocumentKind::Resume {
+                            "履歴書"
+                        } else {
+                            "職務経歴書"
+                        }
+                    ),
                     "{text}"
                 );
                 if !project.profile.name.is_empty() {
@@ -89,6 +91,208 @@ fn formal_documents_compile_from_exported_bundles_with_and_without_photos() {
                 }
             }
         }
+    }
+}
+
+#[test]
+#[cfg(target_os = "macos")]
+fn resume_form_keeps_two_base_pages_and_preserves_overflow_in_section_order() {
+    use resume_studio_lib::{
+        domain::validation::parse_project,
+        generator::{documents::generate_project, templates::DocumentKind},
+    };
+    for source in [
+        include_bytes!("../../tests/fixtures/project-empty.json").as_slice(),
+        include_bytes!("../../tests/fixtures/project-full.json").as_slice(),
+    ] {
+        let project = parse_project(source).unwrap();
+        let artifact = compile(
+            &TexRuntime::discover(),
+            &generate_project(&project, DocumentKind::Resume).unwrap(),
+        )
+        .unwrap();
+        assert!(!artifact.log.contains("Overfull"), "{}", artifact.log);
+        assert!(
+            !artifact.log.contains("Missing character:"),
+            "{}",
+            artifact.log
+        );
+        let pages = inspected_pdf_pages(&artifact.bytes);
+        assert_eq!(pages.len(), 2, "{pages:?}");
+        assert!(pages[0]["text"].as_str().unwrap().contains("学歴・職歴"));
+        for label in ["免許・資格", "志望動機", "本人希望欄"] {
+            assert!(pages[1]["text"].as_str().unwrap().contains(label));
+        }
+        assert_a4(&pages);
+    }
+
+    let mut value: serde_json::Value =
+        serde_json::from_str(include_str!("../../tests/fixtures/project-full.json")).unwrap();
+    // A single row exceeds the first table region: it must split, rather than disappear
+    // inside an indivisible tabular cell. All input remains below schema limits.
+    value["resume"]["education"] = serde_json::json!([
+        {"id":"long-education","yearMonth":"2012-03","text":"長い学校名と学習内容。".repeat(70)}
+    ]);
+    for (field, marker) in [
+        ("employment", "HISTORYTAIL"),
+        ("qualifications", "QUALTAIL"),
+    ] {
+        let rows: Vec<_> = (0..45)
+            .map(|i| {
+                serde_json::json!({
+                    "id":format!("{field}-{i}"),"yearMonth":"2020-04",
+                "text":if i == 44 { marker.into() } else { format!("架空の履歴内容（{field}{i:02}）") }
+                })
+            })
+            .collect();
+        value["resume"][field] = serde_json::json!(rows);
+    }
+    for (field, marker) in [
+        ("motivation", "MOTIVATIONTAIL"),
+        ("preferences", "PREFERENCETAIL"),
+    ] {
+        value["resume"][field] = serde_json::json!({"type":"doc","content":[
+            {"type":"paragraph","content":[{"type":"text","text":
+                format!("{}{marker}", "架空の長文を改ページして保持する。".repeat(140))}]}]});
+    }
+    value["profile"]["address"] =
+        serde_json::json!(format!("{}住所末尾", "架空の長い住所".repeat(10)));
+    let project = parse_project(&serde_json::to_vec(&value).unwrap()).unwrap();
+    let artifact = compile(
+        &TexRuntime::discover(),
+        &generate_project(&project, DocumentKind::Resume).unwrap(),
+    )
+    .unwrap();
+    assert!(!artifact.log.contains("Overfull"), "{}", artifact.log);
+    assert!(
+        !artifact.log.contains("Missing character:"),
+        "{}",
+        artifact.log
+    );
+    let pages = inspected_pdf_pages(&artifact.bytes);
+    assert!(pages.len() > 2);
+    assert_a4(&pages);
+    for label in ["免許・資格", "志望動機", "本人希望欄"] {
+        assert!(pages[1]["text"].as_str().unwrap().contains(label));
+    }
+    let joined: String = pages.iter().map(|p| p["text"].as_str().unwrap()).collect();
+    let normalized = joined.split_whitespace().collect::<String>();
+    assert!(
+        joined
+            .split_whitespace()
+            .collect::<String>()
+            .contains("住所末尾"),
+        "{joined}"
+    );
+    let mut previous_page = 1;
+    for marker in [
+        "HISTORYTAIL",
+        "QUALTAIL",
+        "MOTIVATIONTAIL",
+        "PREFERENCETAIL",
+    ] {
+        let index = pages
+            .iter()
+            .position(|p| {
+                p["text"]
+                    .as_str()
+                    .unwrap()
+                    .split_whitespace()
+                    .collect::<String>()
+                    .contains(marker)
+            })
+            .unwrap_or_else(|| panic!("missing {marker}: {joined}"));
+        assert!(
+            index > previous_page,
+            "unexpected continuation order: {marker} on {index}"
+        );
+        if matches!(marker, "HISTORYTAIL" | "QUALTAIL") {
+            assert!(pages[index]["text"].as_str().unwrap().contains("以上"));
+        }
+        previous_page = index;
+    }
+    // Reassemble split text without the repeated form headers. A sentence may
+    // cross a page boundary, where page.string also inserts the next heading.
+    assert!(normalized
+        .replace("年月学歴・職歴（続き）", "")
+        .contains(&"長い学校名と学習内容。".repeat(70)));
+    for (title, marker) in [
+        ("志望動機・特技・アピールポイントなど", "MOTIVATIONTAIL"),
+        ("本人希望欄", "PREFERENCETAIL"),
+    ] {
+        let mut body = String::new();
+        for page in &pages {
+            let text = page["text"]
+                .as_str()
+                .unwrap()
+                .split_whitespace()
+                .collect::<String>();
+            if let Some((_, content)) = text.split_once(title) {
+                let content = content.strip_prefix("（続き）").unwrap_or(content);
+                let content = if title != "本人希望欄" {
+                    content.split("本人希望欄").next().unwrap()
+                } else {
+                    content
+                };
+                body.push_str(content);
+            }
+        }
+        assert!(
+            body.contains(&format!(
+                "{}{marker}",
+                "架空の長文を改ページして保持する。".repeat(140)
+            )),
+            "{body}"
+        );
+    }
+    for field in ["employment", "qualifications"] {
+        for i in 0..44 {
+            let marker = format!("架空の履歴内容（{field}{i:02}）");
+            assert_eq!(
+                normalized.matches(&marker).count(),
+                1,
+                "missing or repeated {marker}"
+            );
+        }
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn inspected_pdf_pages(bytes: &[u8]) -> Vec<serde_json::Value> {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("resume.pdf");
+    fs::write(&path, bytes).unwrap();
+    let output = std::process::Command::new("/usr/bin/swift")
+        .args([
+            "-e",
+            r#"
+import Foundation
+import PDFKit
+let document = PDFDocument(url: URL(fileURLWithPath: CommandLine.arguments[1]))!
+let pages = (0..<document.pageCount).map { index -> [String: Any] in
+    let page = document.page(at: index)!
+    let size = page.bounds(for: .mediaBox).size
+    return ["text": page.string ?? "", "width": size.width, "height": size.height]
+}
+print(String(data: try! JSONSerialization.data(withJSONObject: pages), encoding: .utf8)!)
+"#,
+            &path.to_string_lossy(),
+        ])
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    serde_json::from_slice(&output.stdout).unwrap()
+}
+
+#[cfg(target_os = "macos")]
+fn assert_a4(pages: &[serde_json::Value]) {
+    for page in pages {
+        assert!((page["width"].as_f64().unwrap() - 595.276).abs() < 0.1);
+        assert!((page["height"].as_f64().unwrap() - 841.89).abs() < 0.1);
     }
 }
 
