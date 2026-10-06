@@ -448,6 +448,7 @@ try {
       if (Date.now() > deadline) throw new Error(`Formal ${label} PDF did not render`);
       await delay(200);
     }
+    assert.equal(await browser.$('[aria-label="生成状態"]').getText(), `${label}：生成完了`);
     if (label === "履歴書") {
       const coloredPixels = await browser.execute(() => {
         const canvas = document.querySelector("canvas");
@@ -482,6 +483,21 @@ try {
     } finally {
       await task.destroy();
     }
+  }
+  // Returning to either document keeps its own last successful PDF.
+  for (const label of ["履歴書", "職務経歴書"]) {
+    await browser.$(`button=${label}`).click();
+    await browser.waitUntil(
+      async () =>
+        await browser.execute(
+          (title) =>
+            Array.from(document.querySelectorAll("output")).some(
+              (item) => item.textContent === `プレビュー：${title}`,
+            ) && document.querySelector("canvas")?.dataset.renderedPage === "1",
+          label,
+        ),
+      { timeout: 10000 },
+    );
   }
   await browser.$(".draft-editor input").setValue("架空 終了確認");
   const closeRequest = await browser.executeAsync((done) => {

@@ -10,6 +10,7 @@ pub fn run() {
         .manage(commands::files::ProjectFiles::default())
         .manage(commands::close::CloseGuard::default())
         .manage(compiler::results::PdfStore::default())
+        .manage(compiler::jobs::GenerationJobs::default())
         .invoke_handler(tauri::generate_handler![
             commands::diagnose_tex,
             commands::generate_draft,

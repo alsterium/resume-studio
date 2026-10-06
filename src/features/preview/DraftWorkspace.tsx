@@ -1,5 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import type { AppClient, SavedProject } from "../../infrastructure/app-client";
+import type {
+  AppClient,
+  DocumentKind,
+  JobPhase,
+  SavedProject,
+} from "../../infrastructure/app-client";
 import { PdfPreview } from "./PdfPreview";
 import { BodyEditor } from "../../editor/BodyEditor";
 import type { JSONContent } from "@tiptap/core";
@@ -12,6 +17,24 @@ import { CareerEditor } from "../career/CareerEditor";
 import { TemplatePicker } from "./TemplatePicker";
 
 type PendingAction = "new" | "open" | "close";
+type Preview = {
+  id: string;
+  bytes: Uint8Array;
+  name: string;
+  body: JSONContent;
+  projectId: string;
+  revision: number;
+  document?: string;
+};
+const phases: Record<JobPhase | "reading", string> = {
+  queued: "生成待ち",
+  validating: "入力を確認中",
+  generating: "書類を準備中",
+  compiling: "PDFを生成中",
+  reading: "PDFを読み込み中",
+  succeeded: "生成完了",
+  failed: "生成失敗",
+};
 
 export function DraftWorkspace({
   client,
@@ -36,14 +59,21 @@ export function DraftWorkspace({
   const photo = project.assets.find((asset) => asset.id === project.profile.photoAssetId);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [pdf, setPdf] = useState<{
-    id: string;
-    bytes: Uint8Array;
-    name: string;
-    body: JSONContent;
-    revision?: number;
-    document?: string;
-  } | null>(null);
+  const [draftPdf, setDraftPdf] = useState<Preview | null>(null);
+  const [documentPdfs, setDocumentPdfs] = useState<Partial<Record<DocumentKind, Preview>>>({});
+  const [job, setJob] = useState<{ document: string; phase: JobPhase | "reading" } | null>(null);
+  const jobRunning = useRef(false);
+  const generation = useRef(0);
+  const mounted = useRef(true);
+  const selectedKind = document === "履歴書" ? "resume" : "career";
+  const pdf = documentPdfs[selectedKind] ?? draftPdf;
+
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     currentSession.current = session;
@@ -77,7 +107,9 @@ export function DraftWorkspace({
         setSession(beginSession(opened.project));
         setFile({ fileId: opened.fileId, displayName: opened.displayName });
         setEditorKey((key) => key + 1);
-        setPdf(null);
+        setDraftPdf(null);
+        setDocumentPdfs({});
+        setJob(null);
         setFileMessage("JSONを読み込みました。");
       }
     } catch (failure) {
@@ -159,7 +191,9 @@ export function DraftWorkspace({
   function resetProject() {
     setSession(beginSession(newProject()));
     setFile(null);
-    setPdf(null);
+    setDraftPdf(null);
+    setDocumentPdfs({});
+    setJob(null);
     setError(null);
     setFileMessage(null);
     setEditorKey((key) => key + 1);
@@ -202,37 +236,97 @@ export function DraftWorkspace({
   }
 
   async function updatePdf() {
+    if (jobRunning.current) return;
+    jobRunning.current = true;
+    const snapshot = session;
     setBusy(true);
     setError(null);
     const draft = { name, body: "", richBody: body };
     try {
       const { resultId } = await client.generateDraft(draft);
       const bytes = await client.readPdf(resultId);
-      setPdf({ id: resultId, bytes, name, body });
+      if (
+        mounted.current &&
+        currentSession.current.project.projectId === snapshot.project.projectId
+      )
+        setDraftPdf({
+          id: resultId,
+          bytes,
+          name,
+          body,
+          projectId: snapshot.project.projectId,
+          revision: snapshot.revision,
+        });
     } catch (failure) {
       setError(
         typeof failure === "string" ? failure : "PDF生成に失敗しました。もう一度お試しください。",
       );
     } finally {
+      jobRunning.current = false;
       setBusy(false);
     }
   }
 
   async function updateDocument() {
+    if (jobRunning.current) return;
+    jobRunning.current = true;
     const snapshot = session;
+    const kind = selectedKind;
+    const label = document;
+    const generationId = ++generation.current;
+    let receivingProgress = true;
+    const showPhase = (phase: JobPhase | "reading") => {
+      if (mounted.current && generation.current === generationId)
+        setJob({ document: label, phase });
+    };
     setBusy(true);
     setError(null);
+    showPhase("queued");
     try {
-      const { resultId } = await client.generateDocument(
+      const result = await client.generateDocument(
         snapshot.project,
-        document === "履歴書" ? "resume" : "career",
+        kind,
+        snapshot.revision,
+        (phase) => {
+          if (receivingProgress && phase !== "succeeded") showPhase(phase);
+        },
       );
-      const bytes = await client.readPdf(resultId);
-      setPdf({ id: resultId, bytes, name, body, revision: snapshot.revision, document });
+      receivingProgress = false;
+      if (
+        result.projectId !== snapshot.project.projectId ||
+        result.revision !== snapshot.revision ||
+        result.kind !== kind
+      )
+        throw new Error("生成結果と編集中の書類が一致しません。もう一度生成してください。");
+      showPhase("reading");
+      const bytes = await client.readPdf(result.resultId);
+      if (
+        mounted.current &&
+        currentSession.current.project.projectId === snapshot.project.projectId
+      ) {
+        setDocumentPdfs((current) => ({
+          ...current,
+          [kind]: {
+            id: result.resultId,
+            bytes,
+            name,
+            body,
+            projectId: result.projectId,
+            revision: result.revision,
+            document: label,
+          },
+        }));
+        showPhase("succeeded");
+      }
     } catch (failure) {
-      setError(failure instanceof Error ? failure.message : String(failure));
+      if (mounted.current) {
+        showPhase("failed");
+        setError(failure instanceof Error ? failure.message : String(failure));
+      }
     } finally {
-      setBusy(false);
+      receivingProgress = false;
+      jobRunning.current = false;
+      if (mounted.current) setBusy(false);
     }
   }
 
@@ -275,8 +369,8 @@ export function DraftWorkspace({
           {dirty ? "未保存の変更があります" : file ? "保存済み" : "新規プロジェクト"}
         </output>
         {fileMessage && <output>{fileMessage}</output>}
-        <h2 id="draft-title">下書き</h2>
-        <p>氏名と本文からPDFを生成できます。</p>
+        <h2 id="draft-title">応募書類の編集</h2>
+        <p>編集内容から、選択した書類のPDFを生成できます。</p>
         <label>
           氏名
           <input
@@ -422,13 +516,13 @@ export function DraftWorkspace({
           {busy ? "PDF生成中…" : "PDF更新"}
         </button>
         {error && !pending && <p role="alert">{error}</p>}
+        {job && (
+          <output aria-label="生成状態" aria-live="polite">
+            {job.document}：{phases[job.phase]}
+          </output>
+        )}
         {pdf?.document && <output>プレビュー：{pdf.document}</output>}
-        {pdf &&
-          (pdf.revision !== undefined
-            ? pdf.revision !== session.revision
-            : pdf.name !== name || JSON.stringify(pdf.body) !== JSON.stringify(body)) && (
-            <output>PDFは更新前の内容です。</output>
-          )}
+        {pdf && pdf.revision !== session.revision && <output>PDFは更新前の内容です。</output>}
       </div>
       {pdf ? (
         <PdfPreview

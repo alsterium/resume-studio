@@ -1,4 +1,6 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
+import type { Channel } from "@tauri-apps/api/core";
+import type { GeneratedDocument, JobPhase } from "../../src/infrastructure/app-client";
 import userEvent from "@testing-library/user-event";
 import { mockIPC } from "@tauri-apps/api/mocks";
 import { expect, test, vi } from "vitest";
@@ -7,13 +9,128 @@ import { PdfPreview } from "../../src/features/preview/PdfPreview";
 import { tauriClient } from "../../src/infrastructure/app-client";
 import fullProject from "../fixtures/project-full.json";
 
+test("生成中も編集と書類切替ができ、書類別PDFと古いrevisionを保持する", async () => {
+  const user = userEvent.setup();
+  let complete: ((result: GeneratedDocument) => void) | undefined;
+  let result: GeneratedDocument | undefined;
+  let progress: Channel<JobPhase> | undefined;
+  let fail = false;
+  mockIPC((command, rawArgs) => {
+    const args = rawArgs as Record<string, unknown> | undefined;
+    if (command === "generate_document") {
+      progress = args?.progress as Channel<JobPhase>;
+      result = {
+        resultId: args?.kind === "resume" ? "resume" : "career",
+        kind: args?.kind as GeneratedDocument["kind"],
+        revision: args?.revision as number,
+        projectId: (args?.project as typeof fullProject)?.projectId,
+      };
+      progress.onmessage("compiling");
+      if (fail) throw "履歴書の生成失敗";
+      if (args?.kind === "resume") return result;
+      return new Promise<GeneratedDocument>((resolve) => {
+        complete = resolve;
+      });
+    }
+    if (command === "read_pdf") return new Uint8Array([37, 80, 68, 70, 45]).buffer;
+    throw new Error(command);
+  });
+  const { rerender } = render(<DraftWorkspace client={tauriClient} />);
+  await user.click(screen.getByRole("button", { name: "履歴書PDF更新" }));
+  await screen.findByText("プレビュー：履歴書");
+  expect(screen.getByLabelText("生成状態")).toHaveTextContent("履歴書：生成完了");
+  rerender(<DraftWorkspace client={tauriClient} document="職務経歴書" />);
+  expect(screen.queryByLabelText("生成されたPDFページ")).not.toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "職務経歴書PDF更新" }));
+  expect(screen.getByLabelText("生成状態")).toHaveTextContent("職務経歴書：PDFを生成中");
+  expect(screen.getByRole("button", { name: "職務経歴書PDF更新" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "新規" })).toBeDisabled();
+  await user.type(screen.getByLabelText("氏名"), "生成開始後の変更");
+  rerender(<DraftWorkspace client={tauriClient} document="履歴書" />);
+  expect(screen.getByText("プレビュー：履歴書")).toBeVisible();
+  expect(screen.getByText("PDFは更新前の内容です。")).toBeVisible();
+  await act(async () => {
+    complete?.(result!);
+  });
+  expect(screen.getByText("プレビュー：履歴書")).toBeVisible();
+  // A delayed channel notification must not overwrite the finished state.
+  act(() => progress?.onmessage("compiling"));
+  expect(screen.getByLabelText("生成状態")).toHaveTextContent("職務経歴書：生成完了");
+  rerender(<DraftWorkspace client={tauriClient} document="職務経歴書" />);
+  expect(screen.getByText("プレビュー：職務経歴書")).toBeVisible();
+  expect(screen.getByText("PDFは更新前の内容です。")).toBeVisible();
+  rerender(<DraftWorkspace client={tauriClient} document="履歴書" />);
+  await screen.findByLabelText("生成されたPDFページ");
+  const canvas = screen.getByLabelText("生成されたPDFページ");
+  fail = true;
+  await user.click(screen.getByRole("button", { name: "履歴書PDF更新" }));
+  expect(await screen.findByRole("alert")).toHaveTextContent("履歴書の生成失敗");
+  expect(screen.getByLabelText("生成されたPDFページ")).toBe(canvas);
+  expect(screen.getByLabelText("生成状態")).toHaveTextContent("履歴書：生成失敗");
+  fail = false;
+  await user.click(screen.getByRole("button", { name: "履歴書PDF更新" }));
+  await waitFor(() =>
+    expect(screen.queryByText("PDFは更新前の内容です。")).not.toBeInTheDocument(),
+  );
+  await user.click(screen.getByRole("button", { name: "新規" }));
+  await user.click(screen.getByRole("button", { name: "保存せず続行" }));
+  expect(screen.queryByLabelText("生成されたPDFページ")).not.toBeInTheDocument();
+  rerender(<DraftWorkspace client={tauriClient} document="職務経歴書" />);
+  expect(screen.queryByLabelText("生成されたPDFページ")).not.toBeInTheDocument();
+});
+
+test("別プロジェクト・revision・書類種別の生成結果を表示せず読込失敗でも成功PDFを保つ", async () => {
+  const user = userEvent.setup();
+  let mode = "success";
+  const readPdf = vi.fn();
+  mockIPC((command, rawArgs) => {
+    const args = rawArgs as Record<string, unknown> | undefined;
+    if (command === "generate_document") {
+      const result = {
+        resultId: "saved",
+        kind: args?.kind,
+        revision: args?.revision,
+        projectId: (args?.project as typeof fullProject)?.projectId,
+      };
+      if (mode === "project") result.projectId = "different-project";
+      if (mode === "revision") result.revision = (result.revision as number) + 1;
+      if (mode === "kind") result.kind = "career";
+      return result;
+    }
+    if (command === "read_pdf") {
+      readPdf();
+      if (mode === "read") throw "PDFの読み込み失敗";
+      return new Uint8Array([37, 80, 68, 70, 45]).buffer;
+    }
+    throw new Error(command);
+  });
+  render(<DraftWorkspace client={tauriClient} />);
+  await user.click(screen.getByRole("button", { name: "履歴書PDF更新" }));
+  const canvas = await screen.findByLabelText("生成されたPDFページ");
+  for (const invalid of ["project", "revision", "kind"]) {
+    mode = invalid;
+    await user.click(screen.getByRole("button", { name: "履歴書PDF更新" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "生成結果と編集中の書類が一致しません",
+    );
+    expect(screen.getByLabelText("生成されたPDFページ")).toBe(canvas);
+    expect(readPdf).toHaveBeenCalledTimes(1);
+  }
+  mode = "read";
+  await user.click(screen.getByRole("button", { name: "履歴書PDF更新" }));
+  expect(await screen.findByRole("alert")).toHaveTextContent("PDFの読み込み失敗");
+  expect(screen.getByLabelText("生成されたPDFページ")).toBe(canvas);
+  expect(screen.getByRole("button", { name: "履歴書PDF更新" })).toBeEnabled();
+});
+
 test("版付きテンプレートを明示選択し、書類全項目の生成と失敗時のPDF保持を行う", async () => {
   const user = userEvent.setup();
   let fail = false;
   let generated = false;
   const project = structuredClone(fullProject);
   project.templates.resume.version = "99.0.0";
-  mockIPC((command, args) => {
+  mockIPC((command, rawArgs) => {
+    const args = rawArgs as Record<string, unknown> | undefined;
     if (command === "open_project") return { project, fileId: "file", displayName: "架空.json" };
     if (command === "list_templates")
       return [
@@ -40,15 +157,27 @@ test("版付きテンプレートを明示選択し、書類全項目の生成�
       ];
     if (command === "generate_document") {
       if (fail) throw "生成失敗";
-      expect(args).toEqual({
-        project: {
-          ...project,
-          templates: { ...project.templates, resume: { id: "resume-standard", version: "1.0.0" } },
-        },
-        kind: "resume",
-      });
+      expect(args).toEqual(
+        expect.objectContaining({
+          project: {
+            ...project,
+            templates: {
+              ...project.templates,
+              resume: { id: "resume-standard", version: "1.0.0" },
+            },
+          },
+          kind: "resume",
+          revision: expect.any(Number),
+          progress: expect.any(Object),
+        }),
+      );
       generated = true;
-      return { resultId: "formal" };
+      return {
+        resultId: "formal",
+        projectId: project.projectId,
+        revision: args?.revision,
+        kind: "resume",
+      };
     }
     if (command === "read_pdf") {
       expect(args).toEqual({ resultId: "formal" });
@@ -86,10 +215,16 @@ test("版付きテンプレートを明示選択し、書類全項目の生成�
 
 test("職務経歴書の生成では選択中の書類種別をIPCへ渡す", async () => {
   const user = userEvent.setup();
-  mockIPC((command, args) => {
+  mockIPC((command, rawArgs) => {
+    const args = rawArgs as Record<string, unknown> | undefined;
     if (command === "generate_document") {
       expect(args).toEqual(expect.objectContaining({ kind: "career" }));
-      return { resultId: "career" };
+      return {
+        resultId: "career",
+        projectId: (args?.project as typeof fullProject)?.projectId,
+        revision: args?.revision,
+        kind: "career",
+      };
     }
     if (command === "read_pdf") return new Uint8Array([37, 80, 68, 70, 45]).buffer;
     throw new Error(command);
@@ -135,7 +270,8 @@ test("通常2ページの履歴書には続紙警告を表示せず、超過PDF�
 
 test("入力をIPCで生成し、結果IDから読込・ページ移動・拡大を行う", async () => {
   const user = userEvent.setup();
-  mockIPC((command, args) => {
+  mockIPC((command, rawArgs) => {
+    const args = rawArgs as Record<string, unknown> | undefined;
     if (command === "generate_draft") {
       expect(args).toEqual({
         draft: {

@@ -4,15 +4,20 @@ pub mod documents;
 pub mod files;
 pub mod photos;
 use crate::{
-    compiler::{compile::compile, results::PdfStore},
+    compiler::{
+        compile::compile,
+        jobs::{GenerationJobs, JobPhase},
+        results::PdfStore,
+    },
     generator::{generate, Draft},
 };
 
 #[tauri::command]
-pub async fn diagnose_tex() -> Result<TexDiagnostics, String> {
-    tauri::async_runtime::spawn_blocking(|| diagnose(&TexRuntime::discover()))
+pub async fn diagnose_tex(
+    jobs: tauri::State<'_, GenerationJobs>,
+) -> Result<TexDiagnostics, String> {
+    jobs.execute(|_| {}, |_| Ok(diagnose(&TexRuntime::discover())))
         .await
-        .map_err(|error| error.to_string())
 }
 
 #[derive(serde::Serialize)]
@@ -24,14 +29,20 @@ pub struct GeneratedPdf {
 #[tauri::command]
 pub async fn generate_draft(
     draft: Draft,
+    jobs: tauri::State<'_, GenerationJobs>,
     store: tauri::State<'_, PdfStore>,
 ) -> Result<GeneratedPdf, String> {
-    let bundle = generate(&draft)?;
-    let artifact =
-        tauri::async_runtime::spawn_blocking(move || compile(&TexRuntime::discover(), &bundle))
-            .await
-            .map_err(|e| e.to_string())?
-            .map_err(|e| format!("{} ({})\n{}", e.message, e.code, e.log))?;
+    let artifact = jobs
+        .execute(
+            |_| {},
+            move |notify| {
+                let bundle = generate(&draft)?;
+                notify(JobPhase::Compiling);
+                compile(&TexRuntime::discover(), &bundle)
+                    .map_err(|e| format!("{} ({})\n{}", e.message, e.code, e.log))
+            },
+        )
+        .await?;
     Ok(GeneratedPdf {
         result_id: store.insert(artifact.bytes)?,
     })

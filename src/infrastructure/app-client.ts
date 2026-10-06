@@ -1,5 +1,5 @@
 import { getVersion } from "@tauri-apps/api/app";
-import { invoke } from "@tauri-apps/api/core";
+import { Channel, invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import type { JSONContent } from "@tiptap/core";
 import type { Project } from "../domain/project";
@@ -28,6 +28,19 @@ export interface TexDiagnostics {
 }
 
 export type DocumentKind = "resume" | "career";
+export type JobPhase =
+  | "queued"
+  | "validating"
+  | "generating"
+  | "compiling"
+  | "succeeded"
+  | "failed";
+export interface GeneratedDocument {
+  resultId: string;
+  projectId: string;
+  revision: number;
+  kind: DocumentKind;
+}
 export interface TemplateManifest {
   id: string;
   version: string;
@@ -41,7 +54,12 @@ export interface TemplateManifest {
 
 export interface AppClient {
   listTemplates(): Promise<TemplateManifest[]>;
-  generateDocument(project: Project, kind: DocumentKind): Promise<{ resultId: string }>;
+  generateDocument(
+    project: Project,
+    kind: DocumentKind,
+    revision: number,
+    onProgress: (phase: JobPhase) => void,
+  ): Promise<GeneratedDocument>;
   importPhoto(): Promise<ImportedPhoto | null>;
   onCloseRequested(handler: () => void): Promise<() => void>;
   requestClose(): Promise<void>;
@@ -64,8 +82,19 @@ export interface AppClient {
 
 export const tauriClient: AppClient = {
   listTemplates: () => invoke("list_templates"),
-  generateDocument: (project, kind) =>
-    invoke("generate_document", { project: validateProject(project), kind }),
+  generateDocument: (project, kind, revision, onProgress) => {
+    const validated = validateProject(project);
+    if (!Number.isSafeInteger(revision) || revision < 0)
+      throw new Error("編集revisionを確認できませんでした。");
+    const progress = new Channel<JobPhase>();
+    progress.onmessage = onProgress;
+    return invoke("generate_document", {
+      project: validated,
+      kind,
+      revision,
+      progress,
+    });
+  },
   importPhoto: () => invoke("import_photo"),
   onCloseRequested: (handler) => listen("resume-studio:request-close", handler),
   requestClose: () => invoke("request_app_close", { quit: true }),

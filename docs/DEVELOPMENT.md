@@ -211,10 +211,18 @@ T16はRustの共通visitorを両書類の本文変換の正本とする。許可
 
 ## 正式書類の生成とテンプレート選択
 
-T17では「履歴書PDF更新」「職務経歴書PDF更新」が正式Project全項目をRustのgenerate_documentへ渡す。テンプレート一覧はlist_templatesで取得し、非対応ID／版を維持したまま明示選択で変更できる。生成失敗で最後の成功PDFを維持し、生成時revisionと編集revisionが異なれば古い内容と表示する。ジョブと書類別結果の管理はT21で拡張する。初期の「PDF更新」（氏名と職務要約だけの下書き）は検証経路として暫定的に残す。
+T17では「履歴書PDF更新」「職務経歴書PDF更新」が正式Project全項目をRustのgenerate_documentへ渡す。テンプレート一覧はlist_templatesで取得し、非対応ID／版を維持したまま明示選択で変更できる。生成失敗で最後の成功PDFを維持し、生成時revisionと編集revisionが異なれば古い内容と表示する。ジョブと書類別結果の管理は下記T21の仕様を使用する。初期の「PDF更新」（氏名と職務要約だけの下書き）は検証経路として暫定的に残す。
 
 生成ファイル・版解決・制限・単体コンパイル手順は[GENERATED_TEX.md](GENERATED_TEX.md)。T17の紙面は初期流し込み版で、参考帳票の組版はT18／T19。PDF再生成時に前のloading taskのdestroyと次の生成が重なり、共有workerでPDFWorker.createが失敗することを実E2Eで再現した。runtimeが同梱PDFWorkerを所有し、各loading taskは書類のtransportだけを後始末する構成へ修正した。workerをtaskの所有物にしないため、前のPDFのdestroyが次のworkerを破棄しない。E2Eは下書き→写真付き履歴書→職務経歴書の連続生成を通してこの回帰も検証する。
 
 ## 紙面の検証と画像化
 
 実TeXによる紙面の上限検証と目視QAは[GENERATED_TEX.md](GENERATED_TEX.md#t20の検証マトリクスと目視qa)の手順を使用する。検証用PDFを残す環境変数はreal-tex結合テストだけが参照し、通常アプリには含めない。Node起動の`pnpm pdf:render`はmacOS PDFKitで全ページPNGと一覧を作る。
+
+## 生成ジョブ（T21）
+
+正式書類の生成はProjectの不変snapshot、書類種別、編集revisionを渡す非同期IPCで行う。Rustの`GenerationJobs`が待機と実行を管理し、入力確認→書類準備→コンパイルの段階を呼出元専用のTauri Channelへ通知する。全書類・暫定下書き・環境診断は同じコンパイルgateを使い、TeXの同時起動を防ぐ。実行中を含む最大8件を受け付け、超過は明示エラーにする。IPCの待機が破棄されても実行workerは完了までgateを所有し、二重起動を防ぐ。操作キャンセルはT22で追加する。
+
+フロントエンドは結果のprojectId／revision／kindを要求snapshotと照合してからPDFを読み込む。両書類の最後の成功PDFを別々に保持し、切替時は対象書類の結果を表示する。生成中も編集と書類切替を許可し、完了したPDFのrevisionが現在と異なれば「更新前の内容」と表示する。失敗・バイナリ読込失敗では直前の成功結果を維持し、再実行を許可する。新規／別JSON読込では結果を消す。新規・読込・終了・重複生成は生成完了まで待ち、JSON保存は生成中でも可能。完了後に遅れて到着した進行通知を無視し、前ジョブの通知で新ジョブを巻き戻さない。
+
+Rust結合では並行ジョブの待機／失敗後の再実行、IPC future破棄時のgate保持、待機件数制限と枠の解放を確認する。UI結合では生成中編集・書類切替・書類別保持・古いrevision・結果照合・生成／読込失敗・再実行・新規時の消去を検証し、実macOS E2EでChannel接続と両書類の再表示を確認する。
