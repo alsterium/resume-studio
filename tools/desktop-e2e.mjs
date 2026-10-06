@@ -109,6 +109,32 @@ try {
   await browser.$('[aria-label="本文"]').addValue("架空の職務内容 & % _ # $ { } ~ ^ \\ 日本語");
   const text = await browser.$('[aria-label="本文"]').getText();
   assert.ok(text.includes("架空の職務内容"), `Input was lost: ${text}`);
+  // Date/month controls use the native setter + input/change adapter documented in ADR 0004.
+  await browser.execute(() => {
+    const inputFor = (label) =>
+      Array.from(document.querySelectorAll("label"))
+        .find((item) => item.textContent.trim() === label)
+        .querySelector("input");
+    for (const [label, value] of [
+      ["書類日付", "2025-03-01"],
+      ["生年月日", "2000-02-29"],
+      ["氏名ふりがな", "かくう やまだ"],
+      ["現住所・住所ふりがな", "かくうのじゅうしょ"],
+    ]) {
+      const input = inputFor(label);
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(input, value);
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+  });
+  assert.ok((await browser.$('[aria-label="満年齢"]').getText()).includes("満25歳"));
+  await browser.$("button=学歴を追加").click();
+  await browser.$(".history-row input[type=month]").waitForExist();
+  await browser.$(".history-row input:not([type=month])").setValue("架空大学 卒業");
+  await browser
+    .$('[role="textbox"][aria-label="志望動機・特技・アピールポイント"]')
+    .addValue("架空の志望動機末尾");
+  await browser.$('[role="textbox"][aria-label="本人希望欄"]').addValue("架空の希望末尾");
   await browser.$("button=写真を取り込む").click();
   await browser.waitUntil(
     async () =>
@@ -128,6 +154,13 @@ try {
   const saved = JSON.parse(await readFile(projectPath, "utf8"));
   assert.equal(saved.schemaVersion, 1);
   assert.equal(saved.profile.name, "架空 山田");
+  assert.equal(saved.profile.nameKana, "かくう やまだ");
+  assert.equal(saved.profile.addressKana, "かくうのじゅうしょ");
+  assert.equal(saved.profile.birthDate, "2000-02-29");
+  assert.equal(saved.documentDate, "2025-03-01");
+  assert.equal(saved.resume.education[0].text, "架空大学 卒業");
+  assert.ok(JSON.stringify(saved.resume.motivation).includes("架空の志望動機末尾"));
+  assert.ok(JSON.stringify(saved.resume.preferences).includes("架空の希望末尾"));
   assert.ok(JSON.stringify(saved.career.summary).includes("架空の職務内容"));
   assert.ok(
     JSON.stringify(saved.career.summary).includes('"type":"bold"'),
@@ -182,6 +215,18 @@ try {
   assert.ok(
     (await browser.$('[aria-label="本文"] strong').getText()).includes("架空の職務内容"),
     "Restart lost body formatting",
+  );
+  assert.ok((await browser.$('[aria-label="満年齢"]').getText()).includes("満25歳"));
+  assert.equal(await browser.$(".history-row input:not([type=month])").getValue(), "架空大学 卒業");
+  assert.ok(
+    (
+      await browser.$('[role="textbox"][aria-label="志望動機・特技・アピールポイント"]').getText()
+    ).includes("架空の志望動機末尾"),
+  );
+  assert.ok(
+    (await browser.$('[role="textbox"][aria-label="本人希望欄"]').getText()).includes(
+      "架空の希望末尾",
+    ),
   );
   await browser.execute(() => {
     delete Map.prototype.getOrInsertComputed;

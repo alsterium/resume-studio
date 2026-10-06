@@ -7,6 +7,7 @@ import { createId, newProject } from "../../domain/new-project";
 import type { BodyDoc } from "../../domain/project";
 import { beginSession, editSession, hasUnsavedChanges, recordSaved } from "../../domain/session";
 import { DiscardDialog } from "../files/DiscardDialog";
+import { ResumeEditor } from "../resume/ResumeEditor";
 
 type PendingAction = "new" | "open" | "close";
 
@@ -331,6 +332,15 @@ export function DraftWorkspace({ client }: { client: AppClient }) {
                 career: { ...current.project.career, summary: content as BodyDoc },
               }),
             );
+            setFileMessage(null);
+          }}
+        />
+        <ResumeEditor
+          project={project}
+          disabled={opening || pending !== null}
+          editorKey={editorKey}
+          onChange={(updated) => {
+            setSession((current) => editSession(current, updated));
             setFileMessage(null);
           }}
         />

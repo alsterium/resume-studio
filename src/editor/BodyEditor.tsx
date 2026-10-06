@@ -9,16 +9,18 @@ export function BodyEditor({
   initialContent = emptyBody,
   onChange,
   editable = true,
+  label = "本文",
 }: {
   initialContent?: JSONContent;
   onChange: (body: JSONContent) => void;
   editable?: boolean;
+  label?: string;
 }) {
   const editor = useEditor({
     extensions: bodyExtensions(),
     content: initialContent,
     editorProps: {
-      attributes: { "aria-label": "本文", role: "textbox", "aria-multiline": "true" },
+      attributes: { "aria-label": label, role: "textbox", "aria-multiline": "true" },
     },
     onUpdate: ({ editor: updated }) => onChange(updated.getJSON()),
   });
@@ -37,7 +39,7 @@ export function BodyEditor({
 
   return (
     <div className="body-editor">
-      <div aria-label="本文の書式" className="editor-toolbar">
+      <div aria-label={`${label}の書式`} className="editor-toolbar">
         <button
           type="button"
           disabled={!editor || !editable}

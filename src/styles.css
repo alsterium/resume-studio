@@ -145,6 +145,37 @@ dialog button {
 .body-editor .tiptap p {
   margin: 0 0 12px;
 }
+.resume-editor fieldset {
+  min-width: 0;
+  margin: 20px 0;
+  padding: 12px;
+  border: 1px solid #bdcdc2;
+  border-radius: 8px;
+}
+.resume-editor input {
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+.resume-editor .checkbox-label {
+  display: flex;
+  align-items: center;
+}
+.resume-editor input[type="checkbox"] {
+  width: auto;
+}
+.history-row {
+  border-top: 1px solid #dce5dc;
+  padding: 8px 0 16px;
+}
+.row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.row-actions button {
+  padding: 8px 12px;
+}
 @media (max-width: 850px) {
   .draft-workspace {
     grid-template-columns: 1fr;
