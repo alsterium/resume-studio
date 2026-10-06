@@ -1,5 +1,6 @@
 import { getVersion } from "@tauri-apps/api/app";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import type { JSONContent } from "@tiptap/core";
 import type { Project } from "../domain/project";
 import { validateProject } from "../domain/validate-project";
@@ -20,6 +21,9 @@ export interface TexDiagnostics {
 }
 
 export interface AppClient {
+  onCloseRequested(handler: () => void): Promise<() => void>;
+  requestClose(): Promise<void>;
+  finishClose(): Promise<void>;
   getAppVersion(): Promise<string>;
   diagnoseTex(): Promise<TexDiagnostics>;
   generateDraft(draft: {
@@ -37,6 +41,9 @@ export interface AppClient {
 }
 
 export const tauriClient: AppClient = {
+  onCloseRequested: (handler) => listen("resume-studio:request-close", handler),
+  requestClose: () => invoke("request_app_close", { quit: true }),
+  finishClose: () => invoke("finish_app_close"),
   getAppVersion: getVersion,
   diagnoseTex: () => invoke<TexDiagnostics>("diagnose_tex"),
   generateDraft: (draft) => invoke("generate_draft", { draft }),

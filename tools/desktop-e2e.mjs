@@ -165,12 +165,50 @@ try {
     { timeout: 30000 },
   );
   assert.ok((await browser.execute(() => document.querySelector("canvas").width)) > first.width);
+  await browser.$(".draft-editor input").setValue("架空 終了確認");
+  const closeRequest = await browser.executeAsync((done) => {
+    window.__TAURI_INTERNALS__
+      .invoke("request_app_close", { quit: false })
+      .then(() => done({ requested: true }))
+      .catch((failure) => done({ failure: String(failure) }));
+  });
+  assert.equal(closeRequest.failure, undefined);
+  await browser.$("dialog[open]").waitForExist({ timeout: 10000 });
+  assert.ok(await browser.execute(() => document.querySelector("dialog").matches(":modal")));
+  await browser.$("button=キャンセル").click();
+  await browser.waitUntil(async () => !(await browser.$("dialog").isExisting()), {
+    timeout: 10000,
+  });
+  assert.equal(await browser.$(".draft-editor input").getValue(), "架空 終了確認");
+  // Quit goes through RunEvent::ExitRequested, independently of native window close.
+  await browser.$("button=終了").click();
+  await browser.$("dialog[open]").waitForExist({ timeout: 10000 });
+  await browser.$("button=キャンセル").click();
+  await browser.$("button=終了").click();
+  await browser.$("dialog[open]").waitForExist({ timeout: 10000 });
+  // Return the driver response before the owned app shuts down its server.
+  await browser.execute(() => {
+    setTimeout(
+      () =>
+        Array.from(document.querySelectorAll("dialog button"))
+          .find((button) => button.textContent === "保存して続行")
+          .click(),
+      50,
+    );
+  });
+  const exitDeadline = Date.now() + 15000;
+  while (app.exitCode === null && app.signalCode === null) {
+    if (Date.now() >= exitDeadline) throw new Error("Confirmed close did not exit the app");
+    await delay(100);
+  }
+  assert.equal(app.exitCode, 0, `Confirmed close failed: ${output}`);
+  assert.equal(JSON.parse(await readFile(projectPath, "utf8")).profile.name, "架空 終了確認");
   console.log(
-    "DESKTOP_E2E: PASS (app bundle → input → real JSON save/open → real TeX → PDF text/canvas → zoom; picker adapter)",
+    "DESKTOP_E2E: PASS (real JSON save/open → TeX/PDF → guarded window close/quit → save/exit; picker adapter)",
   );
 } finally {
   try {
-    if (browser) await browser.deleteSession();
+    if (browser && app.exitCode === null && app.signalCode === null) await browser.deleteSession();
   } finally {
     if (app.exitCode === null && app.signalCode === null && app.pid) {
       const exited = once(app, "exit");

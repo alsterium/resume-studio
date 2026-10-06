@@ -1,0 +1,4 @@
+[[permission]]
+identifier = "allow-project-close"
+description = "編集確認を経由する終了要求と確認後の終了を許可する"
+commands.allow = ["request_app_close", "finish_app_close"]

@@ -164,3 +164,11 @@ T11の新規・開く・保存・名前を付けて保存は[Project JSON v1](PR
 UI結合テストは実TiptapとTauri mockIPCで復元・全項目保存・別名保存・キャンセル・失敗からの再試行を確認する。Rust storage結合テストは日本語／スペースを含む実パスで往復・移動・上書き・容量制限・既存権限維持を検証する。置換境界への失敗注入では実一時書込後の原本保持と後始末を確認する。
 
 desktop-e2eではNodeが所有する一時ディレクトリのJSONパスをRESUME_STUDIO_E2E_PROJECTへ渡す。desktop-e2e featureのRustだけがnative pickerをそのパスへ置き換える。UIの入力→実IPC→実JSON保存→新規→実JSON読み込み→実TeX→PDF描画を通す。本番ビルドはこの環境変数を解釈しない。native dialog自体の操作と終了・再起動を含む最終受け入れはT28で確認する。
+
+## 未保存変更と終了確認
+
+T12は編集revisionと保存成功revisionを分離する。UI結合では保存待機中の追加入力、保存失敗／キャンセル、破棄確認の各選択、保存成功後の読み込み失敗、終了通知から保存後の終了を検証する。Unitでは遅延した保存結果が追加編集や別プロジェクトの状態を巻き戻さないことを確認する。
+
+native closeは[WindowEvent::CloseRequested](https://docs.rs/tauri/latest/tauri/enum.WindowEvent.html)、quitは[RunEvent::ExitRequested](https://docs.rs/tauri/latest/tauri/enum.RunEvent.html)をRustで阻止する。WebViewはイベントのlisten/unlistenと用途別request_app_close/finish_app_closeだけを使用する。汎用window destroyやprocess exit IPCを許可しない。
+
+desktop-e2eは実IPCでwindow.closeを要求して確認画面のキャンセル・入力保持を検証し、終了ボタンからapp.exitの阻止と確認画面を検証する。最後に保存して続行で実JSONの更新と所有アプリの終了コード0を確認する。ここはnativeイベントとRust処理を代替しない。UI結合のdialog.showModal/closeはjsdomにないため最小adapterで代替し、実WebViewのmodal表示はE2Eで確認する。OSのタイトルバー・Cmd+QとIME操作の組合せは最終手動受け入れで補完する。

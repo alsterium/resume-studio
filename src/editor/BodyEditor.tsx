@@ -1,15 +1,18 @@
 import { EditorContent, useEditor, useEditorState } from "@tiptap/react";
 import type { JSONContent } from "@tiptap/core";
 import { bodyExtensions } from "./extensions";
+import { useEffect } from "react";
 
 export const emptyBody: JSONContent = { type: "doc", content: [{ type: "paragraph" }] };
 
 export function BodyEditor({
   initialContent = emptyBody,
   onChange,
+  editable = true,
 }: {
   initialContent?: JSONContent;
   onChange: (body: JSONContent) => void;
+  editable?: boolean;
 }) {
   const editor = useEditor({
     extensions: bodyExtensions(),
@@ -19,6 +22,9 @@ export function BodyEditor({
     },
     onUpdate: ({ editor: updated }) => onChange(updated.getJSON()),
   });
+  useEffect(() => {
+    editor?.setEditable(editable, false);
+  }, [editor, editable]);
   const state = useEditorState({
     editor,
     selector: ({ editor: current }) => ({
@@ -34,7 +40,7 @@ export function BodyEditor({
       <div aria-label="本文の書式" className="editor-toolbar">
         <button
           type="button"
-          disabled={!editor}
+          disabled={!editor || !editable}
           aria-pressed={state.bold}
           onClick={() => editor?.chain().focus().toggleBold().run()}
         >
@@ -42,7 +48,7 @@ export function BodyEditor({
         </button>
         <button
           type="button"
-          disabled={!editor}
+          disabled={!editor || !editable}
           aria-pressed={state.italic}
           onClick={() => editor?.chain().focus().toggleItalic().run()}
         >
@@ -50,7 +56,7 @@ export function BodyEditor({
         </button>
         <button
           type="button"
-          disabled={!editor}
+          disabled={!editor || !editable}
           aria-pressed={state.bullets}
           onClick={() => editor?.chain().focus().toggleBulletList().run()}
         >
@@ -58,7 +64,7 @@ export function BodyEditor({
         </button>
         <button
           type="button"
-          disabled={!editor}
+          disabled={!editor || !editable}
           aria-pressed={state.ordered}
           onClick={() => editor?.chain().focus().toggleOrderedList().run()}
         >
@@ -66,14 +72,14 @@ export function BodyEditor({
         </button>
         <button
           type="button"
-          disabled={!editor}
+          disabled={!editor || !editable}
           onClick={() => editor?.chain().focus().undo().run()}
         >
           元に戻す
         </button>
         <button
           type="button"
-          disabled={!editor}
+          disabled={!editor || !editable}
           onClick={() => editor?.chain().focus().redo().run()}
         >
           やり直す

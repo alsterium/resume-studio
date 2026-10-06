@@ -87,6 +87,19 @@ button:disabled {
   cursor: default;
   opacity: 0.5;
 }
+dialog {
+  max-width: min(480px, 80vw);
+  border: 1px solid #bdcdc2;
+  border-radius: 12px;
+  padding: 24px;
+  color: inherit;
+}
+dialog::backdrop {
+  background: #25352f88;
+}
+dialog button {
+  margin: 4px;
+}
 .preview-controls {
   display: flex;
   align-items: center;

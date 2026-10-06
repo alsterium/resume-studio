@@ -68,10 +68,12 @@ test("キャンセル・不正JSON・書込失敗で現在の入力と保存先�
   await user.type(screen.getByLabelText("氏名"), "保存する名前");
   await user.type(screen.getByLabelText("本文"), "編集内容");
   await user.click(screen.getByRole("button", { name: "開く" }));
+  await user.click(screen.getByRole("button", { name: "保存せず続行" }));
   await user.click(screen.getByRole("button", { name: "保存" }));
   expect(screen.getByLabelText("プロジェクトファイル")).toHaveTextContent("保存先未設定");
   mode = "invalid";
   await user.click(screen.getByRole("button", { name: "開く" }));
+  await user.click(screen.getByRole("button", { name: "保存せず続行" }));
   expect(await screen.findByRole("alert")).toBeVisible();
   expect(screen.getByLabelText("氏名")).toHaveValue("保存する名前");
   expect(screen.getByLabelText("本文")).toHaveTextContent("編集内容");

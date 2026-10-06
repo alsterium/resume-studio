@@ -6,6 +6,8 @@ fn main() {
             "read_pdf",
             "open_project",
             "save_project",
+            "request_app_close",
+            "finish_app_close",
         ]),
     ))
     .expect("Tauri権限定義の生成に失敗しました");

@@ -41,7 +41,10 @@ fn main_window_only_has_declared_application_permissions() {
             "core:app:allow-version",
             "allow-diagnose-tex",
             "allow-draft-preview",
-            "allow-project-files"
+            "allow-project-files",
+            "allow-project-close",
+            "core:event:allow-listen",
+            "core:event:allow-unlisten"
         ])
     );
     assert!(capability.get("remote").is_none());
