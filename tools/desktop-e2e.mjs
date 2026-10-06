@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { spawn } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import { once } from "node:events";
 import { mkdir, mkdtemp, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { createServer } from "node:net";
@@ -7,6 +7,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
+import { promisify } from "node:util";
 import { remote } from "webdriverio";
 
 // Standalone WebdriverIO drives the same embedded W3C server as the Tauri service.
@@ -16,12 +17,11 @@ server.listen(0, "127.0.0.1");
 await once(server, "listening");
 const { port } = server.address();
 await new Promise((resolve) => server.close(resolve));
-const binary = fileURLToPath(
-  new URL(
-    "../src-tauri/target/debug/bundle/macos/Resume Studio.app/Contents/MacOS/resume-studio",
-    import.meta.url,
-  ),
+const appBundle = fileURLToPath(
+  new URL("../src-tauri/target/debug/bundle/macos/Resume Studio.app", import.meta.url),
 );
+const binary = join(appBundle, "Contents/MacOS/resume-studio");
+const runFile = promisify(execFile);
 const projectDirectory = await mkdtemp(join(tmpdir(), "resume-studio-e2e-"));
 let projectPath = join(projectDirectory, "応募 書類.json");
 const photoPath = join(projectDirectory, "架空 写真.png");
@@ -90,8 +90,22 @@ async function waitForExit() {
   assert.equal(app.exitCode, 0, `Confirmed close failed: ${output}`);
 }
 let browser;
+async function presentTestApp() {
+  assert.ok(
+    app.pid && app.exitCode === null && app.signalCode === null,
+    "Owned test app is not running",
+  );
+  // Activation changes native window visibility; no RAF/renderer stubs are used.
+  // The exact bundle is the one whose child process this harness already owns.
+  await runFile("/usr/bin/open", ["-a", appBundle], { timeout: 5000 });
+  await browser.waitUntil(
+    async () => await browser.execute(() => document.visibilityState === "visible"),
+    { timeout: 10000, interval: 200, timeoutMsg: "Owned test WebView remained hidden" },
+  );
+}
 try {
   browser = await connect();
+  await presentTestApp();
   await browser.$(".draft-editor input").waitForExist({ timeout: 30000 });
   await browser.execute(() => {
     // PDF.js must also work when the host WebKit lacks this newer Map API.
@@ -262,6 +276,7 @@ try {
   await rm(photoPath);
   app = launch();
   browser = await connect();
+  await presentTestApp();
   await browser.$(".draft-editor input").waitForExist({ timeout: 30000 });
   assert.equal(await browser.$(".draft-editor input").getValue(), "");
   await browser.$("button=開く").click();
@@ -317,6 +332,7 @@ try {
       original(...args);
     };
   });
+  await presentTestApp();
   await browser.$("button=PDF更新").click();
   const renderDeadline = Date.now() + 90000;
   for (;;) {
@@ -337,6 +353,7 @@ try {
     if (state.failure)
       throw new Error(`${state.failure.slice(0, 2000)}\n${state.diagnostics.slice(-4).join("\n")}`);
     if (state.ready) break;
+    if (state.visibility === "hidden") await presentTestApp();
     if (Date.now() >= renderDeadline)
       throw new Error(`Real TeX PDF did not render\n${JSON.stringify(state)}`);
     await delay(200);
@@ -381,10 +398,14 @@ try {
     select.dispatchEvent(new Event("change", { bubbles: true }));
   });
   await browser.waitUntil(
-    async () =>
-      await browser.execute(
-        () => document.querySelector("canvas")?.dataset.renderedScale === "1.5",
-      ),
+    async () => {
+      const state = await browser.execute(() => ({
+        ready: document.querySelector("canvas")?.dataset.renderedScale === "1.5",
+        visibility: document.visibilityState,
+      }));
+      if (!state.ready && state.visibility === "hidden") await presentTestApp();
+      return state.ready;
+    },
     { timeout: 30000 },
   );
   assert.ok((await browser.execute(() => document.querySelector("canvas").width)) > first.width);
@@ -403,6 +424,7 @@ try {
     ["履歴書", "2", ["架空大学卒業", "架空の志望動機末尾", "架空の希望末尾"]],
     ["職務経歴書", "3", ["架空会社", "架空案件", "架空の業務末尾", "架空の自己PR末尾"]],
   ]) {
+    await presentTestApp();
     if (label === "職務経歴書") await browser.$("button=職務経歴書").click();
     await browser.$(`button=${label}PDF更新`).click();
     const deadline = Date.now() + 90000;
@@ -411,6 +433,7 @@ try {
         (title) => ({
           failure: document.querySelector('[role="alert"]')?.textContent,
           diagnostics: window.__e2eConsoleFailures,
+          visibility: document.visibilityState,
           ready:
             Array.from(document.querySelectorAll("output")).some(
               (item) => item.textContent === `プレビュー：${title}`,
@@ -421,6 +444,7 @@ try {
       if (state.failure)
         throw new Error(`${state.failure}\n${state.diagnostics.slice(-4).join("\n")}`);
       if (state.ready) break;
+      if (state.visibility === "hidden") await presentTestApp();
       if (Date.now() > deadline) throw new Error(`Formal ${label} PDF did not render`);
       await delay(200);
     }
