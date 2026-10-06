@@ -5,6 +5,6 @@
   "documentKind": "career",
   "schemaVersions": [1],
   "engine": "lualatex",
-  "packages": ["luatexja-preset", "geometry", "hyperref"],
+  "packages": ["luatexja-preset", "geometry", "hyperref", "color"],
   "fonts": ["Harano Aji Mincho", "Harano Aji Gothic"]
 }

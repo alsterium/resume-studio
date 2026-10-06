@@ -148,8 +148,18 @@ fn every_body_and_optional_field_is_escaped_once_and_order_is_preserved() {
     assert!(career
         .content_tex
         .contains(r"\CareerURL{https://example.com/\%7Btext\%7D?a=1\&b=2\#fragment}"));
-    assert!(career.content_tex.contains(r"\%\allowbreak{}7Btext"));
+    assert!(career
+        .content_tex
+        .contains(r"\%\allowbreak{}7\allowbreak{}B\allowbreak{}t"));
     assert!(!career.content_tex.contains(r"\input{private}"));
+}
+
+#[test]
+fn empty_self_promotion_does_not_emit_a_heading_without_content() {
+    let project = parse_project(include_bytes!("../../tests/fixtures/project-full.json")).unwrap();
+    assert!(!project.career.self_promotion.has_content());
+    let career = generate_project(&project, DocumentKind::Career).unwrap();
+    assert!(!career.content_tex.contains("\\CareerSection{自己PR}"));
 }
 
 #[test]

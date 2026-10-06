@@ -76,7 +76,7 @@ fn contact(output: &mut String, title: &str, contact: &Contact) {
 fn period(start: &str, end: Option<&str>, ongoing: &str) -> String {
     format!("{} ～ {}", start, end.unwrap_or(ongoing))
 }
-fn resume_date(value: &str) -> String {
+fn document_date(value: &str) -> String {
     let parts: Vec<_> = value.split('-').collect();
     match parts.as_slice() {
         [year, month, day] => format!(
@@ -96,9 +96,9 @@ fn render_url(value: &str) -> Result<(String, String), String> {
         .chars()
         .map(|c| {
             let mut text = escape_text(&c.to_string());
-            if "/?.&=#-_:%".contains(c) {
-                text.push_str("\\allowbreak{}");
-            }
+            // A URL may contain a path segment longer than the entire paper width.
+            // Keep every displayed character while permitting a break anywhere.
+            text.push_str("\\allowbreak{}");
             text
         })
         .collect();
@@ -111,7 +111,7 @@ fn render(model: &DocumentModel<'_>) -> Result<String, String> {
             command(
                 &mut output,
                 "ResumeHeader",
-                &[escape_text(&resume_date(model.date))],
+                &[escape_text(&document_date(model.date))],
             );
             let age = age_on_date(&model.profile.birth_date, model.date)
                 .map(|age| format!("満{age}歳"))
@@ -127,7 +127,7 @@ fn render(model: &DocumentModel<'_>) -> Result<String, String> {
                 &[
                     escape_text(&model.profile.name_kana),
                     escape_text(&model.profile.name),
-                    escape_text(&resume_date(&model.profile.birth_date)),
+                    escape_text(&document_date(&model.profile.birth_date)),
                     age,
                     escape_text(model.profile.gender_label.as_deref().unwrap_or_default()),
                     photo,
@@ -180,7 +180,10 @@ fn render(model: &DocumentModel<'_>) -> Result<String, String> {
             command(
                 &mut output,
                 "CareerHeader",
-                &[escape_text(model.date), escape_text(&model.profile.name)],
+                &[
+                    escape_text(&document_date(model.date)),
+                    escape_text(&model.profile.name),
+                ],
             );
             command(&mut output, "CareerSection", &["経歴要約".into()]);
             output.push_str(&render_body(&career.summary)?);
@@ -235,6 +238,9 @@ fn render(model: &DocumentModel<'_>) -> Result<String, String> {
                         field(&mut output, label, value.as_deref().unwrap_or_default());
                     }
                 }
+                if !position.projects.is_empty() {
+                    command(&mut output, "CareerProjects", &[]);
+                }
                 for item in &position.projects {
                     command(
                         &mut output,
@@ -248,8 +254,15 @@ fn render(model: &DocumentModel<'_>) -> Result<String, String> {
                             )),
                         ],
                     );
+                    if item.overview.has_content() {
+                        command(
+                            &mut output,
+                            "CareerBody",
+                            &["プロジェクト概要".into(), render_body(&item.overview)?],
+                        );
+                    }
+                    field(&mut output, "担当フェーズ", &item.phases.join("、"));
                     for (label, body) in [
-                        ("プロジェクト概要", &item.overview),
                         ("業務内容", &item.responsibilities),
                         ("実績・取り組み", &item.achievements),
                     ] {
@@ -261,22 +274,23 @@ fn render(model: &DocumentModel<'_>) -> Result<String, String> {
                             );
                         }
                     }
+                    field(&mut output, "プロジェクト規模", &item.team_size);
                     for (label, items) in [
-                        ("担当フェーズ", &item.phases),
                         ("使用言語", &item.languages),
                         ("使用技術", &item.technologies),
                     ] {
                         field(&mut output, label, &items.join("、"));
                     }
-                    field(&mut output, "プロジェクト規模", &item.team_size);
                     if let Some(value) = item.url.as_deref().filter(|value| !value.is_empty()) {
                         let (target, label) = render_url(value)?;
                         command(&mut output, "CareerURL", &[target, label]);
                     }
                 }
             }
-            command(&mut output, "CareerSection", &["自己PR".into()]);
-            output.push_str(&render_body(&career.self_promotion)?);
+            if career.self_promotion.has_content() {
+                command(&mut output, "CareerSection", &["自己PR".into()]);
+                output.push_str(&render_body(&career.self_promotion)?);
+            }
         }
     }
     Ok(output)
@@ -338,13 +352,13 @@ pub fn generate_project(project: &Project, kind: DocumentKind) -> Result<Generat
 
 #[cfg(test)]
 mod tests {
-    use super::{render_url, resume_date};
+    use super::{document_date, render_url};
 
     #[test]
-    fn resume_dates_keep_the_year_and_allow_an_empty_birth_date() {
-        assert_eq!(resume_date("2026-10-06"), "2026年10月6日");
-        assert_eq!(resume_date("0001-01-01"), "0001年1月1日");
-        assert_eq!(resume_date(""), "");
+    fn document_dates_keep_the_year_and_allow_an_empty_birth_date() {
+        assert_eq!(document_date("2026-10-06"), "2026年10月6日");
+        assert_eq!(document_date("0001-01-01"), "0001年1月1日");
+        assert_eq!(document_date(""), "");
     }
 
     #[test]
@@ -355,11 +369,14 @@ mod tests {
             target,
             r"https://example.com/\%7Btext\%7D?a=1\&b=2\#fragment"
         );
-        assert!(label.contains(r"/\allowbreak{}\%\allowbreak{}7Btext"));
-        assert!(label.contains(r"\&\allowbreak{}b=\allowbreak{}2\#\allowbreak{}fragment"));
+        assert_eq!(
+            label.replace(r"\allowbreak{}", ""),
+            r"https://example.com/\%7Btext\%7D?a=1\&b=2\#fragment"
+        );
+        assert_eq!(label.matches(r"\allowbreak{}").count(), 47);
         let (target, label) = render_url("https://example.com/日本語").unwrap();
         assert!(target.contains(r"\%E6\%97\%A5"));
-        assert!(label.ends_with("日本語"));
+        assert!(label.ends_with(r"日\allowbreak{}本\allowbreak{}語\allowbreak{}"));
     }
 
     #[test]

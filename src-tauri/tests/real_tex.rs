@@ -61,6 +61,16 @@ fn formal_documents_compile_from_exported_bundles_with_and_without_photos() {
                 .starts_with(b"%PDF-"));
             #[cfg(target_os = "macos")]
             {
+                if kind == DocumentKind::Career {
+                    let pages = inspected_pdf_pages(&artifact.bytes);
+                    assert_eq!(
+                        pages.len(),
+                        1,
+                        "normal/empty career must not add an empty page"
+                    );
+                    assert_a4(&pages);
+                    assert!(!pages[0]["text"].as_str().unwrap().contains("自己PR"));
+                }
                 let text = extracted_pdf_text(&artifact.bytes);
                 assert!(
                     text.split_whitespace().collect::<String>().contains(
@@ -272,7 +282,8 @@ let document = PDFDocument(url: URL(fileURLWithPath: CommandLine.arguments[1]))!
 let pages = (0..<document.pageCount).map { index -> [String: Any] in
     let page = document.page(at: index)!
     let size = page.bounds(for: .mediaBox).size
-    return ["text": page.string ?? "", "width": size.width, "height": size.height]
+    let urls = page.annotations.compactMap { ($0.action as? PDFActionURL)?.url?.absoluteString }
+    return ["text": page.string ?? "", "width": size.width, "height": size.height, "urls": urls]
 }
 print(String(data: try! JSONSerialization.data(withJSONObject: pages), encoding: .utf8)!)
 "#,
@@ -293,6 +304,111 @@ fn assert_a4(pages: &[serde_json::Value]) {
     for page in pages {
         assert!((page["width"].as_f64().unwrap() - 595.276).abs() < 0.1);
         assert!((page["height"].as_f64().unwrap() - 841.89).abs() < 0.1);
+    }
+}
+
+#[test]
+#[cfg(target_os = "macos")]
+fn career_flow_preserves_long_cases_skill_cells_and_breakable_url_links() {
+    use resume_studio_lib::{
+        domain::validation::parse_project,
+        generator::{documents::generate_project, templates::DocumentKind},
+    };
+    let mut value: serde_json::Value =
+        serde_json::from_str(include_str!("../../tests/fixtures/project-full.json")).unwrap();
+    let paragraph = |text: String| {
+        serde_json::json!({"type":"doc","content":[
+        {"type":"paragraph","content":[{"type":"text","text":text}]}]})
+    };
+    let responsibility = format!(
+        "{}RESPONSIBILITYTAIL",
+        "架空の長い業務内容を欠落なく表示する。".repeat(200)
+    );
+    let achievement = format!(
+        "{}ACHIEVEMENTTAIL",
+        "架空の実績を改ページして保持する。".repeat(160)
+    );
+    let promotion = format!(
+        "{}SELFPRTAIL",
+        "架空の自己PRを連続して保持する。".repeat(80)
+    );
+    let skill = format!(
+        "{}SKILLTAIL",
+        "架空のスキル経験を長文でも保持する。".repeat(30)
+    );
+    let url = format!(
+        "https://example.com/{}?tail=URLTAIL",
+        "verylongsegment".repeat(70)
+    );
+    value["career"]["positions"][0]["projects"][0]["responsibilities"] =
+        paragraph(responsibility.clone());
+    value["career"]["positions"][0]["projects"][0]["achievements"] = paragraph(achievement.clone());
+    value["career"]["positions"][0]["projects"][0]["url"] = serde_json::json!(url);
+    value["career"]["selfPromotion"] = paragraph(promotion.clone());
+    value["career"]["skills"][0]["description"] = serde_json::json!(skill);
+    let project = parse_project(&serde_json::to_vec(&value).unwrap()).unwrap();
+    let bundle = generate_project(&project, DocumentKind::Career).unwrap();
+    let artifact = compile(&TexRuntime::discover(), &bundle).unwrap();
+    assert!(!artifact.log.contains("Overfull"), "{}", artifact.log);
+    assert!(
+        !artifact.log.contains("Missing character:"),
+        "{}",
+        artifact.log
+    );
+    let pages = inspected_pdf_pages(&artifact.bytes);
+    assert!(pages.len() > 2);
+    assert_a4(&pages);
+    let text = pages
+        .iter()
+        .map(|p| p["text"].as_str().unwrap())
+        .collect::<String>()
+        .split_whitespace()
+        .collect::<String>();
+    for body in [&responsibility, &achievement, &promotion, &skill, &url] {
+        assert!(text.contains(body), "lost text: {body}");
+    }
+    for (before, after) in [
+        ("経歴要約", "活かせるスキル・経験"),
+        ("活かせるスキル・経験", "職務経歴"),
+        ("主な実績", "架空プロジェクト"),
+        ("【担当フェーズ】", "【業務内容】"),
+        ("【プロジェクト規模】", "【使用言語】"),
+        ("URLTAIL", "自己PR"),
+    ] {
+        // Exclude the document title when locating the 職務経歴 section.
+        let content = text.trim_start_matches("職務経歴書");
+        assert!(content.find(before).unwrap() < content.find(after).unwrap());
+    }
+    let links: Vec<_> = pages
+        .iter()
+        .flat_map(|p| p["urls"].as_array().unwrap())
+        .filter(|target| target.as_str() == Some(&url))
+        .collect();
+    assert!(
+        links.len() > 1,
+        "long URL must retain its target across lines"
+    );
+    for page in &pages {
+        let last = page["text"]
+            .as_str()
+            .unwrap()
+            .lines()
+            .rev()
+            .find(|line| !line.trim().is_empty())
+            .unwrap();
+        assert!(
+            ![
+                "経歴要約",
+                "活かせるスキル・経験",
+                "職務経歴",
+                "自己PR",
+                "主な実績",
+                "【業務内容】",
+                "【実績・取り組み】"
+            ]
+            .contains(&last.trim()),
+            "orphan heading: {last}"
+        );
     }
 }
 
