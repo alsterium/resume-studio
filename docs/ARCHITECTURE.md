@@ -48,7 +48,7 @@ docs/
 
 JSONは唯一の編集データ。生成TeX、PDF、絶対パス、コンパイルログはプロジェクトに保存しない。1ファイルを移動するだけで内容と写真を引き継げる。
 
-以下はデータの形を示すサンプルであり、正式なJSON SchemaはM2で作成する。
+正式契約は[Project JSON v1](PROJECT_JSON.md)と[JSON Schema](../schemas/project-v1.schema.json)。以下は形を示す初期サンプルで、正式契約にはaddressKana等の追加項目が含まれる。
 
 ```json
 {

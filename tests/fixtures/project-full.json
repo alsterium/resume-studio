@@ -1,0 +1,288 @@
+{
+  "schemaVersion": 1,
+  "projectId": "sample-full",
+  "title": "架空の応募書類",
+  "documentDate": "2026-10-06",
+  "profile": {
+    "postalCode": "100-0001",
+    "address": "東京都千代田区（架空）",
+    "addressKana": "とうきょうとちよだく",
+    "phone": "090-0000-0000",
+    "email": "sample@example.com",
+    "name": "架空 山田",
+    "nameKana": "かくう やまだ",
+    "birthDate": "1990-10-06",
+    "photoAssetId": "photo-1",
+    "genderLabel": "任意",
+    "alternateContact": {
+      "postalCode": "",
+      "address": "架空の連絡先",
+      "addressKana": "",
+      "phone": "",
+      "email": ""
+    }
+  },
+  "resume": {
+    "education": [
+      {
+        "id": "edu-1",
+        "yearMonth": "2012-03",
+        "text": "架空大学 卒業"
+      }
+    ],
+    "employment": [
+      {
+        "id": "job-1",
+        "yearMonth": "2012-04",
+        "text": "架空株式会社 入社"
+      }
+    ],
+    "qualifications": [
+      {
+        "id": "qualification-1",
+        "yearMonth": "2013-10",
+        "text": "架空資格"
+      }
+    ],
+    "motivation": {
+      "type": "doc",
+      "content": [
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "太字の日本語 & %",
+              "marks": [
+                {
+                  "type": "bold"
+                }
+              ]
+            },
+            {
+              "type": "hardBreak"
+            },
+            {
+              "type": "text",
+              "text": "斜体の本文",
+              "marks": [
+                {
+                  "type": "italic"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "bulletList",
+          "content": [
+            {
+              "type": "listItem",
+              "content": [
+                {
+                  "type": "paragraph",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "箇条書きの業務"
+                    }
+                  ]
+                },
+                {
+                  "type": "orderedList",
+                  "attrs": {
+                    "start": 2,
+                    "type": null
+                  },
+                  "content": [
+                    {
+                      "type": "listItem",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "番号付きの実績"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "preferences": {
+      "type": "doc",
+      "content": [
+        {
+          "type": "paragraph"
+        }
+      ]
+    }
+  },
+  "career": {
+    "summary": {
+      "type": "doc",
+      "content": [
+        {
+          "type": "paragraph"
+        }
+      ]
+    },
+    "positions": [
+      {
+        "id": "position-1",
+        "companyName": "架空株式会社",
+        "startYearMonth": "2012-04",
+        "endYearMonth": null,
+        "role": "エンジニア",
+        "companyOverview": {
+          "business": "架空システム開発",
+          "capital": "1,000万円",
+          "employees": "30名"
+        },
+        "projects": [
+          {
+            "id": "project-1",
+            "name": "架空プロジェクト",
+            "startYearMonth": "2020-01",
+            "endYearMonth": "2022-03",
+            "overview": {
+              "type": "doc",
+              "content": [
+                {
+                  "type": "paragraph"
+                }
+              ]
+            },
+            "phases": ["設計", "実装"],
+            "responsibilities": {
+              "type": "doc",
+              "content": [
+                {
+                  "type": "paragraph",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "太字の日本語 & %",
+                      "marks": [
+                        {
+                          "type": "bold"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "hardBreak"
+                    },
+                    {
+                      "type": "text",
+                      "text": "斜体の本文",
+                      "marks": [
+                        {
+                          "type": "italic"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "bulletList",
+                  "content": [
+                    {
+                      "type": "listItem",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "箇条書きの業務"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "orderedList",
+                          "attrs": {
+                            "start": 2,
+                            "type": null
+                          },
+                          "content": [
+                            {
+                              "type": "listItem",
+                              "content": [
+                                {
+                                  "type": "paragraph",
+                                  "content": [
+                                    {
+                                      "type": "text",
+                                      "text": "番号付きの実績"
+                                    }
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            "achievements": {
+              "type": "doc",
+              "content": [
+                {
+                  "type": "paragraph"
+                }
+              ]
+            },
+            "teamSize": "5名",
+            "languages": ["TypeScript", "Rust"],
+            "technologies": ["React", "Tauri"],
+            "url": "https://example.com/project?a=1&b=2"
+          }
+        ]
+      }
+    ],
+    "skills": [
+      {
+        "id": "skill-1",
+        "name": "Rust",
+        "experienceLabel": "3年",
+        "description": "架空の実務経験"
+      }
+    ],
+    "selfPromotion": {
+      "type": "doc",
+      "content": [
+        {
+          "type": "paragraph"
+        }
+      ]
+    }
+  },
+  "templates": {
+    "resume": {
+      "id": "resume-standard",
+      "version": "1.0.0"
+    },
+    "career": {
+      "id": "career-standard",
+      "version": "1.0.0"
+    }
+  },
+  "assets": [
+    {
+      "id": "photo-1",
+      "mediaType": "image/png",
+      "base64": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jNcoAAAAASUVORK5CYII="
+    }
+  ]
+}

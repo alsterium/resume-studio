@@ -1,16 +1,18 @@
 use super::escape_text;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct BodyNode {
     #[serde(rename = "type")]
     kind: String,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     content: Vec<BodyNode>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     text: Option<String>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     marks: Vec<Mark>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     attrs: Option<ListAttrs>,
 }
 
@@ -69,18 +71,19 @@ mod tests {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct Mark {
     #[serde(rename = "type")]
     kind: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct ListAttrs {
+    #[serde(skip_serializing_if = "Option::is_none")]
     start: Option<u16>,
-    #[serde(rename = "type")]
+    #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
     numbering: Option<String>,
 }
 

@@ -5,11 +5,17 @@ import { expect, test, vi } from "vitest";
 import { BodyEditor } from "../../src/editor/BodyEditor";
 import { bodyExtensions } from "../../src/editor/extensions";
 import fixture from "../fixtures/rich-body.json";
+import emptyProject from "../fixtures/project-empty.json";
+import { validateProject } from "../../src/domain/validate-project";
 
 test("許可書式と日本語をJSONで取得し、再投入して保持する", () => {
   const editor = new Editor({ extensions: bodyExtensions(), content: fixture });
   try {
     const json = editor.getJSON();
+    expect(
+      validateProject({ ...emptyProject, career: { ...emptyProject.career, summary: json } }).career
+        .summary,
+    ).toEqual(json);
     editor.commands.clearContent();
     editor.commands.setContent(json, { errorOnInvalidContent: true });
     expect(editor.getJSON()).toEqual(json);
