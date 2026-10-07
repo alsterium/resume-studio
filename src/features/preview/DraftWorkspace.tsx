@@ -1,3 +1,4 @@
+import { OperationError } from "../errors/OperationError";
 import { useEffect, useRef, useState } from "react";
 import type {
   AppClient,
@@ -654,12 +655,12 @@ export function DraftWorkspace({
                   : result.status === "skipped"
                     ? "スキップしました"
                     : "保存に失敗しました"}
-                {result.error && <p>{result.error}</p>}
+                {result.error && <OperationError error={result.error} />}
               </li>
             ))}
           </ul>
         )}
-        {error && !pending && <p role="alert">{error}</p>}
+        {error && !pending && <OperationError error={error} />}
         {busy && activeJob.current && (
           <button type="button" disabled={cancelling} onClick={() => void cancelGeneration()}>
             生成をキャンセル

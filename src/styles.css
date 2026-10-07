@@ -195,3 +195,18 @@ dialog button {
     padding: 12px 18px;
   }
 }
+
+.operation-error {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid #b35b4b;
+  border-radius: 8px;
+  background: #fff8f5;
+  overflow-wrap: anywhere;
+}
+.operation-error pre {
+  max-height: 20rem;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

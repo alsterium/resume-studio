@@ -547,6 +547,17 @@ try {
   );
   assert.ok(await browser.$("button=職務経歴書PDF更新").isEnabled());
   assert.equal(await browser.$('[role="alert"]').isExisting(), false);
+  await browser.$("button=TeX環境を確認").click();
+  await browser.waitUntil(
+    async () =>
+      await browser.execute(() =>
+        Array.from(document.querySelectorAll("output")).some(
+          (element) => element.textContent === "日本語PDFを生成できました。",
+        ),
+      ),
+    { timeout: 90000 },
+  );
+  assert.equal(await browser.$('[role="alert"]').isExisting(), false);
   // Export the current snapshot through real Rust commands and storage.
   // Native picker/overwrite choice alone is substituted in this test build.
   await browser.execute(() => {
@@ -677,7 +688,7 @@ try {
   await waitForExit();
   assert.equal(JSON.parse(await readFile(projectPath, "utf8")).profile.name, "架空 終了確認");
   console.log(
-    "DESKTOP_E2E: PASS (photo import → JSON save/move → restart/restore → draft/resume/career TeX/PDF and embedded photo → guarded close/quit → save/exit; picker adapters)",
+    "DESKTOP_E2E: PASS (photo import → JSON save/move → restart/restore → draft/resume/career TeX/PDF and embedded photo → cancellation/diagnostics → PDF/TeX export/overwrite skip → guarded close/quit → save/exit; picker adapters)",
   );
 } finally {
   try {

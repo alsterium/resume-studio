@@ -45,7 +45,17 @@ fn discovers_executables_in_paths_with_japanese_and_spaces() {
     );
     let report = diagnose(&runtime);
     assert_eq!(report.error.unwrap().code, "TEX_DEPENDENCY_MISSING");
-    assert_eq!(report.missing_dependencies.len(), 4);
+    assert_eq!(report.missing_dependencies.len(), 11);
+    for template in resume_studio_lib::generator::templates::bundled_templates() {
+        for package in template.manifest.packages {
+            assert!(
+                report
+                    .missing_dependencies
+                    .contains(&format!("{package}.sty")),
+                "template dependency is not diagnosed: {package}"
+            );
+        }
+    }
 }
 
 #[test]
@@ -70,5 +80,23 @@ fn rejects_compiler_failure_and_invalid_pdf() {
         let report = diagnose(&runtime(dir.path(), &compiler, "echo fixture"));
         assert!(!report.pdf_validated);
         assert_eq!(report.error.unwrap().code, "COMPILE_FAILED");
+    }
+}
+
+#[test]
+fn missing_template_package_or_bold_font_is_identified_without_running_compilation() {
+    for missing in ["graphicx.sty", "HaranoAjiGothic-Bold.otf"] {
+        let dir = tempfile::tempdir().unwrap();
+        let trace = dir.path().join("compile-started.txt");
+        let compiler = format!(
+            "if [ \"$1\" = --version ]; then echo latexmk; exit 0; fi\ntouch '{}'",
+            trace.display()
+        );
+        let lookup = format!("if [ \"$1\" = '{missing}' ]; then exit 1; else echo fixture; fi");
+        let report = diagnose(&runtime(dir.path(), &compiler, &lookup));
+        assert_eq!(report.missing_dependencies, [missing]);
+        assert_eq!(report.error.unwrap().code, "TEX_DEPENDENCY_MISSING");
+        assert!(!trace.exists());
+        assert!(!report.pdf_validated);
     }
 }

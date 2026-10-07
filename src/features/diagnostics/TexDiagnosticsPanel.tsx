@@ -1,3 +1,4 @@
+import { OperationError } from "../errors/OperationError";
 import { useState } from "react";
 import type { AppClient, TexDiagnostics } from "../../infrastructure/app-client";
 
@@ -26,11 +27,11 @@ export function TexDiagnosticsPanel({ client }: { client: AppClient }) {
         {checking ? "確認中…" : "TeX環境を確認"}
       </button>
       {checking && <output>日本語PDFを生成して確認しています…</output>}
-      {error && <p role="alert">{error}</p>}
+      {error && <OperationError error={error} />}
       {report && (
         <div>
           {report.pdfValidated && <output>日本語PDFを生成できました。</output>}
-          {report.error && <p role="alert">{report.error.message}</p>}
+          {report.error && <OperationError error={report.error} />}
           {report.missingDependencies.length > 0 && (
             <div>
               <p>以下をTeX環境へ追加してください。</p>
@@ -50,7 +51,6 @@ export function TexDiagnosticsPanel({ client }: { client: AppClient }) {
                 </li>
               ))}
             </ul>
-            {report.error?.log && <pre>{report.error.log}</pre>}
           </details>
         </div>
       )}

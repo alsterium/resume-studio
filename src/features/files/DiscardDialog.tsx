@@ -1,3 +1,4 @@
+import { OperationError } from "../errors/OperationError";
 import { useEffect, useRef } from "react";
 
 export function DiscardDialog({
@@ -30,7 +31,7 @@ export function DiscardDialog({
     >
       <h2 id="discard-title">変更を保存しますか？</h2>
       <p>保存していない変更があります。</p>
-      {error && <p role="alert">{error}</p>}
+      {error && <OperationError error={error} />}
       <button type="button" disabled={busy} onClick={onSave}>
         保存して続行
       </button>

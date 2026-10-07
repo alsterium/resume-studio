@@ -11,8 +11,15 @@ use serde::Serialize;
 const DEPENDENCIES: &[&str] = &[
     "ltjsarticle.cls",
     "luatexja-preset.sty",
+    "regexpatch.sty",
+    "graphicx.sty",
+    "geometry.sty",
+    "hyperref.sty",
+    "color.sty",
     "HaranoAjiMincho-Regular.otf",
     "HaranoAjiGothic-Medium.otf",
+    "HaranoAjiMincho-Bold.otf",
+    "HaranoAjiGothic-Bold.otf",
 ];
 
 #[derive(Debug, Clone, Default)]

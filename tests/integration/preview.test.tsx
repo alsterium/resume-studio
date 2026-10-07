@@ -486,3 +486,43 @@ test("現在の書類・両書類をPDFとTeXで書き出し、部分成功と�
   );
   expect(screen.getByRole("button", { name: "書き出す" })).toBeEnabled();
 });
+
+test("TeX未検出・時間切れ・コンパイル失敗の対処とログを表示し、成功PDFを保持して再実行できる", async () => {
+  const user = userEvent.setup();
+  let failure: string | null = null;
+  mockIPC((command, rawArgs) => {
+    const args = rawArgs as Record<string, unknown>;
+    if (command === "generate_document") {
+      if (failure) throw failure;
+      return {
+        resultId: "last-success",
+        jobId: args.jobId,
+        kind: args.kind,
+        revision: args.revision,
+        projectId: (args.project as typeof fullProject).projectId,
+      };
+    }
+    if (command === "read_pdf") return new Uint8Array([37, 80, 68, 70, 45]).buffer;
+    throw new Error(command);
+  });
+  render(<DraftWorkspace client={tauriClient} />);
+  await user.click(screen.getByRole("button", { name: "履歴書PDF更新" }));
+  const canvas = await screen.findByLabelText("生成されたPDFページ");
+  for (const [code, hint] of [
+    ["TEX_NOT_FOUND", "TeX一式"],
+    ["TIMEOUT", "時間内"],
+    ["COMPILE_FAILED", "生成ログ"],
+  ]) {
+    failure = `生成失敗 (${code})\n! 架空 failure log`;
+    await user.click(screen.getByRole("button", { name: "履歴書PDF更新" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(hint);
+    expect(screen.getByLabelText("生成されたPDFページ")).toBe(canvas);
+    expect(screen.getByRole("button", { name: "履歴書PDF更新" })).toBeEnabled();
+    await user.click(screen.getByText("生成ログを表示"));
+    expect(screen.getByText("! 架空 failure log")).toBeVisible();
+  }
+  failure = null;
+  await user.click(screen.getByRole("button", { name: "履歴書PDF更新" }));
+  await screen.findByLabelText("生成されたPDFページ");
+  expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+});
