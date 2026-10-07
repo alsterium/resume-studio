@@ -2,6 +2,8 @@
 
 T28の受け入れを[PRD](PRD.md)へ対応付ける。進捗の正本は[JSONL台帳](../tasks/tasks.jsonl)。自動テスト、OS実操作、紙面目視はそれぞれの境界を区別する。表の「自動確認済み」はOSダイアログや物理IMEの完了を意味しない。
 
+2026-10-07の最終証跡コミット`1b7ed2a`は3品質ジョブが全成功したが、[集約ジョブ](https://github.com/alsterium/resume-studio/actions/runs/37569317367/job/112625313289)がGitHubのアカウント支払い／利用上限を理由に起動拒否された。課金設定の解消後に再実行する。OS実操作結果も未確認のため、T28はblockedとしている。
+
 ## 要件と証跡
 
 | 要件 | 確認内容・証跡 | 現状 |
@@ -27,7 +29,7 @@ T28の受け入れを[PRD](PRD.md)へ対応付ける。進捗の正本は[JSONL�
 | N05 日本語・キー | T08の日本語IMEはユーザー確認済み。T33の保存キーUI/実WebView、長文Undo/Redo | 新しい物理保存キー／IMEの組合せは下記実操作 |
 | N06 中断回復 | process Unit、jobs/cancellationの実待機／compile中キャンセル・timeout・子孫停止・後始末、実E2Eキャンセル | 自動確認済み |
 | N07 古いPDF | UIの遅延結果・別project／revision／kind／jobId照合、成功PDF維持、実compile中編集後の更新前表示 | 自動確認済み |
-| N08 CI | TS/Oxc/Rust/Node/UI/Unit/実TeX/実WebView/通常bundleとrequired-checks | 最新Pushの全ジョブ成功を台帳へ記録する |
+| N08 CI | TS/Oxc/Rust/Node/UI/Unit/実TeX/実WebView/通常bundleとrequired-checks | 3品質ジョブ成功。最終証跡コミットの集約起動はGitHub Billingで停止 |
 
 紙面はT20で空／通常、最大固定項目、本文64KiB、日本語／英数字、mark境界、PNG／JPEGの10実TeXテストと128ページの画像化・目視を行った。架空QA成果物はローカル一時領域だけにある。T28のE2E補完は紙面定義を変更しない。
 
