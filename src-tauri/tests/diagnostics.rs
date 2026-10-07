@@ -45,7 +45,7 @@ fn discovers_executables_in_paths_with_japanese_and_spaces() {
     );
     let report = diagnose(&runtime);
     assert_eq!(report.error.unwrap().code, "TEX_DEPENDENCY_MISSING");
-    assert_eq!(report.missing_dependencies.len(), 11);
+    assert_eq!(report.missing_dependencies.len(), 12);
     for template in resume_studio_lib::generator::templates::bundled_templates() {
         for package in template.manifest.packages {
             assert!(

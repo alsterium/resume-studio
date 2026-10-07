@@ -89,7 +89,7 @@ fn formal_documents_preserve_fields_and_export_owned_resources() {
 fn exact_template_kind_version_and_schema_are_required() {
     let mut project =
         parse_project(include_bytes!("../../tests/fixtures/project-empty.json")).unwrap();
-    assert_eq!(bundled_templates().len(), 3);
+    assert_eq!(bundled_templates().len(), 5);
     for template in bundled_templates() {
         assert_eq!(template.manifest.engine, "lualatex");
         assert_eq!(template.manifest.schema_versions, [1]);
@@ -248,4 +248,30 @@ fn resume_revision_preserves_saved_version_and_exports_jis_style() {
     let manifest: serde_json::Value =
         serde_json::from_slice(&fs::read(directory.path().join("manifest.json")).unwrap()).unwrap();
     assert_eq!(manifest["version"], "1.1.0");
+}
+
+#[test]
+fn reference_revisions_export_both_documents_without_changing_their_content() {
+    let mut project =
+        parse_project(include_bytes!("../../tests/fixtures/project-full.json")).unwrap();
+    for (kind, version, style_name) in [
+        (DocumentKind::Resume, "1.2.0", "resume.sty"),
+        (DocumentKind::Career, "1.1.0", "career.sty"),
+    ] {
+        let original = generate_project(&project, kind).unwrap();
+        match kind {
+            DocumentKind::Resume => project.templates.resume.version = version.into(),
+            DocumentKind::Career => project.templates.career.version = version.into(),
+        }
+        let revised = generate_project(&project, kind).unwrap();
+        assert_eq!(original.content_tex, revised.content_tex);
+        assert!(revised.main_tex.contains("HaranoAjiGothic-Regular.otf"));
+        let directory = tempfile::tempdir().unwrap();
+        write_bundle(directory.path(), &revised).unwrap();
+        assert!(directory.path().join(style_name).is_file());
+        let manifest: serde_json::Value =
+            serde_json::from_slice(&fs::read(directory.path().join("manifest.json")).unwrap())
+                .unwrap();
+        assert_eq!(manifest["version"], version);
+    }
 }

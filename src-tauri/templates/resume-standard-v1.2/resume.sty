@@ -1,0 +1,213 @@
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{resume}[2026/10/07 Resume Studio reference resume]
+\RequirePackage[left=18mm,right=18mm,top=18mm,bottom=18mm]{geometry}
+\RequirePackage{graphicx}
+\pagestyle{empty}
+\renewcommand{\familydefault}{\sfdefault}
+\renewcommand{\kanjifamilydefault}{\gtdefault}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0pt}
+\setlength{\fboxsep}{0pt}
+\setlength{\fboxrule}{.8pt}
+\newbox\rs@history
+\newbox\rs@qualifications
+\newbox\rs@motivation
+\newbox\rs@preferences
+\newbox\rs@metadata
+\newbox\rs@profile
+\newbox\rs@contactLeft
+\newbox\rs@contactRight
+\newbox\rs@contact
+\newbox\rs@slice
+\newbox\rs@frame
+\newdimen\rs@width
+\newdimen\rs@year
+\newdimen\rs@month
+\newdimen\rs@body
+\newdimen\rs@height
+\newdimen\rs@firstHistory
+% All dimensions belong to the template, not to the project JSON.
+\newcommand{\ResumeRowHeight}{9.5mm}
+\newcommand{\ResumeFirstHistoryHeight}{152mm}
+\newcommand{\ResumeSecondHistoryHeight}{57mm}
+\newcommand{\ResumeQualificationHeight}{57mm}
+\newcommand{\ResumeMotivationHeight}{49mm}
+\newcommand{\ResumePreferenceHeight}{49mm}
+\AtBeginDocument{\rs@width=\dimexpr\textwidth-2\fboxrule\relax
+  \rs@year=.12\rs@width \rs@month=.08\rs@width
+  \rs@body=\dimexpr\rs@width-\rs@year-\rs@month\relax
+  \fontsize{11.25pt}{19pt}\selectfont
+  \emergencystretch=2em}
+\newcommand{\ResumeHeader}[1]{\gdef\rs@date{#1}%
+  \vspace*{-3mm}\noindent\hbox to120mm{{\fontsize{18pt}{25pt}\selectfont 履\hspace{.8em}歴\hspace{.8em}書}%
+    \hfil {\fontsize{9pt}{11pt}\selectfont #1 現在}}\par\nointerlineskip\vspace{2mm}}
+\newcommand{\rs@continuationHeader}{履歴書（続紙）\hfill\rs@date\space 現在\par\vspace{4mm}}
+\newcommand{\rs@cell}[2]{\vbox{\hsize=#1\relax\linewidth=\hsize
+  \raggedright\leftskip=2mm\rightskip=2mm\parindent=0pt #2\par}}
+\newcommand{\rs@dottedRule}{\nointerlineskip\hbox to\hsize{\leaders\hbox{\rule{.6pt}{.3pt}\hskip1pt}\hfill}\nointerlineskip}
+\newcommand{\ResumePhoto}[1]{\includegraphics[width=30mm,height=39.9mm,keepaspectratio]{#1}}
+\newcommand{\rs@appendMetadata}[2]{%
+  \global\setbox\rs@metadata=\vbox{\unvbox\rs@metadata
+    \hsize=\dimexpr\rs@width-4mm\relax\linewidth=\hsize
+    \leftskip=0pt\rightskip=0pt\fontsize{11.25pt}{19pt}\selectfont
+    \textbf{#1}\par\nobreak #2\par\vspace{3mm}}}
+% Short labels keep a fixed column; values wrap independently.
+\newcommand{\rs@labelled}[2]{\hbox to\hsize{%
+  \vtop{\vskip0pt\hsize=21mm\rs@cell{\hsize}{\fontsize{9pt}{11pt}\selectfont #1}}%
+  \vtop{\vskip0pt\hsize=\dimexpr\hsize-21mm\relax\rs@cell{\hsize}{#2}}}}
+\newcommand{\rs@mincell}[2]{%
+  \setbox\rs@slice=\vbox{\hsize=\dimexpr120mm-2\fboxrule\relax #2}%
+  \rs@height=\dimexpr\ht\rs@slice+\dp\rs@slice\relax
+  \ifdim\rs@height<#1\relax\rs@height=#1\relax\fi
+  \vbox to\rs@height{\hsize=\dimexpr120mm-2\fboxrule\relax\vfil\unvbox\rs@slice\vfil}}
+\newcommand{\ResumeProfile}[6]{%
+  \setbox\rs@profile=\vbox{\hsize=\dimexpr120mm-2\fboxrule\relax
+    \rs@mincell{6.5mm}{\rs@labelled{ふりがな}{\fontsize{9pt}{11pt}\selectfont #1}}\rs@dottedRule
+    \rs@mincell{18mm}{\rs@labelled{名前}{{\fontsize{15.75pt}{22pt}\selectfont #2}}}%
+    \hrule height.4pt
+    \rs@mincell{14mm}{\hbox to\hsize{%
+      \vtop{\vskip0pt\hsize=99mm\rs@cell{\hsize}{\fontsize{10.5pt}{14pt}\selectfont\raggedleft #3 生\quad #4}}%
+      \vrule width.4pt
+      \vtop{\vskip0pt\hsize=\dimexpr\hsize-99mm-.4pt\relax\rs@cell{\hsize}{\centering #5}}}}}%
+  \ifdim\dimexpr\ht\rs@profile+\dp\rs@profile\relax>50mm
+    \rs@appendMetadata{基本情報}{ふりがな\quad #1\par 氏名\quad #2\par
+      生年月日\quad #3\quad #4\par 任意の性別表示\quad #5}%
+    \setbox\rs@profile=\vbox to39mm{\hsize=\dimexpr120mm-2\fboxrule\relax
+      \rs@cell{\hsize}{基本情報\par この欄に収まらないため、続紙に全文を記載しています。}\vfil}%
+  \fi
+  \rs@height=\dimexpr\ht\rs@profile+\dp\rs@profile\relax
+  \ifdim\rs@height<39mm \rs@height=39mm\fi
+  \setbox\rs@profile=\vbox to\rs@height{\unvbox\rs@profile\vfil}%
+  \noindent\hbox to\textwidth{%
+    \vtop{\vskip0pt\hsize=120mm\noindent\fbox{\box\rs@profile}\par}\hskip12mm
+    \vtop{\vskip0pt\vskip-6mm\vbox to40mm{\hsize=30mm
+      \vfil\hbox to30mm{\hfil #6\hfil}\vfil}}\hfil}\par}
+\newcommand{\ResumeContact}[6]{%
+  \def\rs@title{#1}\def\rs@addressTitle{現住所}%
+  \ifx\rs@title\rs@addressTitle\rs@height=24mm\else\rs@height=20mm\fi
+  \setbox\rs@contactLeft=\vbox{\hsize=.70\rs@width\vskip1mm
+    \rs@labelled{ふりがな}{\fontsize{9pt}{11pt}\selectfont #4}\vskip1.5mm\rs@dottedRule\vskip1mm
+    \rs@labelled{#1}{\fontsize{10.5pt}{12pt}\selectfont 〒#2\par #3}}
+  \setbox\rs@contactRight=\vbox{\hsize=\dimexpr.30\rs@width-.4pt\relax\vskip1mm
+    \rs@cell{\hsize}{\fontsize{10.5pt}{12pt}\selectfont 電話\quad #5}\hrule height.4pt
+    \rs@cell{\hsize}{\fontsize{9pt}{11pt}\selectfont Email\par #6}}
+  \ifdim\dimexpr\ht\rs@contactLeft+\dp\rs@contactLeft\relax>\rs@height
+    \rs@height=\dimexpr\ht\rs@contactLeft+\dp\rs@contactLeft\relax\fi
+  \ifdim\dimexpr\ht\rs@contactRight+\dp\rs@contactRight\relax>\rs@height
+    \rs@height=\dimexpr\ht\rs@contactRight+\dp\rs@contactRight\relax\fi
+  \ifdim\rs@height>55mm
+    \rs@appendMetadata{#1}{住所ふりがな\quad #4\par 郵便番号\quad #2\par
+      住所\quad #3\par 電話\quad #5\par メール\quad #6}%
+    \noindent\fbox{\vbox{\hsize=\rs@width
+      \rs@cell{\hsize}{\vspace{2mm}#1\par
+        この欄に収まらないため、続紙に全文を記載しています。\vspace{2mm}}}}\par
+  \else
+    \noindent\fbox{\hbox to\rs@width{%
+      \vtop{\vskip0pt\vbox to\rs@height{\hsize=.70\rs@width\unvbox\rs@contactLeft\vfil}}%
+      \vrule width.4pt
+      \vtop{\vskip0pt\vbox to\rs@height{\hsize=\dimexpr.30\rs@width-.4pt\relax\unvbox\rs@contactRight\vfil}}}}\par
+  \fi}
+% Each history paragraph remains a vertical list of individual lines. TeX may
+% split a multi-line row; an oversized row is never an indivisible table cell.
+\newcommand{\rs@row}[3]{%
+  \hsize=\rs@width\linewidth=\hsize
+  \leftskip=\dimexpr\rs@year+\rs@month+2mm\relax\rightskip=2mm
+  \baselineskip=\ResumeRowHeight\relax\lineskiplimit=-1000pt
+  \vrule width0pt height6.2mm depth3.3mm\llap{\hbox to\dimexpr\rs@year+\rs@month+2mm\relax{%
+    \hbox to\rs@year{\hfil #1\hfil}\hbox to\rs@month{\hfil #2\hfil}\hskip2mm}}#3\strut\par
+  \penalty0\nointerlineskip\hbox{\vrule width\rs@width height.5pt}}
+\newcommand{\rs@section}[1]{\rs@row{}{}{\hfill #1\hfill\mbox{}}}
+\newcommand{\ResumeHistoryBegin}[1]{%
+  \def\rs@title{#1}\def\rs@qualTitle{免許・資格}%
+  \ifx\rs@title\rs@qualTitle
+    \let\rs@target\rs@qualifications
+  \else
+    \let\rs@target\rs@history
+    \def\rs@employmentTitle{職歴}%
+    \ifx\rs@title\rs@employmentTitle
+      \global\setbox\rs@target=\vbox{\unvbox\rs@target\rs@row{}{}{}}%
+    \fi
+    \global\setbox\rs@target=\vbox{\unvbox\rs@target\rs@section{#1}}%
+  \fi}
+\newcommand{\ResumeHistoryRow}[3]{%
+  \global\setbox\rs@target=\vbox{\unvbox\rs@target\rs@row{#1}{#2}{#3}}}
+\newcommand{\rs@endHistory}{%
+  \global\setbox\rs@target=\vbox{\unvbox\rs@target
+    % Keep the final item with its closing label: no page containing only 以上.
+    \setbox\rs@slice=\lastbox\unpenalty\penalty10000
+    \nointerlineskip\box\rs@slice\penalty10000\rs@row{}{}{\hfill 以上}}}
+\newcommand{\ResumeHistoryEnd}{%
+  \ifx\rs@target\rs@qualifications
+    \rs@endHistory
+  \else
+    \def\rs@employment{職歴}\ifx\rs@title\rs@employment
+      \rs@endHistory
+    \fi
+  \fi}
+\newcommand{\ResumeBody}[2]{%
+  \def\rs@title{#1}\def\rs@preferenceTitle{本人希望欄}%
+  \ifx\rs@title\rs@preferenceTitle\let\rs@target\rs@preferences
+  \else\let\rs@target\rs@motivation\fi
+  \global\setbox\rs@target=\vbox{\hsize=\dimexpr\rs@width-4mm\relax
+    \linewidth=\hsize\columnwidth=\hsize\parindent=0pt
+    \leftskip=0pt\rightskip=0pt\fontsize{11.25pt}{19pt}\selectfont #2}}
+% A split consumes only the selected lines. Fill the remaining space with blank
+% rows, so both base pages retain their form even for an empty project.
+\newcommand{\rs@split}[2]{%
+  \splittopskip=\topskip\splitmaxdepth=0pt
+  % Natural lists may exceed maxdimen. Read their dimensions via Lua without
+  % feeding an oversized dimension through TeX's dimension scanner.
+  \ifnum\directlua{local b=tex.box[\number#1];
+    tex.sprint(b and b.height+b.depth>\number\dimexpr#2\relax\space and 1 or 0)}=1
+    \setbox\rs@slice=\vsplit#1 to#2\relax
+  \else\setbox\rs@slice=\box#1\fi}
+\newcommand{\rs@remaining}[1]{\directlua{local b=tex.box[\number#1];
+  tex.sprint(b and b.height+b.depth>0 and 1 or 0)}}
+\newcommand{\rs@vertical}[2]{\hbox to0pt{\kern#1\vrule width.3pt height#2 depth0pt\hss}}
+\newcommand{\rs@dottedVertical}[2]{\hbox to0pt{\kern#1\vbox to#2{%
+  \leaders\vbox to1.2mm{\vfil\hrule width.3pt height.6pt\vfil}\vfill}\hss}}
+\newcommand{\rs@table}[3]{%
+  \rs@split{#1}{#2}%
+  \setbox\rs@frame=\vbox{\hsize=\rs@width
+    \vbox to8mm{\vfil\hbox to\rs@width{\fontsize{9pt}{11pt}\selectfont\hbox to\rs@year{\hfil 年\hfil}%
+      \hbox to\rs@month{\hfil 月\hfil}%
+      \hbox to\rs@body{\hfil #3\hfil}}\vfil}\hrule height.4pt
+    \vbox to#2{\unvbox\rs@slice
+      \leaders\vbox to\ResumeRowHeight{\vfil\hrule width\rs@width height.25pt}\vfill}}%
+  \rs@height=\dimexpr\ht\rs@frame+\dp\rs@frame\relax
+  \noindent\fbox{\hbox{\rs@dottedVertical{\rs@year}{\rs@height}%
+    \rs@vertical{\dimexpr\rs@year+\rs@month\relax}{\rs@height}\box\rs@frame}}\par}
+\newcommand{\rs@bodyFrame}[4]{%
+  \rs@split{#1}{#2}%
+  \noindent\fbox{\vbox{\hsize=\rs@width
+    \rs@cell{\hsize}{\fontsize{9pt}{11pt}\selectfont #3\space #4\vspace{1mm}}%
+    \hbox{\hskip2mm\vbox to#2{\hsize=\dimexpr\rs@width-4mm\relax
+      \unvbox\rs@slice\vfil}\hskip2mm}}}\par}
+\newcommand{\rs@continueTable}[2]{%
+  \loop\ifnum\rs@remaining{#1}=1
+    \newpage\rs@continuationHeader
+    \rs@table{#1}{235mm}{#2（続き）}%
+  \repeat}
+\newcommand{\rs@continueBody}[2]{%
+  \loop\ifnum\rs@remaining{#1}=1
+    \newpage\rs@continuationHeader
+    \rs@bodyFrame{#1}{225mm}{#2（続き）}{}%
+  \repeat}
+\newcommand{\ResumeFinish}{%
+  \vspace{1.5mm}\par\penalty0
+  % Fill page one; long contacts reduce the table without losing content.
+  \rs@height=\dimexpr\textheight-\pagetotal-11.5mm\relax
+  \rs@firstHistory=\ResumeFirstHistoryHeight\relax
+  \ifdim\rs@firstHistory>\rs@height\rs@firstHistory=\rs@height\fi
+  \ifdim\rs@firstHistory<15mm\rs@firstHistory=15mm\fi
+  \rs@table{\rs@history}{\rs@firstHistory}{学歴・職歴}%
+  \newpage
+  \rs@table{\rs@history}{\ResumeSecondHistoryHeight}{学歴・職歴}\vspace{3mm}
+  \rs@table{\rs@qualifications}{\ResumeQualificationHeight}{免許・資格}\vspace{3mm}
+  \rs@bodyFrame{\rs@motivation}{\ResumeMotivationHeight}{志望動機・特技・アピールポイントなど}{}\vspace{3mm}
+  \rs@bodyFrame{\rs@preferences}{\ResumePreferenceHeight}{本人希望欄}{（給与・職種・勤務時間・勤務地などについての希望があれば記入）}%
+  \rs@continueBody{\rs@metadata}{基本情報・連絡先}%
+  \rs@continueTable{\rs@history}{学歴・職歴}%
+  \rs@continueTable{\rs@qualifications}{免許・資格}%
+  \rs@continueBody{\rs@motivation}{志望動機・特技・アピールポイントなど}%
+  \rs@continueBody{\rs@preferences}{本人希望欄}}

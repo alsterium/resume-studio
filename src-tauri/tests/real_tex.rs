@@ -15,11 +15,24 @@ fn formal_documents_compile_from_exported_bundles_with_and_without_photos() {
         include_bytes!("../../tests/fixtures/project-empty.json").as_slice(),
     ] {
         let mut project = parse_project(fixture).unwrap();
-        project.templates.resume.version = "1.1.0".into();
+        project.templates.resume.version = "1.2.0".into();
+        project.templates.career.version = "1.1.0".into();
         for kind in [DocumentKind::Resume, DocumentKind::Career] {
             let bundle = generate_project(&project, kind).unwrap();
             let artifact =
                 compile(&TexRuntime::discover(), &bundle).expect("formal document compilation");
+            save_layout_qa(
+                &format!(
+                    "reference-{kind:?}-{}",
+                    if project.profile.name.is_empty() {
+                        "empty"
+                    } else {
+                        "full"
+                    }
+                ),
+                &bundle,
+                &artifact.bytes,
+            );
             assert!(
                 !artifact.log.contains("Missing character:"),
                 "{}",
@@ -117,7 +130,8 @@ fn resume_form_keeps_two_base_pages_and_preserves_overflow_in_section_order() {
         include_bytes!("../../tests/fixtures/project-full.json").as_slice(),
     ] {
         let mut project = parse_project(source).unwrap();
-        project.templates.resume.version = "1.1.0".into();
+        project.templates.resume.version = "1.2.0".into();
+        project.templates.career.version = "1.1.0".into();
         let artifact = compile(
             &TexRuntime::discover(),
             &generate_project(&project, DocumentKind::Resume).unwrap(),
@@ -180,7 +194,8 @@ fn resume_form_keeps_two_base_pages_and_preserves_overflow_in_section_order() {
     value["profile"]["address"] =
         serde_json::json!(format!("{}住所末尾", "架空の長い住所".repeat(10)));
     let mut project = parse_project(&serde_json::to_vec(&value).unwrap()).unwrap();
-    project.templates.resume.version = "1.1.0".into();
+    project.templates.resume.version = "1.2.0".into();
+    project.templates.career.version = "1.1.0".into();
     let artifact = compile(
         &TexRuntime::discover(),
         &generate_project(&project, DocumentKind::Resume).unwrap(),
@@ -192,6 +207,8 @@ fn resume_form_keeps_two_base_pages_and_preserves_overflow_in_section_order() {
         "{}",
         artifact.log
     );
+    let bundle = generate_project(&project, DocumentKind::Resume).unwrap();
+    save_layout_qa("reference-overflow", &bundle, &artifact.bytes);
     let pages = inspected_pdf_pages(&artifact.bytes);
     assert!(pages.len() > 2);
     assert_a4(&pages);
@@ -236,9 +253,28 @@ fn resume_form_keeps_two_base_pages_and_preserves_overflow_in_section_order() {
     }
     // Reassemble split text without the repeated form headers. A sentence may
     // cross a page boundary, where page.string also inserts the next heading.
-    assert!(normalized
-        .replace("年月学歴・職歴（続き）", "")
-        .contains(&"長い学校名と学習内容。".repeat(70)));
+    let history_text = pages
+        .iter()
+        .filter_map(|page| {
+            let text = page["text"]
+                .as_str()
+                .unwrap()
+                .split_whitespace()
+                .collect::<String>();
+            text.split_once("学歴・職歴").map(|(_, body)| {
+                body.strip_prefix("（続き）")
+                    .unwrap_or(body)
+                    .split("年月免許・資格")
+                    .next()
+                    .unwrap()
+                    .to_owned()
+            })
+        })
+        .collect::<String>();
+    assert!(
+        history_text.contains(&"長い学校名と学習内容。".repeat(70)),
+        "{history_text}"
+    );
     for (title, marker) in [
         ("志望動機・特技・アピールポイントなど", "MOTIVATIONTAIL"),
         ("本人希望欄", "PREFERENCETAIL"),
@@ -421,7 +457,8 @@ fn maximum_fixed_fields_wrap_and_resume_moves_oversized_contacts_to_continuation
     value["career"]["positions"][0]["projects"][0]["url"] = serde_json::json!(url);
     career_fields.push(url);
     let mut project = parse_project(&serde_json::to_vec(&value).unwrap()).unwrap();
-    project.templates.resume.version = "1.1.0".into();
+    project.templates.resume.version = "1.2.0".into();
+    project.templates.career.version = "1.1.0".into();
     for (kind, fields) in [
         (DocumentKind::Resume, resume_fields),
         (DocumentKind::Career, career_fields),
@@ -547,7 +584,8 @@ fn maximum_body_bytes_preserve_the_complete_text_in_both_documents() {
         value["resume"]["motivation"] = body.clone();
         value["career"]["summary"] = body;
         let mut project = parse_project(&serde_json::to_vec(&value).unwrap()).unwrap();
-        project.templates.resume.version = "1.1.0".into();
+        project.templates.resume.version = "1.2.0".into();
+        project.templates.career.version = "1.1.0".into();
         for kind in [DocumentKind::Resume, DocumentKind::Career] {
             let bundle = generate_project(&project, kind).unwrap();
             let artifact = compile(&TexRuntime::discover(), &bundle).unwrap();
@@ -611,7 +649,8 @@ fn real_photos_keep_their_aspect_ratio_inside_the_resume_frame() {
     ] {
         let mut project =
             parse_project(include_bytes!("../../tests/fixtures/project-full.json")).unwrap();
-        project.templates.resume.version = "1.1.0".into();
+        project.templates.resume.version = "1.2.0".into();
+        project.templates.career.version = "1.1.0".into();
         project.assets.clear();
         project.profile.photo_asset_id = None;
         if width > 0 {
@@ -664,7 +703,7 @@ fn real_photos_keep_their_aspect_ratio_inside_the_resume_frame() {
         } else {
             let [left, top, right, bottom] = bounds.unwrap();
             assert!(
-                left >= 160.0 && right <= 194.0 && top >= 25.0 && bottom <= 85.0,
+                left >= 149.0 && right <= 182.0 && top >= 20.0 && bottom <= 68.0,
                 "photo outside frame: {bounds:?}"
             );
             let expected_height = if height > width {
@@ -783,7 +822,8 @@ fn career_flow_preserves_long_cases_skill_cells_and_breakable_url_links() {
     value["career"]["positions"][0]["projects"][0]["url"] = serde_json::json!(url);
     value["career"]["selfPromotion"] = paragraph(promotion.clone());
     value["career"]["skills"][0]["description"] = serde_json::json!(skill);
-    let project = parse_project(&serde_json::to_vec(&value).unwrap()).unwrap();
+    let mut project = parse_project(&serde_json::to_vec(&value).unwrap()).unwrap();
+    project.templates.career.version = "1.1.0".into();
     let bundle = generate_project(&project, DocumentKind::Career).unwrap();
     let artifact = compile(&TexRuntime::discover(), &bundle).unwrap();
     assert!(!artifact.log.contains("Overfull"), "{}", artifact.log);

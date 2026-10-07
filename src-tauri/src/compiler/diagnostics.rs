@@ -18,6 +18,7 @@ const DEPENDENCIES: &[&str] = &[
     "color.sty",
     "HaranoAjiMincho-Regular.otf",
     "HaranoAjiGothic-Medium.otf",
+    "HaranoAjiGothic-Regular.otf",
     "HaranoAjiMincho-Bold.otf",
     "HaranoAjiGothic-Bold.otf",
 ];
