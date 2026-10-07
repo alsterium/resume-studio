@@ -89,7 +89,7 @@ fn formal_documents_preserve_fields_and_export_owned_resources() {
 fn exact_template_kind_version_and_schema_are_required() {
     let mut project =
         parse_project(include_bytes!("../../tests/fixtures/project-empty.json")).unwrap();
-    assert_eq!(bundled_templates().len(), 2);
+    assert_eq!(bundled_templates().len(), 3);
     for template in bundled_templates() {
         assert_eq!(template.manifest.engine, "lualatex");
         assert_eq!(template.manifest.schema_versions, [1]);
@@ -214,4 +214,38 @@ fn bundle_rejects_paths_duplicates_and_existing_symlinks_before_writing() {
         assert!(!directory.path().join("main.tex").exists());
         assert_eq!(fs::read_to_string(original).unwrap(), "keep");
     }
+}
+
+#[test]
+fn resume_revision_preserves_saved_version_and_exports_jis_style() {
+    let mut project =
+        parse_project(include_bytes!("../../tests/fixtures/project-full.json")).unwrap();
+    let original = generate_project(&project, DocumentKind::Resume).unwrap();
+    assert_eq!(project.templates.resume.version, "1.0.0");
+    project.templates.resume.version = "1.1.0".into();
+    let revised = generate_project(&project, DocumentKind::Resume).unwrap();
+    assert_eq!(original.content_tex, revised.content_tex);
+    let style = |bundle: &resume_studio_lib::generator::GeneratedBundle| {
+        bundle
+            .resources
+            .iter()
+            .find(|resource| resource.name == "resume.sty")
+            .unwrap()
+            .bytes
+            .clone()
+    };
+    assert_eq!(
+        style(&original),
+        include_bytes!("../templates/resume-standard/resume.sty")
+    );
+    assert_eq!(
+        style(&revised),
+        include_bytes!("../templates/resume-standard-v1.1/resume.sty")
+    );
+    assert_ne!(style(&original), style(&revised));
+    let directory = tempfile::tempdir().unwrap();
+    write_bundle(directory.path(), &revised).unwrap();
+    let manifest: serde_json::Value =
+        serde_json::from_slice(&fs::read(directory.path().join("manifest.json")).unwrap()).unwrap();
+    assert_eq!(manifest["version"], "1.1.0");
 }

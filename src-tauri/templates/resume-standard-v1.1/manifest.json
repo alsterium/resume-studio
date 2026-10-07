@@ -1,0 +1,19 @@
+{
+  "id": "resume-standard",
+  "version": "1.1.0",
+  "displayName": "標準履歴書（JIS形式）",
+  "documentKind": "resume",
+  "schemaVersions": [
+    1
+  ],
+  "engine": "lualatex",
+  "packages": [
+    "luatexja-preset",
+    "graphicx",
+    "geometry"
+  ],
+  "fonts": [
+    "Harano Aji Mincho",
+    "Harano Aji Gothic"
+  ]
+}

@@ -31,6 +31,12 @@ pub struct Template {
 pub fn bundled_templates() -> Vec<Template> {
     [
         (
+            include_str!("../../templates/resume-standard-v1.1/manifest.json"),
+            include_str!("../../templates/resume-standard-v1.1/main.tex"),
+            "resume.sty",
+            include_str!("../../templates/resume-standard-v1.1/resume.sty"),
+        ),
+        (
             include_str!("../../templates/resume-standard/manifest.json"),
             include_str!("../../templates/resume-standard/main.tex"),
             "resume.sty",

@@ -266,3 +266,9 @@ UI結合でTeX未検出・時間切れ・コンパイル失敗の対処と成功
 Cmd/Ctrl+Sで保存、Shift付きで名前を付けて保存する。現在の入力と保存先を既存のsave_projectへ渡し、保存中の追加入力は従来どおり未保存として維持する。compositionイベント中、isComposing、229 keyCode、Alt付き、他の入力処理がpreventDefaultしたキーは処理しない。ファイル操作／読込／破棄確認中はキーによる保存を抑止し、同時の複数キーは同期refで重複保存を防ぐ。
 
 UI結合で氏名と本文エディタからの保存、別名保存、IME抑止、連続キー、保存中の追加編集と確認中の抑止を検証する。macOS E2EはWebDriverのMeta+Sから実WebView／IPC／Rust保存を通す。WebDriverはDOM KeyboardEventを送るため、OSの物理キーとIME変換の組合せはT28で補完する。
+
+## JIS形式TeX履歴書の紙面改善（T34）
+
+Web上の多摩通信社／shigioのTeX履歴書を参照し、標準履歴書1.1.0を追加。旧版を保存したJSONは同じ1.0.0を使い、新規の既定を1.1.0とする。紙面の寸法と参照元は[TEMPLATE_REFERENCE](TEMPLATE_REFERENCE.md#7-jis形式を参考にした履歴書110t34)、出力契約は[GENERATED_TEX](GENERATED_TEX.md)を参照。既存プロジェクトはテンプレート選択から新版へ変更する。
+
+実TeX10件は新版で空／通常のA4・2ページ、最大固定項目、64KiB本文、縦長／正方形／横長JPEG・PNG／写真なし、長文と続紙、TeX一式の独立コンパイルを確認。通常／空の全2ページと最大固定項目の全12ページをPDFKitで画像化し目視QA。旧版の資源を保持し、新版へ同じ本文を渡して出力する契約も結合テストで確認した。品質ゲートと実WebViewのPDF描画・TeX/PDF書き出しを確認する。QA成果物はリポジトリへ同梱しない。

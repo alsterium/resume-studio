@@ -14,7 +14,8 @@ fn formal_documents_compile_from_exported_bundles_with_and_without_photos() {
         include_bytes!("../../tests/fixtures/project-full.json").as_slice(),
         include_bytes!("../../tests/fixtures/project-empty.json").as_slice(),
     ] {
-        let project = parse_project(fixture).unwrap();
+        let mut project = parse_project(fixture).unwrap();
+        project.templates.resume.version = "1.1.0".into();
         for kind in [DocumentKind::Resume, DocumentKind::Career] {
             let bundle = generate_project(&project, kind).unwrap();
             let artifact =
@@ -115,7 +116,8 @@ fn resume_form_keeps_two_base_pages_and_preserves_overflow_in_section_order() {
         include_bytes!("../../tests/fixtures/project-empty.json").as_slice(),
         include_bytes!("../../tests/fixtures/project-full.json").as_slice(),
     ] {
-        let project = parse_project(source).unwrap();
+        let mut project = parse_project(source).unwrap();
+        project.templates.resume.version = "1.1.0".into();
         let artifact = compile(
             &TexRuntime::discover(),
             &generate_project(&project, DocumentKind::Resume).unwrap(),
@@ -126,6 +128,16 @@ fn resume_form_keeps_two_base_pages_and_preserves_overflow_in_section_order() {
             !artifact.log.contains("Missing character:"),
             "{}",
             artifact.log
+        );
+        let bundle = generate_project(&project, DocumentKind::Resume).unwrap();
+        save_layout_qa(
+            if project.profile.name.is_empty() {
+                "jis-empty"
+            } else {
+                "jis-full"
+            },
+            &bundle,
+            &artifact.bytes,
         );
         let pages = inspected_pdf_pages(&artifact.bytes);
         assert_eq!(pages.len(), 2, "{pages:?}");
@@ -167,7 +179,8 @@ fn resume_form_keeps_two_base_pages_and_preserves_overflow_in_section_order() {
     }
     value["profile"]["address"] =
         serde_json::json!(format!("{}住所末尾", "架空の長い住所".repeat(10)));
-    let project = parse_project(&serde_json::to_vec(&value).unwrap()).unwrap();
+    let mut project = parse_project(&serde_json::to_vec(&value).unwrap()).unwrap();
+    project.templates.resume.version = "1.1.0".into();
     let artifact = compile(
         &TexRuntime::discover(),
         &generate_project(&project, DocumentKind::Resume).unwrap(),
@@ -407,7 +420,8 @@ fn maximum_fixed_fields_wrap_and_resume_moves_oversized_contacts_to_continuation
     assert_eq!(url.len(), 2048);
     value["career"]["positions"][0]["projects"][0]["url"] = serde_json::json!(url);
     career_fields.push(url);
-    let project = parse_project(&serde_json::to_vec(&value).unwrap()).unwrap();
+    let mut project = parse_project(&serde_json::to_vec(&value).unwrap()).unwrap();
+    project.templates.resume.version = "1.1.0".into();
     for (kind, fields) in [
         (DocumentKind::Resume, resume_fields),
         (DocumentKind::Career, career_fields),
@@ -532,7 +546,8 @@ fn maximum_body_bytes_preserve_the_complete_text_in_both_documents() {
         let body = serde_json::json!({"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":text}]}]});
         value["resume"]["motivation"] = body.clone();
         value["career"]["summary"] = body;
-        let project = parse_project(&serde_json::to_vec(&value).unwrap()).unwrap();
+        let mut project = parse_project(&serde_json::to_vec(&value).unwrap()).unwrap();
+        project.templates.resume.version = "1.1.0".into();
         for kind in [DocumentKind::Resume, DocumentKind::Career] {
             let bundle = generate_project(&project, kind).unwrap();
             let artifact = compile(&TexRuntime::discover(), &bundle).unwrap();
@@ -596,6 +611,7 @@ fn real_photos_keep_their_aspect_ratio_inside_the_resume_frame() {
     ] {
         let mut project =
             parse_project(include_bytes!("../../tests/fixtures/project-full.json")).unwrap();
+        project.templates.resume.version = "1.1.0".into();
         project.assets.clear();
         project.profile.photo_asset_id = None;
         if width > 0 {
