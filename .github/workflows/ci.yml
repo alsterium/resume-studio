@@ -84,12 +84,14 @@ jobs:
       - name: Check test feature and build embedded WebDriver app
         run: |
           rustup show
-          cargo clippy --manifest-path src-tauri/Cargo.toml --locked --features desktop-e2e --all-targets -- -D warnings
+          cargo clippy --manifest-path src-tauri/Cargo.toml --locked --features desktop-e2e,real-tex --all-targets -- -D warnings
           pnpm build:e2e
       - name: Run native WebView with real TeX
         run: pnpm test:e2e
       - name: Verify body visitor with real TeX and PDF text extraction
         run: pnpm test:tex
+      - name: Build production application without test features
+        run: pnpm tauri build --debug
       - name: Verify production excludes the test server
         run: |
           cargo tree --manifest-path src-tauri/Cargo.toml --locked --edges normal --prefix none > "$RUNNER_TEMP/production-dependencies.txt"
