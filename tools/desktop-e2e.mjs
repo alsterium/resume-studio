@@ -118,7 +118,18 @@ async function connect() {
 async function waitForExit() {
   const deadline = Date.now() + 15000;
   while (app.exitCode === null && app.signalCode === null) {
-    if (Date.now() >= deadline) throw new Error("Confirmed close did not exit the app");
+    if (Date.now() >= deadline)
+      throw new Error(
+        "Confirmed close did not exit the app: " +
+          JSON.stringify(
+            await browser.execute(() => ({
+              saving: document.querySelector('[aria-label="保存状態"]')?.textContent,
+              dialog: document.querySelector('[role="dialog"]')?.textContent,
+              alert: document.querySelector('[role="alert"]')?.textContent,
+              errors: window.__e2eConsoleFailures,
+            })),
+          ),
+      );
     await delay(100);
   }
   assert.equal(app.exitCode, 0, `Confirmed close failed: ${output}`);
@@ -137,6 +148,124 @@ async function presentTestApp() {
     { timeout: 10000, interval: 200, timeoutMsg: "Owned test WebView remained hidden" },
   );
 }
+async function verifyWorkspaceLayout() {
+  const dimensions = () =>
+    browser.execute(() => {
+      const editor = document.querySelector(".inspector-panel").getBoundingClientRect();
+      const preview = document.querySelector(".preview-panel").getBoundingClientRect();
+      return {
+        editor: { width: editor.width, bottom: editor.bottom },
+        preview: { width: preview.width, top: preview.top },
+        viewport: innerWidth,
+        overflow: document.documentElement.scrollWidth,
+      };
+    });
+  const before = await dimensions();
+  assert.ok(Math.abs(before.editor.width - 410) < 3, JSON.stringify(before));
+  assert.ok(
+    before.preview.width >= 360 && before.overflow <= before.viewport,
+    JSON.stringify(before),
+  );
+  const handle = await browser.$('[data-slot="resizable-handle"]');
+  await handle.click();
+  await browser.keys("ArrowRight");
+  await browser.waitUntil(async () => (await dimensions()).editor.width > before.editor.width + 5, {
+    timeout: 5000,
+  });
+  await browser.keys("ArrowLeft");
+  const rect = await browser.getWindowRect();
+  await browser.setWindowSize(680, 800);
+  await browser.waitUntil(
+    async () => {
+      const size = await dimensions();
+      return size.preview.top >= size.editor.bottom - 1 && size.overflow <= size.viewport;
+    },
+    { timeout: 5000 },
+  );
+  await captureLayout("compact");
+  await browser.setWindowSize(rect.width, rect.height);
+  await browser.waitUntil(async () => (await dimensions()).preview.width >= 360, { timeout: 5000 });
+  await browser.waitUntil(
+    async () =>
+      browser.execute(() => {
+        const paper = document.querySelector(".pdf-paper");
+        const pages = Array.from(paper.querySelectorAll("canvas"));
+        const width = pages.reduce((sum, page) => sum + page.getBoundingClientRect().width, 0);
+        return width + (pages.length - 1) * 20 + 48 <= paper.clientWidth + 3;
+      }),
+    { timeout: 5000, timeoutMsg: "Fit preview overflowed its panel" },
+  );
+  console.log("UI_LAYOUT: PASS (desktop bounds, keyboard resizing, compact stacking, PDF fit)");
+}
+
+async function captureLayout(id) {
+  const directory = process.env.RESUME_STUDIO_UI_QA_DIR;
+  if (!directory) return;
+  await mkdir(directory, { recursive: true });
+  await delay(350); // Wait for Radix transitions and the native compositor.
+  await browser.saveScreenshot(join(directory, `${id}.png`));
+}
+async function captureDocumentSections(title) {
+  if (!process.env.RESUME_STUDIO_UI_QA_DIR) return;
+  await selectDocument(title);
+  for (const trigger of await browser.$$('[data-slot="accordion-trigger"][aria-expanded="true"]')) {
+    if (await trigger.isDisplayed()) await trigger.click();
+  }
+  const sections =
+    title === "履歴書"
+      ? [
+          ["profile", "基本情報"],
+          ["history", "学歴・職歴"],
+          ["qualifications", "免許・資格"],
+          ["motivation", "志望動機"],
+          ["preferences", "本人希望"],
+        ]
+      : [
+          ["summary", "職務要約"],
+          ["career", "職務経歴"],
+          ["skills", "スキル"],
+          ["self-promotion", "自己PR"],
+        ];
+  for (const [id, section] of sections) {
+    const trigger = await browser.$(
+      `[data-slot="accordion-trigger"][aria-label="${section}を編集"]`,
+    );
+    await trigger.click();
+    await browser.execute(() => {
+      document.querySelector(".inspector-scroll").scrollTop = 0;
+    });
+    await delay(300);
+    await captureLayout(id);
+    await trigger.click();
+  }
+  await expandEditorSections();
+}
+
+async function expandEditorSections() {
+  for (const trigger of await browser.$$(
+    '[data-slot="accordion-trigger"][aria-expanded="false"]',
+  )) {
+    if (await trigger.isDisplayed()) await trigger.click();
+  }
+}
+async function selectDocument(title) {
+  await browser.$("button=" + title).click();
+  await expandEditorSections();
+}
+async function projectAction(title) {
+  await browser.$('[aria-label="その他のプロジェクト操作"]').click();
+  // The embedded click adapter emits mouse events. Radix opens on pointerdown;
+  // use its accessible keyboard path rather than fabricating a pointer event.
+  await browser.keys("ArrowDown");
+  await browser.$('[role="menuitem"]').waitForExist({ timeout: 5000 });
+  for (const item of await browser.$$('[role="menuitem"]')) {
+    if ((await item.getText()).trim() === title) {
+      await item.click();
+      return;
+    }
+  }
+  throw new Error("Project action was not found: " + title);
+}
 try {
   browser = await connect();
   await presentTestApp();
@@ -152,8 +281,9 @@ try {
     };
   });
   await browser.$(".draft-editor input").setValue("架空 山田");
+  await selectDocument("職務経歴書");
   await browser.$('[aria-label="本文"]').click();
-  await browser.$("button=太字").click();
+  await browser.$('[aria-label="本文の書式"]').$("button=太字").click();
   await browser.$('[aria-label="本文"]').addValue("架空の職務内容 & % _ # $ { } ~ ^ \\ 日本語");
   const text = await browser.$('[aria-label="本文"]').getText();
   assert.ok(text.includes("架空の職務内容"), `Input was lost: ${text}`);
@@ -175,6 +305,7 @@ try {
   await browser.waitUntil(async () =>
     (await browser.$('[aria-label="本文"]').getText()).includes("架空Undo確認"),
   );
+  await selectDocument("履歴書");
   // Date/month controls use the native setter + input/change adapter documented in ADR 0004.
   await browser.execute(() => {
     const inputFor = (label) =>
@@ -201,7 +332,7 @@ try {
     .$('[role="textbox"][aria-label="志望動機・特技・アピールポイント"]')
     .addValue("架空の志望動機末尾");
   await browser.$('[role="textbox"][aria-label="本人希望欄"]').addValue("架空の希望末尾");
-  await browser.$("button=職務経歴書").click();
+  await selectDocument("職務経歴書");
   await browser.$("button=会社を追加").click();
   await browser.execute(() => {
     for (const [label, value] of [
@@ -253,7 +384,7 @@ try {
       input.dispatchEvent(new Event("change", { bubbles: true }));
     }
   });
-  await browser.$("button=履歴書").click();
+  await selectDocument("履歴書");
   await browser.$("button=写真を取り込む").click();
   await browser.waitUntil(
     async () =>
@@ -308,17 +439,16 @@ try {
     async () => (await browser.$(".draft-editor input").getValue()) === "架空 山田",
     { timeout: 30000 },
   );
+  await selectDocument("職務経歴書");
   assert.ok((await browser.$('[aria-label="本文"]').getText()).includes("架空の職務内容"));
-  // Normal clean exit, move only JSON, remove original image, then launch a fresh app.
-  await browser.execute(() => {
-    setTimeout(
-      () =>
-        Array.from(document.querySelectorAll("button"))
-          .find((button) => button.textContent === "終了")
-          .click(),
-      50,
-    );
-  });
+  // The real menu selection requests native quit; a clean session needs no modal.
+  try {
+    await projectAction("終了");
+  } catch (failure) {
+    console.log("Clean quit click response:", failure.message);
+    // A successful clean quit may close the server before the click response.
+    // The owned process must still exit successfully below.
+  }
   await waitForExit();
   browser = undefined;
   const movedDirectory = join(projectDirectory, "移動した 応募先");
@@ -337,6 +467,7 @@ try {
     async () => (await browser.$(".draft-editor input").getValue()) === "架空 山田",
     { timeout: 30000 },
   );
+  await selectDocument("職務経歴書");
   assert.ok((await browser.$('[aria-label="本文"]').getText()).includes("架空の職務内容"));
   await browser.waitUntil(
     async () =>
@@ -351,6 +482,7 @@ try {
     "Restart lost body formatting",
   );
   assert.ok((await browser.$('[aria-label="満年齢"]').getText()).includes("満25歳"));
+  await selectDocument("履歴書");
   assert.equal(await browser.$(".history-row input:not([type=month])").getValue(), "架空大学 卒業");
   assert.ok(
     (
@@ -362,7 +494,7 @@ try {
       "架空の希望末尾",
     ),
   );
-  await browser.$("button=職務経歴書").click();
+  await selectDocument("職務経歴書");
   const restoredCareer = await browser.execute(() => ({
     company: document.querySelector('[aria-label="職務経歴書の編集"] input').value,
     caseText: document.querySelector('[role="textbox"][aria-label="業務内容"]').textContent,
@@ -375,7 +507,7 @@ try {
   assert.ok(restoredCareer.caseText.includes("架空の業務末尾"));
   assert.ok(restoredCareer.selfPromotion.includes("架空の自己PR末尾"));
   assert.equal(restoredCareer.skill, "3年");
-  await browser.$("button=履歴書").click();
+  await selectDocument("履歴書");
   await browser.execute(() => {
     delete Map.prototype.getOrInsertComputed;
     window.__e2eConsoleFailures = [];
@@ -386,7 +518,7 @@ try {
     };
   });
   await presentTestApp();
-  await browser.$("button=PDF更新").click();
+  await projectAction("職務要約の下書きPDF更新");
   const renderDeadline = Date.now() + 90000;
   for (;;) {
     const state = await browser.execute(() => ({
@@ -479,7 +611,7 @@ try {
     ["職務経歴書", "3", ["架空会社", "架空案件", "架空の業務末尾", "架空の自己PR末尾"]],
   ]) {
     await presentTestApp();
-    if (label === "職務経歴書") await browser.$("button=職務経歴書").click();
+    if (label === "職務経歴書") await selectDocument("職務経歴書");
     if (label === "職務経歴書") {
       await browser.execute(() => {
         const observer = new MutationObserver(() => {
@@ -496,14 +628,14 @@ try {
           input.dispatchEvent(new Event("change", { bubbles: true }));
           window.__e2eEditingDuringCompile = { phase, milliseconds: performance.now() - started };
         });
-        observer.observe(document.querySelector(".draft-editor"), {
+        observer.observe(document.querySelector(".studio-shell"), {
           childList: true,
           characterData: true,
           subtree: true,
         });
       });
     }
-    await browser.$(`button=${label}PDF更新`).click();
+    await browser.$(`[aria-label="${label}PDF更新"]`).click();
     const deadline = Date.now() + 90000;
     for (;;) {
       const state = await browser.execute(
@@ -526,6 +658,8 @@ try {
       await delay(200);
     }
     assert.equal(await browser.$('[aria-label="生成状態"]').getText(), `${label}：生成完了`);
+    if (label === "履歴書") await verifyWorkspaceLayout();
+    await captureDocumentSections(label);
     if (label === "履歴書") {
       const coloredPixels = await browser.execute(() => {
         const canvas = document.querySelector("canvas");
@@ -580,7 +714,7 @@ try {
   }
   // Returning to either document keeps its own last successful PDF.
   for (const label of ["履歴書", "職務経歴書"]) {
-    await browser.$(`button=${label}`).click();
+    await selectDocument(label);
     await browser.waitUntil(
       async () =>
         await browser.execute(
@@ -609,13 +743,13 @@ try {
           .click();
       }
     });
-    observer.observe(document.querySelector(".draft-editor"), {
+    observer.observe(document.querySelector(".studio-shell"), {
       childList: true,
       characterData: true,
       subtree: true,
     });
     Array.from(document.querySelectorAll("button"))
-      .find((button) => button.textContent === "職務経歴書PDF更新")
+      .find((button) => button.getAttribute("aria-label") === "職務経歴書PDF更新")
       .click();
   });
   await browser
@@ -636,8 +770,10 @@ try {
     await browser.execute(() => document.querySelector("canvas")?.dataset.cancelProof),
     "previous-success",
   );
-  assert.ok(await browser.$("button=職務経歴書PDF更新").isEnabled());
+  assert.ok(await browser.$('[aria-label="職務経歴書PDF更新"]').isEnabled());
   assert.equal(await browser.$('[role="alert"]').isExisting(), false);
+  await browser.$('[aria-label="設定"]').click();
+  await captureLayout("settings");
   await browser.$("button=TeX環境を確認").click();
   await browser.waitUntil(
     async () =>
@@ -649,6 +785,9 @@ try {
     { timeout: 90000 },
   );
   assert.equal(await browser.$('[role="alert"]').isExisting(), false);
+  await browser.$("button=ダイアログを閉じる").click();
+  await browser.$("button=書き出し").click();
+  await captureLayout("export");
   // Export the current snapshot through real Rust commands and storage.
   // Native picker/overwrite choice alone is substituted in this test build.
   await browser.execute(() => {
@@ -745,6 +884,7 @@ try {
       (await readFile(join(directory, "main.pdf"))).subarray(0, 5).equals(Buffer.from("%PDF-")),
     );
   }
+  await browser.$("button=ダイアログを閉じる").click();
   await browser.$(".draft-editor input").setValue("架空 終了確認");
   const closeRequest = await browser.executeAsync((done) => {
     window.__TAURI_INTERNALS__
@@ -753,24 +893,31 @@ try {
       .catch((failure) => done({ failure: String(failure) }));
   });
   assert.equal(closeRequest.failure, undefined);
-  await browser.$("dialog[open]").waitForExist({ timeout: 10000 });
-  assert.ok(await browser.execute(() => document.querySelector("dialog").matches(":modal")));
+  await browser.$('[role="dialog"]').waitForExist({ timeout: 10000 });
+  await browser.waitUntil(
+    async () =>
+      await browser.execute(() =>
+        document.querySelector('[role="dialog"]')?.contains(document.activeElement),
+      ),
+    { timeout: 5000, timeoutMsg: "Unsaved dialog did not receive keyboard focus" },
+  );
+  await captureLayout("unsaved");
   await browser.$("button=キャンセル").click();
-  await browser.waitUntil(async () => !(await browser.$("dialog").isExisting()), {
+  await browser.waitUntil(async () => !(await browser.$('[role="dialog"]').isExisting()), {
     timeout: 10000,
   });
   assert.equal(await browser.$(".draft-editor input").getValue(), "架空 終了確認");
   // Quit goes through RunEvent::ExitRequested, independently of native window close.
-  await browser.$("button=終了").click();
-  await browser.$("dialog[open]").waitForExist({ timeout: 10000 });
+  await projectAction("終了");
+  await browser.$('[role="dialog"]').waitForExist({ timeout: 10000 });
   await browser.$("button=キャンセル").click();
-  await browser.$("button=終了").click();
-  await browser.$("dialog[open]").waitForExist({ timeout: 10000 });
+  await projectAction("終了");
+  await browser.$('[role="dialog"]').waitForExist({ timeout: 10000 });
   // Return the driver response before the owned app shuts down its server.
   await browser.execute(() => {
     setTimeout(
       () =>
-        Array.from(document.querySelectorAll("dialog button"))
+        Array.from(document.querySelectorAll('[role="dialog"] button'))
           .find((button) => button.textContent === "保存して続行")
           .click(),
       50,

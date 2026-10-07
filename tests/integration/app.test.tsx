@@ -12,19 +12,18 @@ test("Tauri adapterからアプリ情報を取得し、両書類を選択でき�
     throw new Error(`Unexpected command: ${command}`);
   });
   render(<App client={tauriClient} />);
+  const user = userEvent.setup();
+  await user.click(screen.getByRole("button", { name: "設定" }));
   expect(await screen.findByText(`バージョン ${metadata.version}`)).toBeVisible();
+  await user.click(screen.getByRole("button", { name: "ダイアログを閉じる" }));
   expect(screen.getByRole("heading", { name: "履歴書", level: 2 })).toBeVisible();
 
-  const user = userEvent.setup();
-  await user.click(screen.getByRole("button", { name: "職務経歴書" }));
+  await user.click(screen.getByRole("tab", { name: "職務経歴書" }));
   expect(screen.getByRole("heading", { name: "職務経歴書", level: 2 })).toBeVisible();
-  expect(screen.getByRole("button", { name: "職務経歴書" })).toHaveAttribute(
-    "aria-pressed",
-    "true",
-  );
-  expect(screen.getByRole("button", { name: "履歴書" })).toHaveAttribute("aria-pressed", "false");
+  expect(screen.getByRole("tab", { name: "職務経歴書" })).toHaveAttribute("aria-selected", "true");
+  expect(screen.getByRole("tab", { name: "履歴書" })).toHaveAttribute("aria-selected", "false");
 
-  await user.click(screen.getByRole("button", { name: "履歴書" }));
+  await user.click(screen.getByRole("tab", { name: "履歴書" }));
   expect(screen.getByRole("heading", { name: "履歴書", level: 2 })).toBeVisible();
 });
 
@@ -33,7 +32,9 @@ test("IPC失敗を表示しても書類を選択できる", async () => {
     throw new Error("IPC unavailable");
   });
   render(<App client={tauriClient} />);
+  await userEvent.setup().click(screen.getByRole("button", { name: "設定" }));
   expect(await screen.findByText("アプリ情報を取得できませんでした。")).toBeVisible();
-  await userEvent.setup().click(screen.getByRole("button", { name: "職務経歴書" }));
+  await userEvent.setup().click(screen.getByRole("button", { name: "ダイアログを閉じる" }));
+  await userEvent.setup().click(screen.getByRole("tab", { name: "職務経歴書" }));
   expect(screen.getByRole("heading", { name: "職務経歴書", level: 2 })).toBeVisible();
 });

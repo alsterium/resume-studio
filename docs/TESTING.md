@@ -48,3 +48,13 @@ OS pickerと上書き選択はテストfeatureのadapterで置き換える。日
 [CI workflow](../.github/workflows/ci.yml)はfrontend-quality（Ubuntu）、rust-quality（macOS）、desktop-e2e（macOS）、required-checksで構成する。実TeX、通常bundleもdesktop-e2eに含む。required-checksは3品質ジョブの全成功を要求し、失敗・キャンセル・skipを拒否する。現行ゲート、固定版、導入・再現方法は[CI](CI.md)を参照する。
 
 CIの入力と診断ログには架空データだけを使用する。現行workflowは専用artifactをアップロードしない。紙面QAのPDF／画像は指定したローカル一時ディレクトリへ保存する。署名・公証・公開ReleaseのチェックはMVPには含めない。
+
+## C案UIの検証（T38）
+
+UI結合は項目を開いて既存の保存・写真・履歴・会社・案件・スキル・生成・診断・出力・未保存確認を通す。`layout.test.tsx`で項目と書類の往復後の入力・本文書式・Undo履歴、意図しない自動生成がないことを検証する。本文は折りたたみ後も同じDOMを保持する。
+
+jsdomはレイアウトを計算しないため、ResizeObserverとPointerEventを補い、Resizableのハンドルにだけ固定矩形を返す。全要素がゼロ矩形だとライブラリが入力へのクリックを境界操作として捕捉するための補正であり、幅合わせ・ドラッグ・実PDF描画の証明には使わない。
+
+`pnpm build:e2e`後の`pnpm test:e2e`は実macOS WKWebViewで書類タブ・項目・メニュー・モーダルを操作し、実TeX生成、PDF.js描画、生成中の編集、停止、診断、JSONとPDF/TeXの保存、終了確認を検証する。`RESUME_STUDIO_UI_QA_DIR=/private/tmp/resume-ui-qa pnpm test:e2e`で架空入力の画面スクリーンショットを保存できる。成果物は目視QA用でリポジトリへ同梱しない。日付／selectの操作は既存ADRのnative setter adapterを使い、本番IPCとレンダラは置換しない。
+
+T38の検証結果: `pnpm check`で116件（Node 9 / UI結合36 / UI単体12 / Rust 59）とdoc-testが成功。実WebView E2Eはデスクトップの境界寸法、キーボードでの幅変更、680pxでの上下配置、PDF幅合わせも検証する。埋め込みWebDriverのクリックはMouseEventのため、PointerEventで開くRadixメニューは実際のArrowDownキー経路を使う。Dialogの存在とフォーカス、ネイティブ描画の完了を待って確認する。検証用ビルドと通常の`pnpm tauri build --debug`も成功した。

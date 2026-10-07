@@ -1,3 +1,4 @@
+import { expandSections } from "../ui-navigation";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { mockIPC } from "@tauri-apps/api/mocks";
@@ -27,7 +28,8 @@ test("会社→案件・スキルの全項目を編集し、並べ替え・共�
   });
   const user = userEvent.setup();
   render(<App client={tauriClient} />);
-  await user.click(screen.getByRole("button", { name: "職務経歴書" }));
+  await user.click(screen.getByRole("tab", { name: "職務経歴書" }));
+  await expandSections(user);
   expect(screen.getByLabelText("職務経歴書の編集")).toBeVisible();
   expect(screen.getByLabelText("履歴書の編集")).not.toBeVisible();
   await user.type(screen.getByLabelText("本文"), "職務要約末尾");
@@ -95,9 +97,11 @@ test("会社→案件・スキルの全項目を編集し、並べ替え・共�
   await user.type(screen.getByLabelText("自己PR"), "自己PR末尾");
   await user.click(screen.getByRole("button", { name: "免許・資格を追加" }));
   await user.type(screen.getByLabelText("免許・資格 1 内容"), "共通資格");
-  await user.click(screen.getByRole("button", { name: "履歴書" }));
+  await user.click(screen.getByRole("tab", { name: "履歴書" }));
+  await expandSections(user);
   expect(screen.getByLabelText("免許・資格 1 内容")).toHaveValue("共通資格");
-  await user.click(screen.getByRole("button", { name: "職務経歴書" }));
+  await user.click(screen.getByRole("tab", { name: "職務経歴書" }));
+  await expandSections(user);
   await user.click(screen.getByRole("button", { name: "保存" }));
   expect(saved?.career.positions.map((value) => value.companyName)).toEqual([
     "架空会社A",
@@ -162,6 +166,7 @@ test("終了年月・URLの不正で保存を拒否し、修正・任意項目�
   });
   const user = userEvent.setup();
   render(<DraftWorkspace client={tauriClient} document="職務経歴書" />);
+  await expandSections(user);
   await user.click(screen.getByRole("button", { name: "開く" }));
   fireEvent.change(screen.getByLabelText("案件開始年月"), { target: { value: "2025-01" } });
   await user.click(screen.getByRole("button", { name: "保存" }));
@@ -214,6 +219,7 @@ test("会社100・案件200・スキル200・一覧50の上限で追加を止め
   mockIPC(() => ({ project, fileId: "1", displayName: "上限.json" }));
   render(<DraftWorkspace client={tauriClient} document="職務経歴書" />);
   const user = userEvent.setup();
+  await expandSections(user);
   await user.click(screen.getByRole("button", { name: "開く" }));
   for (const name of [
     "会社を追加",

@@ -25,3 +25,22 @@ afterEach(() => {
   cleanup();
   clearMocks();
 });
+
+vi.stubGlobal(
+  "ResizeObserver",
+  class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  },
+);
+// jsdom reports every rectangle at (0, 0), which makes the resize handle
+// intercept all pointer events. Give only the handle a separated hit area;
+// actual panel geometry and resizing are covered by native WebView tests.
+const originalRect = HTMLElement.prototype.getBoundingClientRect;
+HTMLElement.prototype.getBoundingClientRect = function () {
+  return this.dataset.slot === "resizable-handle"
+    ? new DOMRect(410, 0, 1, 800)
+    : originalRect.call(this);
+};
+vi.stubGlobal("PointerEvent", MouseEvent);

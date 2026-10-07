@@ -1,3 +1,7 @@
+import { EditorSection } from "../../components/EditorSection";
+import { Input } from "../../components/ui/input";
+import { Button } from "../../components/ui/button";
+import { ArrowUp, ArrowDown, Trash2, Plus } from "lucide-react";
 import { useState } from "react";
 import type { BodyDoc, CareerProject, Position, Project } from "../../domain/project";
 import { createId } from "../../domain/new-project";
@@ -45,7 +49,7 @@ function TextField({
   return (
     <label>
       {label}
-      <input
+      <Input
         maxLength={maxLength}
         value={value}
         onChange={(event) => onChange(event.target.value)}
@@ -73,7 +77,7 @@ function PeriodFields({
     <div>
       <label>
         {prefix}開始年月
-        <input
+        <Input
           type="month"
           min="0001-01"
           max="9999-12"
@@ -82,7 +86,7 @@ function PeriodFields({
         />
       </label>
       <label className="checkbox-label">
-        <input
+        <Input
           type="checkbox"
           checked={end === null}
           onChange={(event) => onChange(start, event.target.checked ? null : "")}
@@ -92,7 +96,7 @@ function PeriodFields({
       {end !== null && (
         <label>
           {prefix}終了年月
-          <input
+          <Input
             type="month"
             min="0001-01"
             max="9999-12"
@@ -129,18 +133,26 @@ function ListField({
               onChange(items.map((current, itemIndex) => (itemIndex === index ? value : current)))
             }
           />
-          <button
+          <Button
             type="button"
+            variant="outline"
+            size="sm"
             aria-label={`${title} ${index + 1} 削除`}
             onClick={() => onChange(items.filter((_, itemIndex) => itemIndex !== index))}
           >
-            削除
-          </button>
+            <Trash2 aria-hidden="true" />
+          </Button>
         </div>
       ))}
-      <button type="button" disabled={items.length >= 50} onClick={() => onChange([...items, ""])}>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        disabled={items.length >= 50}
+        onClick={() => onChange([...items, ""])}
+      >
         {title}を追加
-      </button>
+      </Button>
       <p>最大50項目。入力した順で表示します。</p>
     </fieldset>
   );
@@ -161,25 +173,35 @@ function OrderActions({
 }) {
   return (
     <div className="row-actions">
-      <button
+      <Button
         type="button"
+        variant="outline"
+        size="sm"
         aria-label={`${label} 上へ`}
         disabled={index === 0}
         onClick={() => onMove(-1)}
       >
-        上へ
-      </button>
-      <button
+        <ArrowUp aria-hidden="true" />
+      </Button>
+      <Button
         type="button"
+        variant="outline"
+        size="sm"
         aria-label={`${label} 下へ`}
         disabled={index === count - 1}
         onClick={() => onMove(1)}
       >
-        下へ
-      </button>
-      <button type="button" aria-label={`${label} 削除`} onClick={onDelete}>
+        <ArrowDown aria-hidden="true" />
+      </Button>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        aria-label={`${label} 削除`}
+        onClick={onDelete}
+      >
         削除
-      </button>
+      </Button>
     </div>
   );
 }
@@ -306,235 +328,250 @@ export function CareerEditor({
   return (
     <section aria-label="職務経歴書の編集" className="career-editor">
       <h3>職務経歴書の項目</h3>
-      <fieldset disabled={disabled}>
-        <legend>職務経歴</legend>
-        <p>会社と案件を選んで編集します。選択の変更は入力内容を保持します。</p>
-        {company && (
-          <label>
-            編集する会社
-            <select
-              value={company.id}
-              onChange={(event) => {
-                setCompanyId(event.target.value);
-                setCaseId(null);
-              }}
-            >
-              {career.positions.map((value, index) => (
-                <option key={value.id} value={value.id}>
-                  {index + 1}. {value.companyName || "会社名未入力"}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
-        <button
-          type="button"
-          disabled={career.positions.length >= 100}
-          onClick={() => {
-            const next = newPosition();
-            updatePositions([...career.positions, next]);
-            setCompanyId(next.id);
-            setCaseId(null);
-          }}
-        >
-          会社を追加
-        </button>
-        {company && (
-          <div key={company.id}>
-            <OrderActions
-              label="会社"
-              index={companyIndex}
-              count={career.positions.length}
-              onMove={(direction) =>
-                updatePositions(moved(career.positions, companyIndex, direction))
-              }
-              onDelete={() =>
-                updatePositions(career.positions.filter((value) => value.id !== company.id))
-              }
-            />
-            <p>会社を削除すると配下の案件も削除します。</p>
-            <TextField
-              label="会社名"
-              value={company.companyName}
-              onChange={(companyName) => updateCompany({ ...company, companyName })}
-            />
-            <TextField
-              label="役職・役割"
-              value={company.role}
-              onChange={(role) => updateCompany({ ...company, role })}
-            />
-            <PeriodFields
-              prefix="会社"
-              ongoing="在籍中"
-              start={company.startYearMonth}
-              end={company.endYearMonth}
-              onChange={(startYearMonth, endYearMonth) =>
-                updateCompany({ ...company, startYearMonth, endYearMonth })
-              }
-            />
-            {(
-              [
-                ["business", "事業内容"],
-                ["capital", "資本金"],
-                ["employees", "従業員数"],
-              ] as const
-            ).map(([key, label]) => (
-              <TextField
-                key={key}
-                label={label}
-                value={company.companyOverview?.[key] ?? ""}
-                onChange={(value) => {
-                  const overview = { ...company.companyOverview };
-                  if (value) overview[key] = value;
-                  else delete overview[key];
-                  const { companyOverview: _overview, ...rest } = company;
-                  updateCompany(
-                    Object.keys(overview).length ? { ...rest, companyOverview: overview } : rest,
-                  );
-                }}
-              />
-            ))}
-            <fieldset>
-              <legend>主な実績・案件</legend>
-              {item && (
-                <label>
-                  編集する案件
-                  <select value={item.id} onChange={(event) => setCaseId(event.target.value)}>
-                    {company.projects.map((value, index) => (
-                      <option key={value.id} value={value.id}>
-                        {index + 1}. {value.name || "案件名未入力"}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              )}
-              <button
-                type="button"
-                disabled={company.projects.length >= 200}
-                onClick={() => {
-                  const next = newCareerProject();
-                  updateCompany({ ...company, projects: [...company.projects, next] });
-                  setCaseId(next.id);
+      <EditorSection value="positions" title="職務経歴">
+        <fieldset disabled={disabled}>
+          <legend>職務経歴</legend>
+          <p>会社と案件を選んで編集します。選択の変更は入力内容を保持します。</p>
+          {company && (
+            <label>
+              編集する会社
+              <select
+                value={company.id}
+                onChange={(event) => {
+                  setCompanyId(event.target.value);
+                  setCaseId(null);
                 }}
               >
-                案件を追加
-              </button>
-              {item && (
-                <div key={item.id}>
-                  <OrderActions
-                    label="案件"
-                    index={caseIndex}
-                    count={company.projects.length}
-                    onMove={(direction) =>
-                      updateCompany({
-                        ...company,
-                        projects: moved(company.projects, caseIndex, direction),
-                      })
-                    }
-                    onDelete={() =>
-                      updateCompany({
-                        ...company,
-                        projects: company.projects.filter((value) => value.id !== item.id),
-                      })
-                    }
-                  />
-                  <ProjectEditor
-                    item={item}
-                    disabled={disabled}
-                    onChange={(updated) =>
-                      updateCompany({
-                        ...company,
-                        projects: company.projects.map((value) =>
-                          value.id === item.id ? updated : value,
-                        ),
-                      })
-                    }
-                  />
-                </div>
-              )}
-            </fieldset>
-          </div>
-        )}
-      </fieldset>
-      <fieldset disabled={disabled}>
-        <legend>活かせるスキル・経験</legend>
-        {career.skills.map((skill, index) => (
-          <div key={skill.id} className="history-row">
-            {(
-              [
-                ["name", "スキル名"],
-                ["experienceLabel", "経験期間"],
-                ["description", "説明"],
-              ] as const
-            ).map(([key, title]) => (
+                {career.positions.map((value, index) => (
+                  <option key={value.id} value={value.id}>
+                    {index + 1}. {value.companyName || "会社名未入力"}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={career.positions.length >= 100}
+            onClick={() => {
+              const next = newPosition();
+              updatePositions([...career.positions, next]);
+              setCompanyId(next.id);
+              setCaseId(null);
+            }}
+          >
+            <Plus aria-hidden="true" />
+            会社を追加
+          </Button>
+          {company && (
+            <div key={company.id}>
+              <OrderActions
+                label="会社"
+                index={companyIndex}
+                count={career.positions.length}
+                onMove={(direction) =>
+                  updatePositions(moved(career.positions, companyIndex, direction))
+                }
+                onDelete={() =>
+                  updatePositions(career.positions.filter((value) => value.id !== company.id))
+                }
+              />
+              <p>会社を削除すると配下の案件も削除します。</p>
               <TextField
-                key={key}
-                label={`スキル ${index + 1} ${title}`}
-                value={skill[key]}
-                onChange={(value) =>
+                label="会社名"
+                value={company.companyName}
+                onChange={(companyName) => updateCompany({ ...company, companyName })}
+              />
+              <TextField
+                label="役職・役割"
+                value={company.role}
+                onChange={(role) => updateCompany({ ...company, role })}
+              />
+              <PeriodFields
+                prefix="会社"
+                ongoing="在籍中"
+                start={company.startYearMonth}
+                end={company.endYearMonth}
+                onChange={(startYearMonth, endYearMonth) =>
+                  updateCompany({ ...company, startYearMonth, endYearMonth })
+                }
+              />
+              {(
+                [
+                  ["business", "事業内容"],
+                  ["capital", "資本金"],
+                  ["employees", "従業員数"],
+                ] as const
+              ).map(([key, label]) => (
+                <TextField
+                  key={key}
+                  label={label}
+                  value={company.companyOverview?.[key] ?? ""}
+                  onChange={(value) => {
+                    const overview = { ...company.companyOverview };
+                    if (value) overview[key] = value;
+                    else delete overview[key];
+                    const { companyOverview: _overview, ...rest } = company;
+                    updateCompany(
+                      Object.keys(overview).length ? { ...rest, companyOverview: overview } : rest,
+                    );
+                  }}
+                />
+              ))}
+              <fieldset>
+                <legend>主な実績・案件</legend>
+                {item && (
+                  <label>
+                    編集する案件
+                    <select value={item.id} onChange={(event) => setCaseId(event.target.value)}>
+                      {company.projects.map((value, index) => (
+                        <option key={value.id} value={value.id}>
+                          {index + 1}. {value.name || "案件名未入力"}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={company.projects.length >= 200}
+                  onClick={() => {
+                    const next = newCareerProject();
+                    updateCompany({ ...company, projects: [...company.projects, next] });
+                    setCaseId(next.id);
+                  }}
+                >
+                  <Plus aria-hidden="true" />
+                  案件を追加
+                </Button>
+                {item && (
+                  <div key={item.id}>
+                    <OrderActions
+                      label="案件"
+                      index={caseIndex}
+                      count={company.projects.length}
+                      onMove={(direction) =>
+                        updateCompany({
+                          ...company,
+                          projects: moved(company.projects, caseIndex, direction),
+                        })
+                      }
+                      onDelete={() =>
+                        updateCompany({
+                          ...company,
+                          projects: company.projects.filter((value) => value.id !== item.id),
+                        })
+                      }
+                    />
+                    <ProjectEditor
+                      item={item}
+                      disabled={disabled}
+                      onChange={(updated) =>
+                        updateCompany({
+                          ...company,
+                          projects: company.projects.map((value) =>
+                            value.id === item.id ? updated : value,
+                          ),
+                        })
+                      }
+                    />
+                  </div>
+                )}
+              </fieldset>
+            </div>
+          )}
+        </fieldset>
+      </EditorSection>
+      <EditorSection value="skills" title="スキル">
+        <fieldset disabled={disabled}>
+          <legend>活かせるスキル・経験</legend>
+          {career.skills.map((skill, index) => (
+            <div key={skill.id} className="history-row">
+              {(
+                [
+                  ["name", "スキル名"],
+                  ["experienceLabel", "経験期間"],
+                  ["description", "説明"],
+                ] as const
+              ).map(([key, title]) => (
+                <TextField
+                  key={key}
+                  label={`スキル ${index + 1} ${title}`}
+                  value={skill[key]}
+                  onChange={(value) =>
+                    onChange({
+                      ...project,
+                      career: {
+                        ...career,
+                        skills: career.skills.map((current) =>
+                          current.id === skill.id ? { ...current, [key]: value } : current,
+                        ),
+                      },
+                    })
+                  }
+                />
+              ))}
+              <OrderActions
+                label={`スキル ${index + 1}`}
+                index={index}
+                count={career.skills.length}
+                onMove={(direction) =>
+                  onChange({
+                    ...project,
+                    career: { ...career, skills: moved(career.skills, index, direction) },
+                  })
+                }
+                onDelete={() =>
                   onChange({
                     ...project,
                     career: {
                       ...career,
-                      skills: career.skills.map((current) =>
-                        current.id === skill.id ? { ...current, [key]: value } : current,
-                      ),
+                      skills: career.skills.filter((value) => value.id !== skill.id),
                     },
                   })
                 }
               />
-            ))}
-            <OrderActions
-              label={`スキル ${index + 1}`}
-              index={index}
-              count={career.skills.length}
-              onMove={(direction) =>
-                onChange({
-                  ...project,
-                  career: { ...career, skills: moved(career.skills, index, direction) },
-                })
-              }
-              onDelete={() =>
-                onChange({
-                  ...project,
-                  career: {
-                    ...career,
-                    skills: career.skills.filter((value) => value.id !== skill.id),
-                  },
-                })
-              }
-            />
-          </div>
-        ))}
-        <button
-          type="button"
-          disabled={career.skills.length >= 200}
-          onClick={() =>
-            onChange({
-              ...project,
-              career: {
-                ...career,
-                skills: [
-                  ...career.skills,
-                  { id: createId("skill"), name: "", experienceLabel: "", description: "" },
-                ],
-              },
-            })
+            </div>
+          ))}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={career.skills.length >= 200}
+            onClick={() =>
+              onChange({
+                ...project,
+                career: {
+                  ...career,
+                  skills: [
+                    ...career.skills,
+                    { id: createId("skill"), name: "", experienceLabel: "", description: "" },
+                  ],
+                },
+              })
+            }
+          >
+            <Plus aria-hidden="true" />
+            スキルを追加
+          </Button>
+        </fieldset>
+      </EditorSection>
+      <EditorSection value="selfPromotion" title="自己PR">
+        <h4>自己PR</h4>
+        <BodyEditor
+          key={`${editorKey}-self-promotion`}
+          label="自己PR"
+          editable={!disabled}
+          initialContent={career.selfPromotion}
+          onChange={(body) =>
+            onChange({ ...project, career: { ...career, selfPromotion: body as BodyDoc } })
           }
-        >
-          スキルを追加
-        </button>
-      </fieldset>
-      <h4>自己PR</h4>
-      <BodyEditor
-        key={`${editorKey}-self-promotion`}
-        label="自己PR"
-        editable={!disabled}
-        initialContent={career.selfPromotion}
-        onChange={(body) =>
-          onChange({ ...project, career: { ...career, selfPromotion: body as BodyDoc } })
-        }
-      />
+        />
+      </EditorSection>
     </section>
   );
 }

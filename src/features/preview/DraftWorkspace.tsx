@@ -1,3 +1,40 @@
+import { Button } from "../../components/ui/button";
+import { Badge } from "../../components/ui/badge";
+import { Tabs, TabsList, TabsTrigger } from "../../components/ui/tabs";
+import { Accordion } from "../../components/ui/accordion";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "../../components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from "../../components/ui/dropdown-menu";
+import {
+  ResizablePanelGroup,
+  ResizablePanel,
+  ResizableHandle,
+} from "../../components/ui/resizable";
+import { EditorNavigationContext, EditorSection } from "../../components/EditorSection";
+import { TexDiagnosticsPanel } from "../diagnostics/TexDiagnosticsPanel";
+import {
+  FileText,
+  FilePlus2,
+  FolderOpen,
+  Save,
+  ChevronDown,
+  Download,
+  Settings,
+  RefreshCw,
+  AlertTriangle,
+} from "lucide-react";
+import appConfig from "../../../src-tauri/tauri.conf.json";
 import { OperationError } from "../errors/OperationError";
 import { useEffect, useRef, useState } from "react";
 import type {
@@ -15,7 +52,7 @@ import { createId, newProject } from "../../domain/new-project";
 import type { BodyDoc } from "../../domain/project";
 import { beginSession, editSession, hasUnsavedChanges, recordSaved } from "../../domain/session";
 import { DiscardDialog } from "../files/DiscardDialog";
-import { HistoryEditor, ResumeEditor } from "../resume/ResumeEditor";
+import { HistoryEditor, ProfileEditor, ResumeEditor } from "../resume/ResumeEditor";
 import { CareerEditor } from "../career/CareerEditor";
 import { TemplatePicker } from "./TemplatePicker";
 
@@ -43,11 +80,36 @@ const phases: Record<JobPhase | "reading" | "cancelling", string> = {
 
 export function DraftWorkspace({
   client,
-  document = "履歴書",
+  document: controlledDocument,
+  onDocumentChange,
+  versionLabel,
 }: {
   client: AppClient;
   document?: "履歴書" | "職務経歴書";
+  onDocumentChange?: (document: "履歴書" | "職務経歴書") => void;
+  versionLabel?: string;
 }) {
+  const [localDocument, setLocalDocument] = useState<"履歴書" | "職務経歴書">("履歴書");
+  const document = controlledDocument ?? localDocument;
+  const [expandedByDocument, setExpandedByDocument] = useState<Record<string, string[]>>({
+    履歴書: ["profile"],
+    職務経歴書: ["profile"],
+  });
+  const expanded = expandedByDocument[document];
+  const [compact, setCompact] = useState(
+    () => window.matchMedia?.("(max-width: 760px)").matches ?? false,
+  );
+  useEffect(() => {
+    const media = window.matchMedia?.("(max-width: 760px)");
+    if (!media) return;
+    const update = () => setCompact(media.matches);
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, []);
+  const [exportOpen, setExportOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const exportTrigger = useRef<HTMLButtonElement>(null);
+  const settingsTrigger = useRef<HTMLButtonElement>(null);
   const [session, setSession] = useState(() => beginSession(newProject()));
   const project = session.project;
   const dirty = hasUnsavedChanges(session);
@@ -466,264 +528,421 @@ export function DraftWorkspace({
     }
   }
 
+  const updateProject = (updated: typeof project) => {
+    setSession((current) => editSession(current, updated));
+    setFileMessage(null);
+  };
+  const editorDisabled = opening || pending !== null;
   return (
-    <section aria-labelledby="draft-title" className="draft-workspace">
-      <div className="draft-editor">
-        <div aria-label="プロジェクト操作">
-          <button
-            type="button"
-            disabled={fileBusy || busy}
+    <section aria-label="応募書類の編集" className="studio-shell">
+      <header className="studio-toolbar">
+        <div className="project-identity">
+          <FileText aria-hidden="true" />
+          <strong>{appConfig.productName}</strong>
+          <span className="toolbar-divider" />
+          <output aria-label="プロジェクトファイル" className="project-filename">
+            {file?.displayName ?? "保存先未設定"}
+          </output>
+          <Badge variant="outline">
+            <output aria-label="保存状態">
+              {dirty ? "未保存の変更があります" : file ? "保存済み" : "新規プロジェクト"}
+            </output>
+          </Badge>
+        </div>
+        <div aria-label="プロジェクト操作" className="project-actions">
+          <Button
+            variant="outline"
+            disabled={fileBusy || busy || pending !== null}
             onClick={() => void requestAction("new")}
           >
+            <FilePlus2 aria-hidden="true" />
             新規
-          </button>
-          <button
-            type="button"
-            disabled={fileBusy || busy}
+          </Button>
+          <Button
+            variant="outline"
+            disabled={fileBusy || busy || pending !== null}
             onClick={() => void requestAction("open")}
           >
+            <FolderOpen aria-hidden="true" />
             開く
-          </button>
-          <button type="button" disabled={fileBusy} onClick={() => void saveProject(false)}>
-            保存
-          </button>
-          <button type="button" disabled={fileBusy} onClick={() => void saveProject(true)}>
-            名前を付けて保存
-          </button>
-          <button
-            type="button"
-            disabled={fileBusy || busy}
-            onClick={() =>
-              void client.requestClose().catch(() => setError("終了を要求できませんでした。"))
-            }
+          </Button>
+          <div className="save-actions">
+            <Button disabled={fileBusy || pending !== null} onClick={() => void saveProject(false)}>
+              <Save aria-hidden="true" />
+              保存
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  aria-label="その他のプロジェクト操作"
+                  disabled={fileBusy || pending !== null}
+                  size="icon"
+                >
+                  <ChevronDown aria-hidden="true" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onSelect={() => void saveProject(true)} disabled={fileBusy}>
+                  名前を付けて保存
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => void updatePdf()} disabled={busy || fileBusy}>
+                  職務要約の下書きPDF更新
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onSelect={() =>
+                    void client.requestClose().catch(() => setError("終了を要求できませんでした。"))
+                  }
+                  disabled={busy || fileBusy}
+                >
+                  終了
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+          <Button
+            ref={exportTrigger}
+            variant="outline"
+            disabled={pending !== null}
+            onClick={() => setExportOpen(true)}
           >
-            終了
-          </button>
+            <Download aria-hidden="true" />
+            書き出し
+          </Button>
+          <Button
+            variant="ghost"
+            ref={settingsTrigger}
+            aria-label="設定"
+            disabled={pending !== null}
+            onClick={() => setSettingsOpen(true)}
+          >
+            <Settings aria-hidden="true" />
+            <span className="settings-label">設定</span>
+          </Button>
         </div>
-        <output aria-label="プロジェクトファイル">{file?.displayName ?? "保存先未設定"}</output>
-        <p>保存：⌘/Ctrl+S、名前を付けて保存：⌘/Ctrl+Shift+S</p>
-        <output aria-label="保存状態">
-          {dirty ? "未保存の変更があります" : file ? "保存済み" : "新規プロジェクト"}
-        </output>
-        {fileMessage && <output>{fileMessage}</output>}
-        <h2 id="draft-title">応募書類の編集</h2>
-        <p>編集内容から、選択した書類のPDFを生成できます。</p>
-        <label>
-          氏名
-          <input
-            disabled={opening || pending !== null}
-            value={name}
-            onChange={(event) => {
-              const value = event.target.value;
-              setSession((current) =>
-                editSession(current, {
-                  ...current.project,
-                  profile: { ...current.project.profile, name: value },
-                }),
-              );
-              setFileMessage(null);
-            }}
-          />
-        </label>
-        <div aria-label="証明写真">
-          {project.assets.length > 0 && (
-            <label>
-              保存済み写真
-              <select
-                disabled={fileBusy || pending !== null}
-                value={project.profile.photoAssetId ?? ""}
-                onChange={(event) => {
-                  const photoAssetId = event.target.value || null;
-                  setSession((current) =>
-                    editSession(current, {
-                      ...current.project,
-                      profile: { ...current.project.profile, photoAssetId },
-                    }),
-                  );
-                  setFileMessage(null);
-                }}
-              >
-                <option value="">写真なし</option>
-                {project.assets.map((asset, index) => (
-                  <option key={asset.id} value={asset.id}>
-                    写真 {index + 1}
-                  </option>
-                ))}
-              </select>
-            </label>
+      </header>
+      <ResizablePanelGroup
+        orientation={compact ? "vertical" : "horizontal"}
+        className="studio-panels"
+      >
+        <ResizablePanel
+          id="editor"
+          defaultSize={compact ? "45%" : 410}
+          minSize={compact ? 160 : 320}
+          maxSize={compact ? "70%" : "60%"}
+          className="inspector-panel"
+        >
+          <div className="inspector">
+            <Tabs
+              value={document}
+              onValueChange={(value) => {
+                const next = value as "履歴書" | "職務経歴書";
+                setLocalDocument(next);
+                onDocumentChange?.(next);
+              }}
+              className="document-tabs"
+            >
+              <TabsList aria-label="書類の選択">
+                <TabsTrigger value="履歴書">履歴書</TabsTrigger>
+                <TabsTrigger value="職務経歴書">職務経歴書</TabsTrigger>
+              </TabsList>
+            </Tabs>
+            <div className="draft-editor inspector-scroll" aria-label="編集パネル">
+              <EditorNavigationContext value={expanded}>
+                <Accordion
+                  type="multiple"
+                  value={expanded}
+                  onValueChange={(values) =>
+                    setExpandedByDocument((current) => ({ ...current, [document]: values }))
+                  }
+                >
+                  <EditorSection value="profile" title="基本情報">
+                    <ProfileEditor
+                      project={project}
+                      disabled={editorDisabled}
+                      onChange={updateProject}
+                    >
+                      <label>
+                        氏名
+                        <input
+                          disabled={opening || pending !== null}
+                          value={name}
+                          onChange={(event) => {
+                            const value = event.target.value;
+                            setSession((current) =>
+                              editSession(current, {
+                                ...current.project,
+                                profile: { ...current.project.profile, name: value },
+                              }),
+                            );
+                            setFileMessage(null);
+                          }}
+                        />
+                      </label>
+                      <div aria-label="証明写真">
+                        {project.assets.length > 0 && (
+                          <label>
+                            保存済み写真
+                            <select
+                              disabled={fileBusy || pending !== null}
+                              value={project.profile.photoAssetId ?? ""}
+                              onChange={(event) => {
+                                const photoAssetId = event.target.value || null;
+                                setSession((current) =>
+                                  editSession(current, {
+                                    ...current.project,
+                                    profile: { ...current.project.profile, photoAssetId },
+                                  }),
+                                );
+                                setFileMessage(null);
+                              }}
+                            >
+                              <option value="">写真なし</option>
+                              {project.assets.map((asset, index) => (
+                                <option key={asset.id} value={asset.id}>
+                                  写真 {index + 1}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                        )}
+                        {photo ? (
+                          <img
+                            src={`data:${photo.mediaType};base64,${photo.base64}`}
+                            alt="取り込んだ証明写真"
+                            width={90}
+                            height={120}
+                            style={{ objectFit: "contain" }}
+                          />
+                        ) : (
+                          <p>写真なし</p>
+                        )}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          type="button"
+                          disabled={fileBusy || pending !== null}
+                          onClick={() => void importPhoto()}
+                        >
+                          写真を取り込む
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          type="button"
+                          disabled={!photo || fileBusy || pending !== null}
+                          onClick={removePhoto}
+                        >
+                          写真を削除
+                        </Button>
+                        <p>JPEG／PNG、5MiB以内。縦横比を保ち最大600×800pxへ調整します。</p>
+                      </div>
+                    </ProfileEditor>
+                  </EditorSection>
+                  <div hidden={document !== "履歴書"}>
+                    <ResumeEditor
+                      project={project}
+                      includeProfile={false}
+                      includeQualifications={false}
+                      disabled={editorDisabled}
+                      editorKey={editorKey}
+                      onChange={updateProject}
+                    />
+                  </div>
+                  <div hidden={document !== "職務経歴書"}>
+                    <EditorSection value="summary" title="職務要約">
+                      <BodyEditor
+                        key={editorKey}
+                        initialContent={body as JSONContent}
+                        editable={!editorDisabled}
+                        onChange={(content) =>
+                          updateProject({
+                            ...project,
+                            career: { ...project.career, summary: content as BodyDoc },
+                          })
+                        }
+                      />
+                    </EditorSection>
+                    <CareerEditor
+                      key={editorKey}
+                      project={project}
+                      disabled={editorDisabled}
+                      editorKey={editorKey}
+                      onChange={updateProject}
+                    />
+                  </div>
+                  <EditorSection value="qualifications" title="免許・資格">
+                    <HistoryEditor
+                      title="免許・資格"
+                      rows={project.resume.qualifications}
+                      disabled={editorDisabled}
+                      onChange={(qualifications) =>
+                        updateProject({ ...project, resume: { ...project.resume, qualifications } })
+                      }
+                    />
+                    <p className="field-hint">免許・資格は両書類で共用します。</p>
+                  </EditorSection>
+                </Accordion>
+              </EditorNavigationContext>
+            </div>
+            <div className="inspector-footer">
+              保存：⌘/Ctrl+S<span>別名保存：⌘/Ctrl+Shift+S</span>
+            </div>
+          </div>
+        </ResizablePanel>
+        <ResizableHandle withHandle aria-label="編集パネルの幅を変更" />
+        <ResizablePanel id="preview" minSize={compact ? 180 : 360} className="preview-panel">
+          <div className="preview-heading">
+            <h2 id="document-title">{document}</h2>
+            <TemplatePicker
+              client={client}
+              project={project}
+              kind={selectedKind}
+              disabled={editorDisabled || busy}
+              onChange={updateProject}
+            />
+            <Button
+              aria-label={document + "PDF更新"}
+              disabled={busy || fileBusy || pending !== null}
+              onClick={() => void updateDocument()}
+            >
+              <RefreshCw aria-hidden="true" className={busy ? "animate-spin" : undefined} />
+              {busy ? "PDF生成中…" : "PDF更新"}
+            </Button>
+          </div>
+          {pdf && pdf.revision !== session.revision && (
+            <div className="stale-notice" aria-live="polite">
+              <AlertTriangle aria-hidden="true" />
+              <output>PDFは更新前の内容です。</output>
+            </div>
           )}
-          {photo ? (
-            <img
-              src={`data:${photo.mediaType};base64,${photo.base64}`}
-              alt="取り込んだ証明写真"
-              width={90}
-              height={120}
-              style={{ objectFit: "contain" }}
+          <div className="operation-status" aria-live="polite">
+            {fileMessage && <output>{fileMessage}</output>}
+            {job && (
+              <output aria-label="生成状態">
+                {job.document}：{phases[job.phase]}
+              </output>
+            )}
+            {busy && activeJob.current && (
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={cancelling}
+                onClick={() => void cancelGeneration()}
+              >
+                生成をキャンセル
+              </Button>
+            )}
+            {pdf?.document && <output>プレビュー：{pdf.document}</output>}
+            {exportMessage && <output aria-label="書き出し状態">{exportMessage}</output>}
+          </div>
+          {exportResults && (
+            <ul aria-label="書き出し結果" className="export-results">
+              {exportResults.map((result) => (
+                <li key={result.kind}>
+                  {result.displayName}：
+                  {result.status === "saved"
+                    ? "保存しました"
+                    : result.status === "skipped"
+                      ? "スキップしました"
+                      : "保存に失敗しました"}
+                  {result.error && <OperationError error={result.error} />}
+                </li>
+              ))}
+            </ul>
+          )}
+          {error && !pending && !exportOpen && <OperationError error={error} />}
+          {pdf ? (
+            <PdfPreview
+              fitToWidth
+              key={pdf.id}
+              bytes={pdf.bytes}
+              standardPages={pdf.document === "履歴書" ? 2 : undefined}
             />
           ) : (
-            <p>写真なし</p>
+            <div className="preview-empty">
+              <div className="empty-paper">
+                <FileText aria-hidden="true" />
+                <h3>書類の仕上がりを確認</h3>
+                <p>
+                  左の項目を編集し、「PDF更新」で
+                  <br />
+                  プレビューを表示します。
+                </p>
+              </div>
+            </div>
           )}
-          <button
-            type="button"
-            disabled={fileBusy || pending !== null}
-            onClick={() => void importPhoto()}
-          >
-            写真を取り込む
-          </button>
-          <button
-            type="button"
-            disabled={!photo || fileBusy || pending !== null}
-            onClick={removePhoto}
-          >
-            写真を削除
-          </button>
-          <p>JPEG／PNG、5MiB以内。縦横比を保ち最大600×800pxへ調整します。</p>
-        </div>
-        <p>職務要約</p>
-        <BodyEditor
-          key={editorKey}
-          initialContent={body as JSONContent}
-          editable={!opening && pending === null}
-          onChange={(content) => {
-            setSession((current) =>
-              editSession(current, {
-                ...current.project,
-                career: { ...current.project.career, summary: content as BodyDoc },
-              }),
-            );
-            setFileMessage(null);
+        </ResizablePanel>
+      </ResizablePanelGroup>
+      <Dialog open={exportOpen && pending === null} onOpenChange={setExportOpen}>
+        <DialogContent
+          onCloseAutoFocus={(event) => {
+            event.preventDefault();
+            exportTrigger.current?.focus();
           }}
-        />
-        <div hidden={document !== "履歴書"}>
-          <ResumeEditor
-            project={project}
-            includeQualifications={false}
-            disabled={opening || pending !== null}
-            editorKey={editorKey}
-            onChange={(updated) => {
-              setSession((current) => editSession(current, updated));
-              setFileMessage(null);
-            }}
-          />
-        </div>
-        <div hidden={document !== "職務経歴書"}>
-          <CareerEditor
-            key={editorKey}
-            project={project}
-            disabled={opening || pending !== null}
-            editorKey={editorKey}
-            onChange={(updated) => {
-              setSession((current) => editSession(current, updated));
-              setFileMessage(null);
-            }}
-          />
-        </div>
-        <HistoryEditor
-          title="免許・資格"
-          rows={project.resume.qualifications}
-          disabled={opening || pending !== null}
-          onChange={(qualifications) => {
-            setSession((current) =>
-              editSession(current, {
-                ...current.project,
-                resume: { ...current.project.resume, qualifications },
-              }),
-            );
-            setFileMessage(null);
-          }}
-        />
-        <p>免許・資格は両書類で共用します。</p>
-        <TemplatePicker
-          client={client}
-          project={project}
-          disabled={opening || pending !== null || busy}
-          onChange={(updated) => {
-            setSession((current) => editSession(current, updated));
-            setFileMessage(null);
-          }}
-        />
-        <button
-          type="button"
-          disabled={busy || fileBusy || pending !== null}
-          onClick={() => void updateDocument()}
         >
-          {document}PDF更新
-        </button>
-        <button type="button" disabled={busy || fileBusy} onClick={() => void updatePdf()}>
-          {busy ? "PDF生成中…" : "PDF更新"}
-        </button>
-        <fieldset disabled={busy || fileBusy || pending !== null || opening}>
-          <legend>書類を書き出す</legend>
-          <label>
-            出力形式
-            <select
-              value={exportFormat}
-              onChange={(event) => setExportFormat(event.target.value as OutputFormat)}
-            >
-              <option value="pdf">PDF</option>
-              <option value="tex">TeX一式</option>
-            </select>
-          </label>
-          <label>
-            出力対象
-            <select
-              value={exportScope}
-              onChange={(event) => setExportScope(event.target.value as "selected" | "both")}
-            >
-              <option value="selected">表示中の書類</option>
-              <option value="both">履歴書と職務経歴書</option>
-            </select>
-          </label>
-          <p>
-            現在の入力を書き出します。保存先フォルダを選択してください。TeX一式はTeX環境がなくても保存できます。
+          <DialogHeader>
+            <DialogTitle>書類を書き出す</DialogTitle>
+            <DialogDescription>
+              現在の入力を書き出します。保存先フォルダを選択してください。
+            </DialogDescription>
+          </DialogHeader>
+          <fieldset disabled={busy || fileBusy || editorDisabled} className="export-options">
+            <label>
+              出力形式
+              <select
+                value={exportFormat}
+                onChange={(event) => setExportFormat(event.target.value as OutputFormat)}
+              >
+                <option value="pdf">PDF</option>
+                <option value="tex">TeX一式</option>
+              </select>
+            </label>
+            <label>
+              出力対象
+              <select
+                value={exportScope}
+                onChange={(event) => setExportScope(event.target.value as "selected" | "both")}
+              >
+                <option value="selected">表示中の書類</option>
+                <option value="both">履歴書と職務経歴書</option>
+              </select>
+            </label>
+          </fieldset>
+          <p className="field-hint">
+            TeX一式はTeX環境がなくても保存できます。生成中もこの画面を閉じて編集を続けられます。
           </p>
-          <button type="button" onClick={() => void exportDocuments()}>
-            書き出す
-          </button>
-        </fieldset>
-        {exportMessage && (
-          <output aria-label="書き出し状態" aria-live="polite">
-            {exportMessage}
-          </output>
-        )}
-        {exportResults && (
-          <ul aria-label="書き出し結果">
-            {exportResults.map((result) => (
-              <li key={result.kind}>
-                {result.displayName}：
-                {result.status === "saved"
-                  ? "保存しました"
-                  : result.status === "skipped"
-                    ? "スキップしました"
-                    : "保存に失敗しました"}
-                {result.error && <OperationError error={result.error} />}
-              </li>
-            ))}
-          </ul>
-        )}
-        {error && !pending && <OperationError error={error} />}
-        {busy && activeJob.current && (
-          <button type="button" disabled={cancelling} onClick={() => void cancelGeneration()}>
-            生成をキャンセル
-          </button>
-        )}
-        {job && (
-          <output aria-label="生成状態" aria-live="polite">
-            {job.document}：{phases[job.phase]}
-          </output>
-        )}
-        {pdf?.document && <output>プレビュー：{pdf.document}</output>}
-        {pdf && pdf.revision !== session.revision && <output>PDFは更新前の内容です。</output>}
-      </div>
-      {pdf ? (
-        <PdfPreview
-          key={pdf.id}
-          bytes={pdf.bytes}
-          standardPages={pdf.document === "履歴書" ? 2 : undefined}
-        />
-      ) : (
-        <p className="preview-empty">「PDF更新」でプレビューを表示します。</p>
-      )}
+          {exportMessage && <output aria-live="polite">{exportMessage}</output>}
+          {error && <OperationError error={error} />}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setExportOpen(false)}>
+              {busy ? "閉じる" : "キャンセル"}
+            </Button>
+            <Button
+              disabled={busy || fileBusy || editorDisabled}
+              onClick={() => void exportDocuments()}
+            >
+              <Download aria-hidden="true" />
+              書き出す
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={settingsOpen && pending === null} onOpenChange={setSettingsOpen}>
+        <DialogContent
+          className="settings-dialog"
+          onCloseAutoFocus={(event) => {
+            event.preventDefault();
+            settingsTrigger.current?.focus();
+          }}
+        >
+          <DialogHeader>
+            <DialogTitle>設定</DialogTitle>
+            <DialogDescription>PDFを生成するための環境を確認できます。</DialogDescription>
+          </DialogHeader>
+          <TexDiagnosticsPanel client={client} />
+          <output>{versionLabel}</output>
+        </DialogContent>
+      </Dialog>
       {pending && (
         <DiscardDialog
           busy={fileBusy}

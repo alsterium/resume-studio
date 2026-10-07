@@ -1,17 +1,11 @@
 import { useEffect, useState } from "react";
 import { type AppClient, tauriClient } from "./infrastructure/app-client";
-import { TexDiagnosticsPanel } from "./features/diagnostics/TexDiagnosticsPanel";
 import { DraftWorkspace } from "./features/preview/DraftWorkspace";
 
-import appConfig from "../src-tauri/tauri.conf.json";
-
-const documents = ["履歴書", "職務経歴書"] as const;
-
 export function App({ client = tauriClient }: { client?: AppClient }) {
-  const [document, setDocument] = useState<(typeof documents)[number]>("履歴書");
+  const [document, setDocument] = useState<"履歴書" | "職務経歴書">("履歴書");
   const [version, setVersion] = useState<string | null>(null);
   const [versionError, setVersionError] = useState(false);
-
   useEffect(() => {
     let active = true;
     void client.getAppVersion().then(
@@ -26,41 +20,20 @@ export function App({ client = tauriClient }: { client?: AppClient }) {
       active = false;
     };
   }, [client]);
-
   return (
     <main className="workspace">
-      <header>
-        <p className="eyebrow">{appConfig.productName}</p>
-        <h1>応募書類を、自分の言葉で。</h1>
-        <p>履歴書・職務経歴書を編集し、LaTeXとPDFへ。</p>
-      </header>
-      <nav aria-label="書類の選択">
-        {documents.map((name) => (
-          <button
-            key={name}
-            type="button"
-            aria-pressed={document === name}
-            onClick={() => setDocument(name)}
-          >
-            {name}
-          </button>
-        ))}
-      </nav>
-      <section className="document-panel" aria-labelledby="document-title">
-        <h2 id="document-title">{document}</h2>
-        <p>両書類の編集内容と写真を、1つのJSONに保存・再開できます。</p>
-      </section>
-      <DraftWorkspace client={client} document={document} />
-      <TexDiagnosticsPanel client={client} />
-      <footer>
-        <output>
-          {versionError
+      <DraftWorkspace
+        client={client}
+        document={document}
+        onDocumentChange={setDocument}
+        versionLabel={
+          versionError
             ? "アプリ情報を取得できませんでした。"
             : version
               ? `バージョン ${version}`
-              : "アプリ情報を確認中…"}
-        </output>
-      </footer>
+              : "アプリ情報を確認中…"
+        }
+      />
     </main>
   );
 }

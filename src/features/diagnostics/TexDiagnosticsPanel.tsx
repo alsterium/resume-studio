@@ -1,3 +1,5 @@
+import { Button } from "../../components/ui/button";
+import { CheckCircle2, Stethoscope } from "lucide-react";
 import { OperationError } from "../errors/OperationError";
 import { useState } from "react";
 import type { AppClient, TexDiagnostics } from "../../infrastructure/app-client";
@@ -23,14 +25,20 @@ export function TexDiagnosticsPanel({ client }: { client: AppClient }) {
   return (
     <section aria-labelledby="tex-diagnostics-title">
       <h2 id="tex-diagnostics-title">PDF生成環境</h2>
-      <button type="button" disabled={checking} onClick={() => void check()}>
+      <Button type="button" disabled={checking} onClick={() => void check()}>
+        <Stethoscope aria-hidden="true" />
         {checking ? "確認中…" : "TeX環境を確認"}
-      </button>
+      </Button>
       {checking && <output>日本語PDFを生成して確認しています…</output>}
       {error && <OperationError error={error} />}
       {report && (
         <div>
-          {report.pdfValidated && <output>日本語PDFを生成できました。</output>}
+          {report.pdfValidated && (
+            <output className="diagnostics-success">
+              <CheckCircle2 aria-hidden="true" />
+              日本語PDFを生成できました。
+            </output>
+          )}
           {report.error && <OperationError error={report.error} />}
           {report.missingDependencies.length > 0 && (
             <div>

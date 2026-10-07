@@ -1,3 +1,4 @@
+import { openSummary, projectMenu } from "../ui-navigation";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { mockIPC } from "@tauri-apps/api/mocks";
@@ -22,6 +23,7 @@ test("読み込みで本文を復元し、未編集の書類・写真を含む�
   });
   const user = userEvent.setup();
   render(<DraftWorkspace client={tauriClient} />);
+  await openSummary(user);
   await user.click(screen.getByRole("button", { name: "開く" }));
   expect(screen.getByLabelText("氏名")).toHaveValue(project.profile.name);
   const editor = screen.getByLabelText("本文");
@@ -29,7 +31,8 @@ test("読み込みで本文を復元し、未編集の書類・写真を含む�
   expect(editor.querySelector("em")).toHaveTextContent("斜体の本文");
   expect(editor.querySelector("ol")).toHaveAttribute("start", "2");
   await user.click(screen.getByRole("button", { name: "保存" }));
-  await user.click(screen.getByRole("button", { name: "名前を付けて保存" }));
+  await projectMenu(user);
+  await user.click(screen.getByRole("menuitem", { name: "名前を付けて保存" }));
   expect(screen.getByLabelText("プロジェクトファイル")).toHaveTextContent("別名.json");
   expect(saves).toBe(2);
 });
@@ -65,6 +68,7 @@ test("キャンセル・不正JSON・書込失敗で現在の入力と保存先�
   });
   const user = userEvent.setup();
   render(<DraftWorkspace client={tauriClient} />);
+  await openSummary(user);
   await user.type(screen.getByLabelText("氏名"), "保存する名前");
   await user.type(screen.getByLabelText("本文"), "編集内容");
   await user.click(screen.getByRole("button", { name: "開く" }));
@@ -107,6 +111,7 @@ test("保存キーが最新の入力を保存し、IME・連続キー・確認�
     return { fileId: "2", displayName: "別名.json" };
   });
   render(<DraftWorkspace client={tauriClient} />);
+  await openSummary(user);
   const input = screen.getByLabelText("氏名");
   await user.type(input, "架空 保存名");
   fireEvent.keyDown(input, { key: "s", metaKey: true, isComposing: true });

@@ -1,3 +1,5 @@
+import { Button } from "../components/ui/button";
+import { Bold, Italic, List, ListOrdered, Undo2, Redo2 } from "lucide-react";
 import { EditorContent, useEditor, useEditorState } from "@tiptap/react";
 import type { JSONContent } from "@tiptap/core";
 import { bodyExtensions } from "./extensions";
@@ -40,52 +42,70 @@ export function BodyEditor({
   return (
     <div className="body-editor">
       <div aria-label={`${label}の書式`} className="editor-toolbar">
-        <button
+        <Button
+          variant="ghost"
+          size="icon-sm"
           type="button"
           disabled={!editor || !editable}
           aria-pressed={state.bold}
           onClick={() => editor?.chain().focus().toggleBold().run()}
         >
-          太字
-        </button>
-        <button
+          <Bold aria-hidden="true" />
+          <span className="sr-only">太字</span>
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon-sm"
           type="button"
           disabled={!editor || !editable}
           aria-pressed={state.italic}
           onClick={() => editor?.chain().focus().toggleItalic().run()}
         >
-          斜体
-        </button>
-        <button
+          <Italic aria-hidden="true" />
+          <span className="sr-only">斜体</span>
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon-sm"
           type="button"
           disabled={!editor || !editable}
           aria-pressed={state.bullets}
           onClick={() => editor?.chain().focus().toggleBulletList().run()}
         >
-          箇条書き
-        </button>
-        <button
+          <List aria-hidden="true" />
+          <span className="sr-only">箇条書き</span>
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon-sm"
           type="button"
           disabled={!editor || !editable}
           aria-pressed={state.ordered}
           onClick={() => editor?.chain().focus().toggleOrderedList().run()}
         >
-          番号付きリスト
-        </button>
-        <button
+          <ListOrdered aria-hidden="true" />
+          <span className="sr-only">番号付きリスト</span>
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon-sm"
           type="button"
           disabled={!editor || !editable}
           onClick={() => editor?.chain().focus().undo().run()}
         >
-          元に戻す
-        </button>
-        <button
+          <Undo2 aria-hidden="true" />
+          <span className="sr-only">元に戻す</span>
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon-sm"
           type="button"
           disabled={!editor || !editable}
           onClick={() => editor?.chain().focus().redo().run()}
         >
-          やり直す
-        </button>
+          <Redo2 aria-hidden="true" />
+          <span className="sr-only">やり直す</span>
+        </Button>
       </div>
       <EditorContent editor={editor} />
     </div>

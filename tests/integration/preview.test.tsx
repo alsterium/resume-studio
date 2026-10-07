@@ -1,3 +1,4 @@
+import { openSummary, projectMenu } from "../ui-navigation";
 import { act, render, screen, waitFor } from "@testing-library/react";
 import type { Channel } from "@tauri-apps/api/core";
 import type { GeneratedDocument, JobPhase } from "../../src/infrastructure/app-client";
@@ -364,13 +365,16 @@ test("入力をIPCで生成し、結果IDから読込・ページ移動・拡大
   });
   render(<DraftWorkspace client={tauriClient} />);
   await user.type(screen.getByLabelText("氏名"), "架空 山田");
+  await openSummary(user);
   await user.type(screen.getByLabelText("本文"), "日本語 & %");
-  await user.click(screen.getByRole("button", { name: "PDF更新" }));
+  await projectMenu(user);
+  await user.click(screen.getByRole("menuitem", { name: "職務要約の下書きPDF更新" }));
   expect(await screen.findByLabelText("ページ番号")).toHaveTextContent("1 / 3");
   expect(screen.queryByText(/続紙を含む/)).not.toBeInTheDocument();
   await waitFor(() =>
     expect(screen.getByLabelText("生成されたPDFページ")).toHaveAttribute("data-rendered-page", "1"),
   );
+  await user.click(screen.getByRole("button", { name: "見開き" }));
   expect(screen.getByRole("button", { name: "前のページ" })).toBeDisabled();
   await user.click(screen.getByRole("button", { name: "次のページ" }));
   await waitFor(() =>
@@ -395,15 +399,17 @@ test("編集後のPDFを古い内容として示し、再生成の失敗でも�
   });
   const user = userEvent.setup();
   render(<DraftWorkspace client={tauriClient} />);
-  await user.click(screen.getByRole("button", { name: "PDF更新" }));
+  await projectMenu(user);
+  await user.click(screen.getByRole("menuitem", { name: "職務要約の下書きPDF更新" }));
   const canvas = await screen.findByLabelText("生成されたPDFページ");
   await user.type(screen.getByLabelText("氏名"), "更新した名前");
   expect(screen.getByText("PDFは更新前の内容です。")).toBeVisible();
   fail = true;
-  await user.click(screen.getByRole("button", { name: "PDF更新" }));
+  await projectMenu(user);
+  await user.click(screen.getByRole("menuitem", { name: "職務要約の下書きPDF更新" }));
   expect(await screen.findByRole("alert")).toHaveTextContent("TeX生成に失敗");
   expect(screen.getByLabelText("生成されたPDFページ")).toBe(canvas);
-  expect(screen.getByRole("button", { name: "PDF更新" })).toBeEnabled();
+  expect(screen.getByRole("button", { name: "履歴書PDF更新" })).toBeEnabled();
 });
 
 test("現在の書類・両書類をPDFとTeXで書き出し、部分成功とスキップとキャンセルを表示する", async () => {
@@ -444,17 +450,26 @@ test("現在の書類・両書類をPDFとTeXで書き出し、部分成功と�
   const { rerender } = render(<DraftWorkspace client={tauriClient} />);
   await user.click(screen.getByRole("button", { name: "履歴書PDF更新" }));
   let previousCanvas = await screen.findByLabelText("生成されたPDFページ");
+  if (!screen.queryByRole("dialog"))
+    await user.click(screen.getByRole("button", { name: "書き出し" }));
   await user.click(screen.getByRole("button", { name: "書き出す" }));
   expect(await screen.findByLabelText("書き出し結果")).toHaveTextContent("保存しました");
   expect(requests.at(-1)).toEqual({ kinds: ["resume"], format: "pdf" });
+  await user.click(screen.getByRole("button", { name: "キャンセル" }));
   rerender(<DraftWorkspace client={tauriClient} document="職務経歴書" />);
+  if (!screen.queryByRole("dialog"))
+    await user.click(screen.getByRole("button", { name: "書き出し" }));
   await user.click(screen.getByRole("button", { name: "書き出す" }));
   expect(requests.at(-1)).toEqual({ kinds: ["career"], format: "pdf" });
+  await user.click(screen.getByRole("button", { name: "キャンセル" }));
   rerender(<DraftWorkspace client={tauriClient} document="履歴書" />);
+  await user.click(screen.getByRole("button", { name: "書き出し" }));
   previousCanvas = await screen.findByLabelText("生成されたPDFページ");
   await user.selectOptions(screen.getByLabelText("出力対象"), "both");
   await user.selectOptions(screen.getByLabelText("出力形式"), "tex");
   mode = "partial";
+  if (!screen.queryByRole("dialog"))
+    await user.click(screen.getByRole("button", { name: "書き出し" }));
   await user.click(screen.getByRole("button", { name: "書き出す" }));
   expect(await screen.findByLabelText("書き出し結果")).toHaveTextContent(
     "resume.tex：保存しました",
@@ -463,20 +478,29 @@ test("現在の書類・両書類をPDFとTeXで書き出し、部分成功と�
   expect(screen.getByLabelText("書き出し結果")).toHaveTextContent("職務経歴書の保存失敗");
   expect(requests.at(-1)).toEqual({ kinds: ["resume", "career"], format: "tex" });
   mode = "skipped";
+  if (!screen.queryByRole("dialog"))
+    await user.click(screen.getByRole("button", { name: "書き出し" }));
   await user.click(screen.getByRole("button", { name: "書き出す" }));
   expect(await screen.findByLabelText("書き出し結果")).toHaveTextContent("スキップしました");
   mode = "cancelled";
+  if (!screen.queryByRole("dialog"))
+    await user.click(screen.getByRole("button", { name: "書き出し" }));
   await user.click(screen.getByRole("button", { name: "書き出す" }));
   expect(await screen.findByLabelText("書き出し状態")).toHaveTextContent("キャンセルしました");
   expect(screen.queryByLabelText("書き出し結果")).not.toBeInTheDocument();
   mode = "failed";
+  if (!screen.queryByRole("dialog"))
+    await user.click(screen.getByRole("button", { name: "書き出し" }));
   await user.click(screen.getByRole("button", { name: "書き出す" }));
   expect(await screen.findByRole("alert")).toHaveTextContent("保存先を確認できませんでした");
   expect(screen.getByLabelText("生成されたPDFページ")).toBe(previousCanvas);
   defer = true;
+  if (!screen.queryByRole("dialog"))
+    await user.click(screen.getByRole("button", { name: "書き出し" }));
   await user.click(screen.getByRole("button", { name: "書き出す" }));
   expect(screen.getByRole("button", { name: "書き出す" })).toBeDisabled();
-  expect(screen.getByRole("button", { name: "新規" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "新規", hidden: true })).toBeDisabled();
+  await user.click(screen.getByRole("button", { name: "閉じる" }));
   await user.type(screen.getByLabelText("氏名"), "追加編集");
   await act(async () => {
     complete?.([{ kind: "resume", status: "saved", displayName: "履歴書-tex", error: null }]);
@@ -484,6 +508,7 @@ test("現在の書類・両書類をPDFとTeXで書き出し、部分成功と�
   expect(await screen.findByLabelText("書き出し状態")).toHaveTextContent(
     "書き出し中の編集は含まれていません",
   );
+  await user.click(screen.getByRole("button", { name: "書き出し" }));
   expect(screen.getByRole("button", { name: "書き出す" })).toBeEnabled();
 });
 
@@ -525,4 +550,36 @@ test("TeX未検出・時間切れ・コンパイル失敗の対処とログを�
   await user.click(screen.getByRole("button", { name: "履歴書PDF更新" }));
   await screen.findByLabelText("生成されたPDFページ");
   expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+});
+
+test("見開きは2ページを描画し、奇数の最終ページから戻り倍率を変更できる", async () => {
+  const user = userEvent.setup();
+  render(<PdfPreview bytes={new Uint8Array([3])} fitToWidth />);
+  await waitFor(() =>
+    expect(screen.getByLabelText("生成されたPDFページ 2")).toHaveAttribute(
+      "data-rendered-page",
+      "2",
+    ),
+  );
+  expect(screen.getByRole("button", { name: "前のページ" })).toBeDisabled();
+  await user.click(screen.getByRole("button", { name: "次のページ" }));
+  await waitFor(() =>
+    expect(screen.getByLabelText("生成されたPDFページ")).toHaveAttribute("data-rendered-page", "3"),
+  );
+  expect(screen.queryByLabelText("生成されたPDFページ 4")).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "次のページ" })).toBeDisabled();
+  await user.click(screen.getByRole("button", { name: "前のページ" }));
+  await user.click(screen.getByRole("button", { name: "見開き" }));
+  expect(screen.queryByLabelText("生成されたPDFページ 2")).not.toBeInTheDocument();
+  await user.selectOptions(screen.getByLabelText("表示倍率"), "1.5");
+  await waitFor(() =>
+    expect(screen.getByLabelText("生成されたPDFページ")).toHaveAttribute(
+      "data-rendered-scale",
+      "1.5",
+    ),
+  );
+  await user.click(screen.getByRole("button", { name: "次のページ" }));
+  await waitFor(() =>
+    expect(screen.getByLabelText("生成されたPDFページ")).toHaveAttribute("data-rendered-page", "2"),
+  );
 });

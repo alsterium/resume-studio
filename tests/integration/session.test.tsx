@@ -1,3 +1,4 @@
+import { openSummary, projectMenu } from "../ui-navigation";
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { mockIPC } from "@tauri-apps/api/mocks";
@@ -21,6 +22,7 @@ test("保存中に追加入力しても未保存を維持し、保存の失敗�
   });
   const user = userEvent.setup();
   render(<DraftWorkspace client={tauriClient} />);
+  await openSummary(user);
   await user.type(screen.getByLabelText("氏名"), "保存開始");
   await user.click(screen.getByRole("button", { name: "保存" }));
   await user.type(screen.getByLabelText("氏名"), "後の追加入力");
@@ -32,7 +34,8 @@ test("保存中に追加入力しても未保存を維持し、保存の失敗�
   await user.click(screen.getByRole("button", { name: "保存" }));
   expect(await screen.findByRole("alert")).toHaveTextContent("保存失敗");
   mode = "cancel";
-  await user.click(screen.getByRole("button", { name: "名前を付けて保存" }));
+  await projectMenu(user);
+  await user.click(screen.getByRole("menuitem", { name: "名前を付けて保存" }));
   expect(screen.getByLabelText("保存状態")).toHaveTextContent("未保存");
   mode = "success";
   await user.click(screen.getByRole("button", { name: "保存" }));
@@ -45,6 +48,7 @@ test("新規作成の確認でキャンセルは編集を保持し、破棄は�
   });
   const user = userEvent.setup();
   render(<DraftWorkspace client={tauriClient} />);
+  await openSummary(user);
   await user.type(screen.getByLabelText("本文"), "残す本文");
   await user.click(screen.getByRole("button", { name: "新規" }));
   expect(screen.getByRole("dialog")).toBeVisible();
@@ -73,6 +77,7 @@ test("保存して開くは保存失敗・保存先キャンセルで止まり�
   });
   const user = userEvent.setup();
   render(<DraftWorkspace client={tauriClient} />);
+  await openSummary(user);
   await user.type(screen.getByLabelText("氏名"), "保持する名前");
   await user.click(screen.getByRole("button", { name: "開く" }));
   await user.click(screen.getByRole("button", { name: "保存して続行" }));
@@ -104,6 +109,7 @@ test("native終了要求は最新の編集を確認し、保存して続行し�
   });
   const user = userEvent.setup();
   render(<DraftWorkspace client={tauriClient} />);
+  await openSummary(user);
   await waitFor(() => expect(requested).toBeTypeOf("function"));
   await user.type(screen.getByLabelText("氏名"), "終了前の編集");
   act(() => requested?.());
