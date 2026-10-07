@@ -66,7 +66,7 @@ fn select_project_path(
         .dialog()
         .file()
         .set_parent(window)
-        .add_filter("Resume Studio JSON", &["json"]);
+        .add_filter("応募書類 JSON", &["json"]);
     let selected = if save {
         picker.set_file_name("応募書類.json").blocking_save_file()
     } else {

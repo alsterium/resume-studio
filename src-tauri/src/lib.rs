@@ -34,7 +34,7 @@ pub fn run() {
             }
         })
         .build(tauri::generate_context!())
-        .expect("Resume Studioの起動に失敗しました")
+        .expect("アプリの起動に失敗しました")
         .run(|app, event| {
             #[cfg(all(target_os = "macos", feature = "desktop-e2e"))]
             if matches!(event, tauri::RunEvent::Ready) {

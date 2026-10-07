@@ -8,9 +8,9 @@
     "build": "pnpm generate:schemas && tsc --noEmit && vite build",
     "preview": "vite preview",
     "tauri": "tauri",
-    "lint": "oxlint --deny-warnings src tests vite.config.ts vitest.config.ts tools/desktop-e2e.mjs tools/generate-schema-validator.mjs tools/render-pdf.mjs",
-    "format": "oxfmt --write src tests vite.config.ts vitest.config.ts tsconfig.json index.html package.json .oxlintrc.json .oxfmtrc.json src-tauri/tauri.conf.json src-tauri/capabilities tools/desktop-e2e.mjs tools/generate-schema-validator.mjs tools/render-pdf.mjs",
-    "format:check": "oxfmt --check src tests vite.config.ts vitest.config.ts tsconfig.json index.html package.json .oxlintrc.json .oxfmtrc.json src-tauri/tauri.conf.json src-tauri/capabilities tools/desktop-e2e.mjs tools/generate-schema-validator.mjs tools/render-pdf.mjs",
+    "lint": "oxlint --deny-warnings src tests vite.config.ts vitest.config.ts tools/desktop-e2e.mjs tools/generate-schema-validator.mjs tools/render-pdf.mjs tools/rename-app.mjs tools/tests/rename-app.test.mjs",
+    "format": "oxfmt --write src tests vite.config.ts vitest.config.ts tsconfig.json index.html package.json .oxlintrc.json .oxfmtrc.json src-tauri/tauri.conf.json src-tauri/capabilities tools/desktop-e2e.mjs tools/generate-schema-validator.mjs tools/render-pdf.mjs tools/rename-app.mjs tools/tests/rename-app.test.mjs",
+    "format:check": "oxfmt --check src tests vite.config.ts vitest.config.ts tsconfig.json index.html package.json .oxlintrc.json .oxfmtrc.json src-tauri/tauri.conf.json src-tauri/capabilities tools/desktop-e2e.mjs tools/generate-schema-validator.mjs tools/render-pdf.mjs tools/rename-app.mjs tools/tests/rename-app.test.mjs",
     "typecheck": "pnpm generate:schemas && tsc --noEmit",
     "rust:format": "cargo fmt --manifest-path src-tauri/Cargo.toml --all",
     "rust:format:check": "cargo fmt --manifest-path src-tauri/Cargo.toml --all --check",
@@ -25,7 +25,8 @@
     "test:e2e": "node tools/desktop-e2e.mjs",
     "test:unit": "pnpm generate:schemas && vitest run tests/unit",
     "generate:schemas": "node tools/generate-schema-validator.mjs",
-    "pdf:render": "node tools/render-pdf.mjs"
+    "pdf:render": "node tools/render-pdf.mjs",
+    "template:rename": "node tools/rename-app.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "2.12.1",

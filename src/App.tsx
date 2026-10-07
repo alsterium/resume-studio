@@ -3,6 +3,8 @@ import { type AppClient, tauriClient } from "./infrastructure/app-client";
 import { TexDiagnosticsPanel } from "./features/diagnostics/TexDiagnosticsPanel";
 import { DraftWorkspace } from "./features/preview/DraftWorkspace";
 
+import appConfig from "../src-tauri/tauri.conf.json";
+
 const documents = ["履歴書", "職務経歴書"] as const;
 
 export function App({ client = tauriClient }: { client?: AppClient }) {
@@ -28,7 +30,7 @@ export function App({ client = tauriClient }: { client?: AppClient }) {
   return (
     <main className="workspace">
       <header>
-        <p className="eyebrow">Resume Studio</p>
+        <p className="eyebrow">{appConfig.productName}</p>
         <h1>応募書類を、自分の言葉で。</h1>
         <p>履歴書・職務経歴書を編集し、LaTeXとPDFへ。</p>
       </header>

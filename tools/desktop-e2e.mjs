@@ -17,10 +17,15 @@ server.listen(0, "127.0.0.1");
 await once(server, "listening");
 const { port } = server.address();
 await new Promise((resolve) => server.close(resolve));
-const appBundle = fileURLToPath(
-  new URL("../src-tauri/target/debug/bundle/macos/Resume Studio.app", import.meta.url),
+const config = JSON.parse(
+  await readFile(new URL("../src-tauri/tauri.conf.json", import.meta.url), "utf8"),
 );
-const binary = join(appBundle, "Contents/MacOS/resume-studio");
+const packageJson = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
+const bundleDirectory = fileURLToPath(
+  new URL("../src-tauri/target/debug/bundle/macos/", import.meta.url),
+);
+const appBundle = join(bundleDirectory, `${config.productName}.app`);
+const binary = join(appBundle, "Contents/MacOS", packageJson.name);
 const runFile = promisify(execFile);
 const projectDirectory = await mkdtemp(join(tmpdir(), "resume-studio-e2e-"));
 let projectPath = join(projectDirectory, "応募 書類.json");

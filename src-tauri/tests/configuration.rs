@@ -12,6 +12,11 @@ fn application_metadata_matches_frontend_and_cargo() {
 
     assert_eq!(config.version.as_deref(), Some(env!("CARGO_PKG_VERSION")));
     assert_eq!(package["version"], env!("CARGO_PKG_VERSION"));
+    assert_eq!(package["name"], env!("CARGO_PKG_NAME"));
+    assert_eq!(
+        config.app.windows[0].title,
+        config.product_name.as_deref().unwrap()
+    );
     assert_eq!(config.app.windows.len(), 1);
     assert_eq!(config.app.windows[0].label, "main");
     assert_eq!(
