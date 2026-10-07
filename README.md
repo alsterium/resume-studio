@@ -54,4 +54,4 @@ GitHubの非公開テンプレートリポジトリとして設定済み。[再�
 
 アプリと独自TeXテンプレートのライセンスは未付与。現在は非公開で開発しており、公開前に利用・再配布条件を決める。依存ライブラリとシステムTeX資源のライセンスはそれぞれ別に扱う。[ライセンス方針](docs/LICENSE_POLICY.md)。
 
-[PRD](docs/PRD.md)、[アーキテクチャ](docs/ARCHITECTURE.md)、[実装ロードマップ](docs/IMPLEMENTATION_PLAN.md)、[参考書式](docs/TEMPLATE_REFERENCE.md)も参照できる。MVPの最終受け入れはタスクT28で記録する。
+[PRD](docs/PRD.md)、[アーキテクチャ](docs/ARCHITECTURE.md)、[実装ロードマップ](docs/IMPLEMENTATION_PLAN.md)、[参考書式](docs/TEMPLATE_REFERENCE.md)も参照できる。MVPの最終受け入れは[受け入れ記録](docs/ACCEPTANCE.md)とタスクT28で記録する。

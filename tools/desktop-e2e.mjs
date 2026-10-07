@@ -28,6 +28,28 @@ const appBundle = join(bundleDirectory, `${config.productName}.app`);
 const binary = join(appBundle, "Contents/MacOS", packageJson.name);
 const runFile = promisify(execFile);
 const projectDirectory = await mkdtemp(join(tmpdir(), "resume-studio-e2e-"));
+const offline = process.env.RESUME_STUDIO_E2E_OFFLINE === "1";
+const offlineProfile = join(projectDirectory, "offline.sb");
+if (offline) {
+  assert.equal(process.platform, "darwin", "The offline profile requires macOS");
+  await writeFile(
+    offlineProfile,
+    '(version 1)\n(allow default)\n(deny network-outbound)\n(allow network-outbound (remote ip "localhost:*"))\n',
+  );
+  // A reserved TEST-NET address must fail at the sandbox boundary, not at a timeout.
+  await runFile(
+    "/usr/bin/sandbox-exec",
+    [
+      "-f",
+      offlineProfile,
+      process.execPath,
+      "--input-type=module",
+      "-e",
+      'import assert from "node:assert/strict"; import {createConnection} from "node:net"; const s=createConnection({host:"203.0.113.1",port:443}); s.setTimeout(2000,()=>s.destroy(new Error("timeout"))); const e=await new Promise(r=>s.once("error",r)); assert.equal(e.code,"EPERM");',
+    ],
+    { timeout: 5000 },
+  );
+}
 let projectPath = join(projectDirectory, "応募 書類.json");
 const exportDirectory = join(projectDirectory, "書き出し");
 await mkdir(exportDirectory);
@@ -41,17 +63,21 @@ let launchError;
 function launch() {
   output = "";
   launchError = undefined;
-  const child = spawn(binary, [], {
-    env: {
-      ...process.env,
-      PATH: "/usr/bin:/bin",
-      TAURI_WEBDRIVER_PORT: String(port),
-      RESUME_STUDIO_E2E_PROJECT: projectPath,
-      RESUME_STUDIO_E2E_PHOTO: photoPath,
-      RESUME_STUDIO_E2E_EXPORT: exportDirectory,
+  const child = spawn(
+    offline ? "/usr/bin/sandbox-exec" : binary,
+    offline ? ["-f", offlineProfile, binary] : [],
+    {
+      env: {
+        ...process.env,
+        PATH: "/usr/bin:/bin",
+        TAURI_WEBDRIVER_PORT: String(port),
+        RESUME_STUDIO_E2E_PROJECT: projectPath,
+        RESUME_STUDIO_E2E_PHOTO: photoPath,
+        RESUME_STUDIO_E2E_EXPORT: exportDirectory,
+      },
+      stdio: ["ignore", "pipe", "pipe"],
     },
-    stdio: ["ignore", "pipe", "pipe"],
-  });
+  );
   child.on("error", (error) => {
     launchError = error;
   });
@@ -131,6 +157,24 @@ try {
   await browser.$('[aria-label="本文"]').addValue("架空の職務内容 & % _ # $ { } ~ ^ \\ 日本語");
   const text = await browser.$('[aria-label="本文"]').getText();
   assert.ok(text.includes("架空の職務内容"), `Input was lost: ${text}`);
+  await browser
+    .$('[aria-label="本文"]')
+    .addValue(
+      Array.from({ length: 600 }, (_, index) => `\n架空の長文${index + 1}作業記録`).join(""),
+    );
+  assert.ok((await browser.$('[aria-label="本文"]').getText()).includes("架空の長文600作業記録"));
+  // Separate the history group, then use the real Tiptap toolbar on the long body.
+  await delay(600);
+  await browser.$('[aria-label="本文"]').addValue("\n架空Undo確認");
+  await browser.$('[aria-label="本文の書式"]').$("button=元に戻す").click();
+  await browser.waitUntil(
+    async () => !(await browser.$('[aria-label="本文"]').getText()).includes("架空Undo確認"),
+  );
+  assert.ok((await browser.$('[aria-label="本文"]').getText()).includes("架空の長文600作業記録"));
+  await browser.$('[aria-label="本文の書式"]').$("button=やり直す").click();
+  await browser.waitUntil(async () =>
+    (await browser.$('[aria-label="本文"]').getText()).includes("架空Undo確認"),
+  );
   // Date/month controls use the native setter + input/change adapter documented in ADR 0004.
   await browser.execute(() => {
     const inputFor = (label) =>
@@ -389,6 +433,7 @@ try {
   const pdfTask = getDocument({ data: new Uint8Array(pdfBytes.bytes), useWasm: false });
   try {
     const pdf = await pdfTask.promise;
+    assert.ok(pdf.numPages >= 10, `Long input produced only ${pdf.numPages} draft pages`);
     const contents = await (await pdf.getPage(1)).getTextContent();
     const extracted = contents.items
       .map((item) => item.str ?? "")
@@ -435,6 +480,29 @@ try {
   ]) {
     await presentTestApp();
     if (label === "職務経歴書") await browser.$("button=職務経歴書").click();
+    if (label === "職務経歴書") {
+      await browser.execute(() => {
+        const observer = new MutationObserver(() => {
+          const phase = document.querySelector('[aria-label="生成状態"]')?.textContent;
+          if (!phase?.includes("PDFを生成中")) return;
+          observer.disconnect();
+          const started = performance.now();
+          const input = document.querySelector(".draft-editor input");
+          Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(
+            input,
+            "架空 編集継続",
+          );
+          input.dispatchEvent(new Event("input", { bubbles: true }));
+          input.dispatchEvent(new Event("change", { bubbles: true }));
+          window.__e2eEditingDuringCompile = { phase, milliseconds: performance.now() - started };
+        });
+        observer.observe(document.querySelector(".draft-editor"), {
+          childList: true,
+          characterData: true,
+          subtree: true,
+        });
+      });
+    }
     await browser.$(`button=${label}PDF更新`).click();
     const deadline = Date.now() + 90000;
     for (;;) {
@@ -481,6 +549,10 @@ try {
     const task = getDocument({ data: new Uint8Array(formalBytes.bytes), useWasm: false });
     try {
       const pdf = await task.promise;
+      if (label === "職務経歴書") {
+        assert.ok(pdf.numPages >= 10, `Long input produced only ${pdf.numPages} career pages`);
+        expected.push("架空の長文600作業記録");
+      }
       let text = "";
       for (let page = 1; page <= pdf.numPages; page++) {
         const content = await (await pdf.getPage(page)).getTextContent();
@@ -491,6 +563,19 @@ try {
         assert.ok(text.includes(value), `Formal ${label} PDF lost ${value}: ${text}`);
     } finally {
       await task.destroy();
+    }
+    if (label === "職務経歴書") {
+      const proof = await browser.execute(() => window.__e2eEditingDuringCompile);
+      assert.ok(
+        proof?.phase.includes("PDFを生成中"),
+        "Editing did not occur during real compilation",
+      );
+      assert.equal(await browser.$(".draft-editor input").getValue(), "架空 編集継続");
+      assert.ok((await browser.$("body").getText()).includes("PDFは更新前の内容です"));
+      console.log(
+        `RESPONSIVE_EDIT: PASS (10+ pages; input dispatch during compilation ${proof.milliseconds.toFixed(1)}ms; React revision confirmed)`,
+      );
+      await browser.$(".draft-editor input").setValue("架空 山田");
     }
   }
   // Returning to either document keeps its own last successful PDF.
@@ -696,6 +781,10 @@ try {
   console.log(
     "DESKTOP_E2E: PASS (photo import → JSON save/move → restart/restore → draft/resume/career TeX/PDF and embedded photo → cancellation/diagnostics → PDF/TeX export/overwrite skip → guarded close/quit → save/exit; picker adapters)",
   );
+  if (offline)
+    console.log(
+      "OFFLINE_E2E: PASS (external outbound denied for app and children; WebDriver localhost only)",
+    );
 } finally {
   try {
     if (browser && app.exitCode === null && app.signalCode === null) await browser.deleteSession();
