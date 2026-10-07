@@ -215,7 +215,8 @@ try {
     { timeout: 30000 },
   );
   // Replace only OS file selection; exercise real IPC, validation and atomic storage.
-  await browser.$("button=保存").click();
+  await browser.$(".draft-editor input").click();
+  await browser.keys(["Meta", "s"]);
   await browser.waitUntil(
     async () =>
       (await browser.$('[aria-label="プロジェクトファイル"]').getText()) === "応募 書類.json",

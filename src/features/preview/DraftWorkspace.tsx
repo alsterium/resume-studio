@@ -57,6 +57,8 @@ export function DraftWorkspace({
   const [opening, setOpening] = useState(false);
   const [file, setFile] = useState<SavedProject | null>(null);
   const [editorKey, setEditorKey] = useState(0);
+  const savingProject = useRef(false);
+  const saveShortcut = useRef<(saveAs: boolean) => void>(() => {});
   const [fileBusy, setFileBusy] = useState(false);
   const [fileMessage, setFileMessage] = useState<string | null>(null);
   const name = project.profile.name;
@@ -93,6 +95,9 @@ export function DraftWorkspace({
   useEffect(() => {
     currentSession.current = session;
     closeHandler.current = () => void requestAction("close");
+    saveShortcut.current = (saveAs) => {
+      if (!fileBusy && !opening && pending === null) void saveProject(saveAs);
+    };
   });
   useEffect(() => {
     let disposed = false;
@@ -111,6 +116,38 @@ export function DraftWorkspace({
       unsubscribe?.();
     };
   }, [client]);
+
+  useEffect(() => {
+    let composing = false;
+    const startComposition = () => {
+      composing = true;
+    };
+    const endComposition = () => {
+      composing = false;
+    };
+    const keydown = (event: KeyboardEvent) => {
+      if (
+        event.defaultPrevented ||
+        composing ||
+        event.isComposing ||
+        event.keyCode === 229 ||
+        event.altKey ||
+        !(event.metaKey || event.ctrlKey) ||
+        event.key.toLowerCase() !== "s"
+      )
+        return;
+      event.preventDefault();
+      saveShortcut.current(event.shiftKey);
+    };
+    window.addEventListener("compositionstart", startComposition);
+    window.addEventListener("compositionend", endComposition);
+    window.addEventListener("keydown", keydown);
+    return () => {
+      window.removeEventListener("compositionstart", startComposition);
+      window.removeEventListener("compositionend", endComposition);
+      window.removeEventListener("keydown", keydown);
+    };
+  }, []);
 
   async function openProject() {
     setFileBusy(true);
@@ -138,6 +175,8 @@ export function DraftWorkspace({
   }
 
   async function saveProject(saveAs: boolean) {
+    if (savingProject.current) return false;
+    savingProject.current = true;
     const snapshot = session;
     setFileBusy(true);
     setError(null);
@@ -155,6 +194,7 @@ export function DraftWorkspace({
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : String(failure));
     } finally {
+      savingProject.current = false;
       setFileBusy(false);
     }
     return false;
@@ -461,6 +501,7 @@ export function DraftWorkspace({
           </button>
         </div>
         <output aria-label="プロジェクトファイル">{file?.displayName ?? "保存先未設定"}</output>
+        <p>保存：⌘/Ctrl+S、名前を付けて保存：⌘/Ctrl+Shift+S</p>
         <output aria-label="保存状態">
           {dirty ? "未保存の変更があります" : file ? "保存済み" : "新規プロジェクト"}
         </output>

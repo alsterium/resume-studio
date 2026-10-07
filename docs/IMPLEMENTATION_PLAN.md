@@ -87,6 +87,7 @@ T09は[実行37391539408](https://github.com/alsterium/resume-studio/actions/run
 | T25 CI拡充 | 実TeX、UI結合、macOS実機E2E、bundleビルドを必須化 |
 | T26 テンプレート手順 | アプリ名・identifier・ウィンドウ名・アイコン・crate名・生成物名の変更手順。新規cloneで検証 |
 | T27 利用・開発ドキュメント | TeX前提環境、起動・テスト・エラー対処、JSON仕様、テンプレート追加、ライセンス |
+| T33 保存ショートカット | N05のCmd/Ctrl+S、別名保存、IME/操作中の抑止。T12の保存処理に接続する独立変更 |
 | T28 MVP受け入れ | PRDのF01〜F14、N01〜N08を検証し、実macOSで全フローを完了 |
 
 GitHubへのリポジトリ作成・pushは2026-10-06のユーザー依頼により許可済み。非公開のalsterium/resume-studioで開発とCI検証を行う。template repository設定はT26で再利用手順と合わせて扱い、公開・Release発行は別途依頼時に行う。
