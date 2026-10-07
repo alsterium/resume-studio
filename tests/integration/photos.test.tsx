@@ -66,7 +66,15 @@ test("写真の取り込み・置換・削除で参照と埋込を更新し、�
       `data:image/png;base64,${fixture.assets[0].base64}`,
     );
     expect(screen.getByLabelText("保存状態")).toHaveTextContent("未保存");
+    const image = screen.getByAltText("取り込んだ証明写真");
+    await user.click(screen.getByRole("tab", { name: "職務経歴書" }));
+    expect(screen.queryByRole("button", { name: "写真を取り込む" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "写真を削除" })).toBeNull();
+    expect(image).not.toBeVisible();
     await user.click(screen.getByRole("button", { name: "保存" }));
+    await user.click(screen.getByRole("tab", { name: "履歴書" }));
+    expect(image).toBeVisible();
+    expect(screen.getByRole("button", { name: "写真を取り込む" })).toBeVisible();
   }
   expect(imports).toBe(2);
   await user.click(screen.getByRole("button", { name: "写真を削除" }));

@@ -678,7 +678,7 @@ export function DraftWorkspace({
                           }}
                         />
                       </label>
-                      <div aria-label="証明写真">
+                      <div aria-label="証明写真" hidden={document !== "履歴書"}>
                         {project.assets.length > 0 && (
                           <label>
                             保存済み写真
