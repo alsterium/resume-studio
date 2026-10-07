@@ -1,6 +1,6 @@
 # PRD：履歴書・職務経歴書生成エンジン
 
-- 状態：初稿／実装前
+- 状態：MVP実装済み、T28の最終受け入れ進行予定（最新状態はJSONL台帳）
 - 作成日：2026-10-05
 - プロダクト名：Resume Studio（仮称）
 - 対応範囲：macOS先行、ローカル専用デスクトップアプリ
@@ -99,13 +99,13 @@ MVPではPDFの文字を直接クリックして編集する機能、任意の�
 
 | 項目 | 初期案 | 決めるタイミング |
 | --- | --- | --- |
-| 正式名称・bundle identifier | Resume Studio、identifierは未定 | M0 |
+| 正式名称・bundle identifier | Resume Studio、com.alsterium.resume-studioを設定済み。改名手順はT26 | M0 |
 | パッケージ管理 | pnpm、バージョンとlockfileを固定 | M0 |
-| 対応macOS最低版・CPU | 開発環境で検証後に決定。Apple Silicon先行 | M0 |
+| 対応macOS最低版・CPU | 設定は12.0、26.5.2／Apple Siliconで先行検証。最低OSとIntelは未検証 | M0 |
 | エディタ・PDFビューア | TiptapのOSS機能、PDF.js | M1のWebView検証 |
 | 日本語TeX | LuaLaTeX＋LuaTeX-ja、latexmk、Harano Ajiフォント | M1 |
 | 本文リンク書式・追加見出し・改ページ指定 | MVPの本文書式には含めない。案件の専用URL欄はMVP対象 | M2前 |
-| ライセンス | 公開前にアプリ／テンプレートのライセンスを決める | M6 |
+| ライセンス | 現在は非公開・未付与。[方針](LICENSE_POLICY.md)に従い公開前に選定する | M6 |
 
 ## 9. 参考資料
 

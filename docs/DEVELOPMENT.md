@@ -1,5 +1,7 @@
 # 開発の進め方
 
+現在の利用・セットアップは[README](../README.md)と[SETUP](SETUP.md)、実装構成は[ARCHITECTURE](ARCHITECTURE.md)、テスト／CIは[TESTING](TESTING.md)と[CI](CI.md)を参照する。以下のT番号付き記録は各段階の実装・検証経緯を含む。タスクの最新状態はJSONL台帳を正本とする。リポジトリ再利用は[REPOSITORY_TEMPLATE](REPOSITORY_TEMPLATE.md)、書類テンプレート開発は[TEMPLATE_DEVELOPMENT](TEMPLATE_DEVELOPMENT.md)、ライセンスは[LICENSE_POLICY](LICENSE_POLICY.md)。
+
 ## タスク台帳
 
 [tasks/tasks.jsonl](../tasks/tasks.jsonl) を進捗の正本とする。1行1タスクのJSONオブジェクトで、最新状態だけを保存する。履歴はGit差分で確認する。T01〜T28は既存ロードマップから移した実装タスクで、初期状態はすべて未着手。
@@ -85,7 +87,7 @@ T01の検証ではフロントビルド、Cargoチェック、開発起動と実
 | `pnpm rust:format:check` / `pnpm rust:format` | rustfmtによる書式確認／適用 |
 | `pnpm rust:check` | Cargoの全target型チェック（locked） |
 | `pnpm rust:lint` | Clippy、全target、警告も失敗（locked） |
-| `pnpm test:tasks` | JSONL・ダッシュボード・localhost HTTPの6テスト |
+| `pnpm test:tasks` | JSONL・ダッシュボード・localhost HTTPと改名ツールの結合テスト |
 | `pnpm test:integration` | Vitest＋Testing Library、UIとTauri adapterの結合テスト |
 | `pnpm test:unit` | Vitest、日付・年齢等の重要な純粋ロジック |
 | `pnpm rust:test` | cargo test、実設定ファイルの結合テスト |

@@ -1,105 +1,50 @@
-# テスト・GitHub Actions方針
+# テスト方針と実行
 
-## 1. 基本方針
+結合テストを中心に、保存は実FS、プロセス停止は実子プロセス、成功するPDF生成は実TeXで確認する。Unitはエスケープ、本文変換、日付・年齢、revision、エラー解釈など重要なロジックに使う。UIのIPC mockと実WebViewの検証は分けて報告する。
 
-外部との境界を実際に通るIntegrationテストを中心にする。保存・読込では一時ディレクトリの本物のファイル、PDF生成では実TeXを使う。Unitテストは変換・検証・状態遷移など、誤りの影響が大きいロジックを狙う。
+## ゲート
 
-ブラウザ内でIPCをmockしたテストと、実Tauri／実TeXのテストは分けて報告する。前者だけでデスクトップアプリ全体を検証したとは扱わない。
+リポジトリルートから実行する。
 
-## 2. レイヤーと主要ケース
+| コマンド | 境界と内容 |
+| --- | --- |
+| `pnpm check` | Oxlint/Oxfmt、TS、Rust fmt/check/Clippy、以下のNode・UI・Unit・Rustテスト |
+| `pnpm test:tasks` | Node.js。JSONL、ダッシュボード検索／再読込／HTTP、実メタデータを使う改名ツール |
+| `pnpm test:integration` | Vitest＋Testing Library＋実Tiptap。Tauri mockIPCで入力／復元／保存／生成／エラー／出力を検証 |
+| `pnpm test:unit` | Vitest。日付・年齢、保存revision、PDFWorker所有権、エラー解釈 |
+| `pnpm rust:test` | Cargo。実FSのJSON／写真／bundle／出力、失敗注入・原本復元、Schema、ジョブ、実プロセス |
+| `pnpm test:tex` | real-tex featureのreal_tex target。実TeXがなければ失敗し、skipしない |
+| `pnpm build:e2e` → `pnpm test:e2e` | desktop-e2e featureの.appと実macOS WebView／IPC／FS／TeX／PDF.js |
+| `pnpm tauri build --debug` | テストfeatureを指定しない通常.app |
 
-| レイヤー | ツール案 | 必須ケース |
-| --- | --- | --- |
-| UI結合 | Vitest＋Testing Library | フォーム・エディタ・編集状態・IPC adapter連携、テンプレート選択、JSON復元、診断表示 |
-| Rust結合 | cargo test、一時FS | JSON往復、写真展開、保存失敗、版不整合、生成bundle、既存ファイル維持 |
-| 実TeX結合 | cargo testの専用target、latexmk/LuaLaTeX | 日本語、特殊文字、空欄、太字・斜体・リスト、両テンプレート、複数ページ、写真 |
-| デスクトップE2E | WebdriverIO＋Tauri embedded WebDriver | 入力→保存→終了→再起動→読込→実PDF生成→出力、本文書式・写真の維持 |
-| Unit | Rust／Vitest | TeX escape、AST visitor、日付・書類日付時点の年齢（閏年・誕生日境界）、URL検証・変換、容量検証、migration、revision・ジョブ状態遷移 |
-| 手動受け入れ | 実macOS | IME、native dialog、bundleのTeX検出、紙面品質、オフライン |
+Rust個別targetは`src-tauri/tests`の実ファイル名を使う。たとえば`cargo test --manifest-path src-tauri/Cargo.toml --locked --test documents`。feature付きClippyは`cargo clippy --manifest-path src-tauri/Cargo.toml --locked --all-targets --features desktop-e2e,real-tex -- -D warnings`。同じtargetディレクトリのCargo処理は直列実行する。
 
-UI結合テストでは安定したadapterを差し替え、コンポーネント内部やDOM構造の細部をmockしない。保存成功・失敗など利用者の観測できる結果を確認する。
+## 主な異常系
 
-## 3. 重要な異常系
+壊れたJSON、未知Schema／属性／本文node／mark、日付・期間・参照、容量・深さ、画像実体とMIME、非対応テンプレート版を検証する。保存・出力では書込失敗、置換失敗、復元失敗、symlink／読取専用、未知資源、部分成功を確認する。
 
-- 壊れたJSON、未知のschemaVersion、未知の本文node/mark、未対応template版。
-- 写真の不正base64、実体とMIMEの不一致、容量上限超過。
-- 保存先書込失敗、置換失敗、一時書込後の中断。失敗注入はstorage境界で行い、実FSの往復も別に確認する。
-- TeX未検出、パッケージ／フォント不足、コンパイル失敗、60秒超過、キャンセル。
-- 生成中に編集、生成後に再編集、古いjobの遅延完了、両書類の片方のみ失敗。
-- スペース・日本語を含むパス、TeX特殊文字を含む入力、巨大な標準出力、子プロセス停止。
+生成ではTeX未検出、依存不足、コンパイル失敗、タイムアウト、待機／実行中キャンセル、大量ログ、子・孫プロセス停止、通常親終了後の残存プロセスを検証する。UIでは生成・保存中の編集、古いジョブ結果、成功PDF維持、新規／開く／終了確認、IME合成イベントと保存キーの競合を確認する。
 
-TeX未検出などの確定的な異常系はテスト用実行adapterを使えるが、成功フローと中断処理は実プロセスでも検証する。
+確定的な環境異常にはテスト用実行プログラムを使う。その成功は実TeX成功として扱わない。実TeXゲートとネイティブE2Eを別に通す。
 
-## 4. PDF検証
+## PDFと紙面
 
-PDFのバイナリsnapshotは使わない。生成日時・内部ID・TeX版で差が出るため、検証対象を分ける。
+PDFバイナリsnapshotは使わない。テンプレート版と同一入力に対するTeXゴールデンで安定性を確認し、PDFは全文、順序、A4寸法、ページ数、リンクannotation、写真の物理位置と縦横比、欠字・Overfull警告を検証する。
 
-1. TeX：正規化した期待ファイルとの比較で変換の退行を検出する。
-2. PDF：ページ数・A4寸法・日本語の期待文字列・終端の目印を確認する。ページ数は代表fixtureだけ固定し、長文は内容維持と妥当な範囲を確認する。
-3. ログ：Missing character、エラー、固定fixtureでの重大なOverfull警告を失敗にする。許容例外は理由と範囲を明記する。
-4. 紙面：固定TeX環境でPDFを画像化し、テンプレート変更時に目視する。通常・長文・写真なしを対象にする。[参考テンプレート仕様](TEMPLATE_REFERENCE.md)の罫線帳票、スキル表、会社帯、案件階層を確認する。長い住所・学校名・URL、継続表、会社／案件見出しの孤立も検証する。基準画像は架空データから作り、原本の本文や写真を使わない。
+空／通常の両書類、続紙、長いスキル／会社／案件／URL、各固定項目最大長、本文64KiB（日本語／区切りなし英数字）、mark境界、各写真形状を実コンパイルする。最大件数と最大本文長の全組合せを成功保証するものではなく、全体容量と60秒制限を別に適用する。
 
-テスト専用のPDF抽出／画像化ツールはCIへ導入する。利用者のPCにはアプリ実行に必要なTeX環境だけを要求する。
+紙面変更時は架空fixtureのPDFを画像化し、各ページと一覧画像を目視する。Node.jsからmacOSのSwift/PDFKitで描画する。Pythonは使用しない。[TeX契約のQA手順](GENERATED_TEX.md#t20の検証マトリクスと目視qa)に従い、本人データやQA生成物をGitへ追加しない。
 
-## 5. CIジョブ
+## ネイティブE2Eの境界
 
-`.github/workflows/ci.yml`にfrontend-quality、rust-quality、required-checksを実装。前者はLinuxでTS品質ゲート・台帳ツールの最小結合テスト・Vite build、後者はmacOSでRust品質ゲート・cargo testを実行する。全依存ジョブがsuccessのときだけrequired-checksを成功にする。Actionsは公式リリースのcommit SHA、Node/pnpm/Rustはリポジトリの固定版を使用する。workflow構文はactionlint 1.7.12で検証する。
+`tools/desktop-e2e.mjs`のNode.jsが同梱.appを最小PATHで起動し、WebdriverIO standaloneからembedded W3C serverへ接続する。実写真取り込み、JSON保存／移動／終了／再起動／復元、両書類と下書きのPDF描画・文字抽出、診断、キャンセル、両PDF／TeX書き出し、独立コンパイル、未保存終了と保存を確認する。
 
-GitHubの非公開リポジトリ`alsterium/resume-studio`でホストCIを確認済み。T03は完了し、書式付きエディタを追加したコミット19e80d7でもfrontend-quality・rust-quality・required-checksがすべて成功した（[実行結果](https://github.com/alsterium/resume-studio/actions/runs/37341177300)）。下表の実TeX・デスクトップジョブはT09・T25で拡充する。
+OS pickerと上書き選択はテストfeatureのadapterで置き換える。日付・年月・倍率の一部はDOMの値変更イベントを使用する。driverのkeyboard actionsもDOM KeyboardEventであり、物理キーや日本語IMEを代替しない。アプリの生成・保存・プロセス・PDF描画は代替しない。[ADR 0004](adr/0004-desktop-e2e.md)に詳細を記載している。
 
-| ジョブ | runner | チェック内容 |
-| --- | --- | --- |
-| frontend-quality | Linux | 固定pnpm＋frozen lockfile、Oxlint、Oxfmt、tsc、UI結合・重要Unit、Vite build |
-| rust-quality | macOS | 固定Rust、cargo fmt、cargo check、Clippy、TeX不要の結合・Unit |
-| tex-integration | Linux | 固定したTeX環境、日本語パッケージ・フォント、実TeXの専用結合テスト、PDF抽出・ログ確認 |
-| desktop-e2e | macOS | 本物のTeX環境、テスト用Tauriビルド、embedded WebDriver、実IPC・実FS・実PDFフロー |
-| desktop-build | macOS | production設定のTauri bundle生成、資源同梱、テスト用プラグイン除外 |
+日本語IMEの基本入力はT08でユーザー確認済み。最終受け入れT28ではネイティブダイアログ、物理保存キー／IME／Undo、オフライン、10ページ相当の編集を別証跡として確認する。未確認のケースを自動E2Eの成功だけで完了扱いにしない。
 
-macOS先行でも、純粋なフロント処理とTeXテンプレートはLinux CIで検証する。Linuxのアプリ対応を意味しない。
+## CI
 
-起動条件は`pull_request`、既定ブランチへの`push`、`workflow_dispatch`。PRで必要なCIは署名鍵や外部サービスのsecretなしで動かす。通常CIのpermissionsは`contents: read`。Releaseの作成や公開は別workflowとする。
+[CI workflow](../.github/workflows/ci.yml)はfrontend-quality（Ubuntu）、rust-quality（macOS）、desktop-e2e（macOS）、required-checksで構成する。実TeX、通常bundleもdesktop-e2eに含む。required-checksは3品質ジョブの全成功を要求し、失敗・キャンセル・skipを拒否する。現行ゲート、固定版、導入・再現方法は[CI](CI.md)を参照する。
 
-キャッシュはpnpm storeとCargoをlockfile・toolchain・OSで分ける。TeX環境は固定版または固定イメージdigestを使い、macOSの環境も版情報を記録する。Actions参照はレビューしたcommit SHAへ固定する。
-
-失敗時だけ架空データのコンパイルログ・PDF・スクリーンショットを短い保持期間でartifactにする。全テストジョブを集約する必須statusを用意し、依存ジョブの失敗・キャンセル・未実行を成功扱いにしない。実TeXジョブはTeX未検出を理由にskipしない。
-
-## 6. 開発コマンドの契約
-
-T02でLint・整形・型チェック・フロントビルドをpackage scriptsへ対応付けた。T04で`pnpm test:integration`（Vitest/Testing Library）と`pnpm rust:test`（Cargo）を追加し、`pnpm check`へ組み込んだ。UIは書類切り替えとIPC失敗、Rustの`configuration` targetは実設定ファイルのメタデータと権限を確認する。IPC mockのUIテストで実WebView動作は保証しない。重要ロジックのUnit・実TeX・E2Eと以下の専用Cargo test targetは後続で追加する。
-
-T05の`diagnostics` targetは実ファイル・テスト用実行プログラムを使い、依存不足、日本語／空白パス、一時ディレクトリの後始末、失敗・不正PDFを検証する。processモジュールのUnitテストは実プロセスでタイムアウト時の子プロセス停止と大量ログの上限を確認する。UI結合は依存不足→再確認成功とIPC失敗の回復を確認する。テスト用実行プログラムの成功を実TeX成功と扱わない。latexmk 4.88導入後、最小PATHでの実診断とgui_diagnostics exampleの実macOS WebView→実IPC→日本語PDF→成功表示を別途確認済み（docs/DEVELOPMENT.md）。
-
-```sh
-pnpm lint             # oxlint
-pnpm format:check     # oxfmt --check
-pnpm typecheck        # tsc --noEmit（分割tsconfigなら各対象を確認）
-pnpm test:integration # vitestのUI結合テスト
-pnpm test:unit        # 重要ロジック
-pnpm build            # Vite production build
-pnpm test:e2e         # Tauri＋実TeXのdesktop E2E
-cargo fmt --all --check
-cargo check --locked --all-targets
-cargo clippy --locked --all-targets -- -D warnings
-cargo test --locked --lib --test storage --test generator
-cargo test --locked --test tex_integration
-```
-
-Cargoコマンドは`src-tauri`をcwdとして実行する。専用test target名は基盤構築時に決める。check/clippyはデスクトップの既定featureを対象にし、全featureを無条件に混ぜて本番で不要なテストプラグインを有効にしない。
-
-Oxlintの型情報を使う追加ルールは導入可能だが、Lintの成功をTypeScript型チェックの代わりにしない。OxfmtはRustの整形を担わず、rustfmtを別途実行する。
-
-## 7. E2E上の注意
-
-現行の[Tauri公式WebDriver資料](https://v2.tauri.app/develop/tests/webdriver/)では、WebdriverIO＋`@wdio/tauri-service`のembedded方式でmacOSを含む実機テストが可能。直接`tauri-driver`を使う方式はWindows/Linux向けのため、MVPのmacOS CIはembedded方式でM1に検証する。
-
-テスト用WebDriverプラグインは明示的なtest featureでのみ有効にする。production buildには制御サーバーを含めない。native dialogの自動化が難しいケースではテスト用adapterを使い、dialogを含めた保存・読込は手動受け入れで補完する。E2Eでmockした境界を記録する。
-
-T09ではWebdriverIO standaloneからembedded W3C serverへ直接接続する。CLI/serviceによる自動検出が不要な単一アプリのため、Node.jsが起動・待機・セッション削除・終了を管理する。ブラウザ用mockや`@wdio/tauri-plugin`は導入しない。[ADR 0004](adr/0004-desktop-e2e.md)に境界と制限を記録する。入力→実IPC→実TeX→PDF描画をmacOS CIで実行し、required-checksに含める。保存・再起動・写真は後続実装時に追加する。
-
-M1で成立しない場合は、理由・代替候補をADRに記録する。UI結合＋Rust実TeX結合で進捗は継続できるが、実macOS全フローの受け入れ確認を省略しない。
-
-## 最小生成エンジンの実TeX結合テスト
-
-T06の`generator`は氏名とプレーン本文を検証し、共通エスケープで`content.tex`を生成する。T08では限定本文ASTの検証・変換を加えた。`templates/draft/main.tex`を同梱し、隔離ディレクトリで実コンパイルする。これはM1の縦切り用で、正式プロジェクトモデル・本文ASTの契約確定・提出用テンプレートは後続タスクで追加する。
-
-`pnpm test:tex`は`real-tex` featureを有効にした`real_tex` targetを実行する。実TeX未導入なら失敗し、skipして成功扱いにしない。通常の`pnpm check`とは別の明示的なゲートで、CI必須化はT25。日本語fixtureの生成成功、PDFヘッダ、欠落文字・Overfull警告を検査し、macOSではPDFKitで文字抽出して氏名・本文・全TeX特殊文字の保持を検証する。PDFKit呼出はRustテストからmacOSのSwiftを使う。開発補助サーバー・台帳ツールはNode.jsのまま。
+CIの入力と診断ログには架空データだけを使用する。現行workflowは専用artifactをアップロードしない。紙面QAのPDF／画像は指定したローカル一時ディレクトリへ保存する。署名・公証・公開ReleaseのチェックはMVPには含めない。

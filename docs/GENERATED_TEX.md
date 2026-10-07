@@ -30,7 +30,7 @@ A4・余白18mm、本文10.5ptのゴシック体、ページ番号なし。1ペ�
 
 長大な本文の箱はTeXの寸法上限を超える場合があるため、LuaTeXから高さ・深さを読み、固定高さで分割する。参照は読み取りだけで、分割・箱の所有権はTeXが管理する。[LuaTeX Reference Manualのbox register API](https://tex.org.uk/systems/doc/luatex/luatex.pdf)に従う。
 
-入力はProject JSONの制限に従い、生成後の`content.tex`は64MiB以内（超過はエラー、切り捨てなし）。bundleの書込は呼出側が所有する新規作業ディレクトリで行う。資源名は固定の許可リストに限定し、重複・既存ファイル／symlinkは書込前に拒否、各ファイルはcreate_newで作成する。途中のI/Oエラーでは作業ディレクトリ所有者が片付ける。コンパイル時はTempDirが成功／失敗双方を片付ける。利用者向け保存・上書き確認はT23で実装する。
+入力はProject JSONの制限に従い、生成後の`content.tex`は64MiB以内（超過はエラー、切り捨てなし）。bundleの書込は呼出側が所有する新規作業ディレクトリで行う。資源名は固定の許可リストに限定し、重複・既存ファイル／symlinkは書込前に拒否、各ファイルはcreate_newで作成する。途中のI/Oエラーでは作業ディレクトリ所有者が片付ける。コンパイル時はTempDirが成功／失敗双方を片付ける。利用者向け保存・上書き確認は現在のsnapshotから行い、書類別に結果を返す。保存失敗と復元の対処は[TROUBLESHOOTING](TROUBLESHOOTING.md)を参照。
 
 ## 職務経歴書の流し込み
 
