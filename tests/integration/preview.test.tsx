@@ -405,3 +405,84 @@ test("編集後のPDFを古い内容として示し、再生成の失敗でも�
   expect(screen.getByLabelText("生成されたPDFページ")).toBe(canvas);
   expect(screen.getByRole("button", { name: "PDF更新" })).toBeEnabled();
 });
+
+test("現在の書類・両書類をPDFとTeXで書き出し、部分成功とスキップとキャンセルを表示する", async () => {
+  const user = userEvent.setup();
+  let mode: "saved" | "partial" | "skipped" | "cancelled" | "failed" = "saved";
+  const requests: { kinds: string[]; format: string }[] = [];
+  let complete: ((value: unknown) => void) | undefined;
+  let defer = false;
+  mockIPC((command, rawArgs) => {
+    const args = rawArgs as Record<string, unknown>;
+    if (command === "generate_document")
+      return {
+        resultId: "previous-success",
+        jobId: args.jobId,
+        kind: args.kind,
+        revision: args.revision,
+        projectId: (args.project as typeof fullProject).projectId,
+      };
+    if (command === "read_pdf") return new Uint8Array([37, 80, 68, 70, 45]).buffer;
+    if (command !== "export_documents") throw new Error(command);
+    const kinds = args.kinds as string[];
+    requests.push({ kinds, format: args.format as string });
+    (args.progress as Channel<JobPhase>).onmessage("generating");
+    if (defer)
+      return new Promise((resolve) => {
+        complete = resolve;
+      });
+    if (mode === "cancelled") return null;
+    if (mode === "failed") throw "保存先を確認できませんでした";
+    return kinds.map((kind, index) => ({
+      kind,
+      displayName: `${kind}.${args.format}`,
+      status:
+        mode === "partial" && index === 1 ? "failed" : mode === "skipped" ? "skipped" : "saved",
+      error: mode === "partial" && index === 1 ? "職務経歴書の保存失敗" : null,
+    }));
+  });
+  const { rerender } = render(<DraftWorkspace client={tauriClient} />);
+  await user.click(screen.getByRole("button", { name: "履歴書PDF更新" }));
+  let previousCanvas = await screen.findByLabelText("生成されたPDFページ");
+  await user.click(screen.getByRole("button", { name: "書き出す" }));
+  expect(await screen.findByLabelText("書き出し結果")).toHaveTextContent("保存しました");
+  expect(requests.at(-1)).toEqual({ kinds: ["resume"], format: "pdf" });
+  rerender(<DraftWorkspace client={tauriClient} document="職務経歴書" />);
+  await user.click(screen.getByRole("button", { name: "書き出す" }));
+  expect(requests.at(-1)).toEqual({ kinds: ["career"], format: "pdf" });
+  rerender(<DraftWorkspace client={tauriClient} document="履歴書" />);
+  previousCanvas = await screen.findByLabelText("生成されたPDFページ");
+  await user.selectOptions(screen.getByLabelText("出力対象"), "both");
+  await user.selectOptions(screen.getByLabelText("出力形式"), "tex");
+  mode = "partial";
+  await user.click(screen.getByRole("button", { name: "書き出す" }));
+  expect(await screen.findByLabelText("書き出し結果")).toHaveTextContent(
+    "resume.tex：保存しました",
+  );
+  expect(screen.getByLabelText("書き出し結果")).toHaveTextContent("career.tex：保存に失敗しました");
+  expect(screen.getByLabelText("書き出し結果")).toHaveTextContent("職務経歴書の保存失敗");
+  expect(requests.at(-1)).toEqual({ kinds: ["resume", "career"], format: "tex" });
+  mode = "skipped";
+  await user.click(screen.getByRole("button", { name: "書き出す" }));
+  expect(await screen.findByLabelText("書き出し結果")).toHaveTextContent("スキップしました");
+  mode = "cancelled";
+  await user.click(screen.getByRole("button", { name: "書き出す" }));
+  expect(await screen.findByLabelText("書き出し状態")).toHaveTextContent("キャンセルしました");
+  expect(screen.queryByLabelText("書き出し結果")).not.toBeInTheDocument();
+  mode = "failed";
+  await user.click(screen.getByRole("button", { name: "書き出す" }));
+  expect(await screen.findByRole("alert")).toHaveTextContent("保存先を確認できませんでした");
+  expect(screen.getByLabelText("生成されたPDFページ")).toBe(previousCanvas);
+  defer = true;
+  await user.click(screen.getByRole("button", { name: "書き出す" }));
+  expect(screen.getByRole("button", { name: "書き出す" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "新規" })).toBeDisabled();
+  await user.type(screen.getByLabelText("氏名"), "追加編集");
+  await act(async () => {
+    complete?.([{ kind: "resume", status: "saved", displayName: "履歴書-tex", error: null }]);
+  });
+  expect(await screen.findByLabelText("書き出し状態")).toHaveTextContent(
+    "書き出し中の編集は含まれていません",
+  );
+  expect(screen.getByRole("button", { name: "書き出す" })).toBeEnabled();
+});

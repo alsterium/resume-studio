@@ -6,6 +6,7 @@ fn main() {
             "generate_document",
             "cancel_generation",
             "list_templates",
+            "export_documents",
             "read_pdf",
             "open_project",
             "save_project",

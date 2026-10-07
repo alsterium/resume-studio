@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import type {
   AppClient,
   DocumentKind,
+  ExportResult,
+  OutputFormat,
   JobPhase,
   SavedProject,
 } from "../../infrastructure/app-client";
@@ -60,6 +62,10 @@ export function DraftWorkspace({
   const body = project.career.summary;
   const photo = project.assets.find((asset) => asset.id === project.profile.photoAssetId);
   const [busy, setBusy] = useState(false);
+  const [exportFormat, setExportFormat] = useState<OutputFormat>("pdf");
+  const [exportScope, setExportScope] = useState<"selected" | "both">("selected");
+  const [exportResults, setExportResults] = useState<ExportResult[] | null>(null);
+  const [exportMessage, setExportMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [draftPdf, setDraftPdf] = useState<Preview | null>(null);
   const [documentPdfs, setDocumentPdfs] = useState<Partial<Record<DocumentKind, Preview>>>({});
@@ -117,6 +123,8 @@ export function DraftWorkspace({
         setEditorKey((key) => key + 1);
         setDraftPdf(null);
         setDocumentPdfs({});
+        setExportResults(null);
+        setExportMessage(null);
         setJob(null);
         setFileMessage("JSONを読み込みました。");
       }
@@ -201,6 +209,8 @@ export function DraftWorkspace({
     setFile(null);
     setDraftPdf(null);
     setDocumentPdfs({});
+    setExportResults(null);
+    setExportMessage(null);
     setJob(null);
     setError(null);
     setFileMessage(null);
@@ -345,6 +355,52 @@ export function DraftWorkspace({
       jobRunning.current = false;
       activeJob.current = null;
       setCancelling(false);
+      if (mounted.current) setBusy(false);
+    }
+  }
+
+  async function exportDocuments() {
+    if (jobRunning.current) return;
+    jobRunning.current = true;
+    const snapshot = session;
+    const kinds: DocumentKind[] = exportScope === "both" ? ["resume", "career"] : [selectedKind];
+    const label = exportScope === "both" ? "両書類の書き出し" : `${document}の書き出し`;
+    let receivingProgress = true;
+    setBusy(true);
+    setError(null);
+    setExportResults(null);
+    setExportMessage(null);
+    setJob({ document: label, phase: "queued" });
+    try {
+      const results = await client.exportDocuments(
+        snapshot.project,
+        kinds,
+        exportFormat,
+        (phase) => {
+          if (receivingProgress && mounted.current && phase !== "succeeded")
+            setJob({ document: label, phase });
+        },
+      );
+      receivingProgress = false;
+      if (mounted.current) {
+        setExportResults(results);
+        setExportMessage(
+          results === null
+            ? "書き出しをキャンセルしました。"
+            : currentSession.current.revision !== snapshot.revision
+              ? "書き出し中の編集は含まれていません。必要ならもう一度書き出してください。"
+              : "書き出し結果を確認してください。",
+        );
+        setJob(null);
+      }
+    } catch (failure) {
+      if (mounted.current) {
+        setError(failure instanceof Error ? failure.message : String(failure));
+        setJob({ document: label, phase: "failed" });
+      }
+    } finally {
+      receivingProgress = false;
+      jobRunning.current = false;
       if (mounted.current) setBusy(false);
     }
   }
@@ -554,6 +610,55 @@ export function DraftWorkspace({
         <button type="button" disabled={busy || fileBusy} onClick={() => void updatePdf()}>
           {busy ? "PDF生成中…" : "PDF更新"}
         </button>
+        <fieldset disabled={busy || fileBusy || pending !== null || opening}>
+          <legend>書類を書き出す</legend>
+          <label>
+            出力形式
+            <select
+              value={exportFormat}
+              onChange={(event) => setExportFormat(event.target.value as OutputFormat)}
+            >
+              <option value="pdf">PDF</option>
+              <option value="tex">TeX一式</option>
+            </select>
+          </label>
+          <label>
+            出力対象
+            <select
+              value={exportScope}
+              onChange={(event) => setExportScope(event.target.value as "selected" | "both")}
+            >
+              <option value="selected">表示中の書類</option>
+              <option value="both">履歴書と職務経歴書</option>
+            </select>
+          </label>
+          <p>
+            現在の入力を書き出します。保存先フォルダを選択してください。TeX一式はTeX環境がなくても保存できます。
+          </p>
+          <button type="button" onClick={() => void exportDocuments()}>
+            書き出す
+          </button>
+        </fieldset>
+        {exportMessage && (
+          <output aria-label="書き出し状態" aria-live="polite">
+            {exportMessage}
+          </output>
+        )}
+        {exportResults && (
+          <ul aria-label="書き出し結果">
+            {exportResults.map((result) => (
+              <li key={result.kind}>
+                {result.displayName}：
+                {result.status === "saved"
+                  ? "保存しました"
+                  : result.status === "skipped"
+                    ? "スキップしました"
+                    : "保存に失敗しました"}
+                {result.error && <p>{result.error}</p>}
+              </li>
+            ))}
+          </ul>
+        )}
         {error && !pending && <p role="alert">{error}</p>}
         {busy && activeJob.current && (
           <button type="button" disabled={cancelling} onClick={() => void cancelGeneration()}>

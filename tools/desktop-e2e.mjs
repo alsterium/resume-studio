@@ -24,6 +24,8 @@ const binary = join(appBundle, "Contents/MacOS/resume-studio");
 const runFile = promisify(execFile);
 const projectDirectory = await mkdtemp(join(tmpdir(), "resume-studio-e2e-"));
 let projectPath = join(projectDirectory, "応募 書類.json");
+const exportDirectory = join(projectDirectory, "書き出し");
+await mkdir(exportDirectory);
 const photoPath = join(projectDirectory, "架空 写真.png");
 const fixture = JSON.parse(
   await readFile(new URL("../tests/fixtures/project-full.json", import.meta.url), "utf8"),
@@ -41,6 +43,7 @@ function launch() {
       TAURI_WEBDRIVER_PORT: String(port),
       RESUME_STUDIO_E2E_PROJECT: projectPath,
       RESUME_STUDIO_E2E_PHOTO: photoPath,
+      RESUME_STUDIO_E2E_EXPORT: exportDirectory,
     },
     stdio: ["ignore", "pipe", "pipe"],
   });
@@ -544,6 +547,102 @@ try {
   );
   assert.ok(await browser.$("button=職務経歴書PDF更新").isEnabled());
   assert.equal(await browser.$('[role="alert"]').isExisting(), false);
+  // Export the current snapshot through real Rust commands and storage.
+  // Native picker/overwrite choice alone is substituted in this test build.
+  await browser.execute(() => {
+    const select = Array.from(document.querySelectorAll("label"))
+      .find((label) => label.textContent.startsWith("出力対象"))
+      .querySelector("select");
+    select.value = "both";
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  await browser.$("button=書き出す").click();
+  await browser.waitUntil(
+    async () => {
+      const results = await browser.$('[aria-label="書き出し結果"]');
+      return (
+        (await results.isExisting()) &&
+        (await results.getText()).includes("職務経歴書.pdf：保存しました")
+      );
+    },
+    { timeout: 90000 },
+  );
+  const exportedPdfs = [];
+  for (const name of ["履歴書", "職務経歴書"]) {
+    const bytes = await readFile(join(exportDirectory, `${name}.pdf`));
+    exportedPdfs.push(bytes);
+    const task = getDocument({ data: new Uint8Array(bytes), useWasm: false });
+    try {
+      const pdf = await task.promise;
+      const text = (await (await pdf.getPage(1)).getTextContent()).items
+        .map((item) => item.str ?? "")
+        .join("")
+        .replace(/\s+/gu, "");
+      assert.ok(text.includes("架空山田"), `Exported ${name} lost the current profile`);
+    } finally {
+      await task.destroy();
+    }
+  }
+  await browser.$("button=書き出す").click();
+  await browser.waitUntil(
+    async () =>
+      (await browser.$('[aria-label="書き出し結果"]').getText()).includes(
+        "職務経歴書.pdf：スキップしました",
+      ),
+    { timeout: 10000 },
+  );
+  for (const [index, name] of ["履歴書", "職務経歴書"].entries()) {
+    assert.deepEqual(await readFile(join(exportDirectory, `${name}.pdf`)), exportedPdfs[index]);
+  }
+  await browser.execute(() => {
+    const select = Array.from(document.querySelectorAll("label"))
+      .find((label) => label.textContent.startsWith("出力形式"))
+      .querySelector("select");
+    select.value = "tex";
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  await browser.$("button=書き出す").click();
+  await browser.waitUntil(
+    async () =>
+      (await browser.$('[aria-label="書き出し結果"]').getText()).includes(
+        "職務経歴書-tex：保存しました",
+      ),
+    { timeout: 10000 },
+  );
+  for (const [name, style] of [
+    ["履歴書", "resume.sty"],
+    ["職務経歴書", "career.sty"],
+  ]) {
+    const directory = join(exportDirectory, `${name}-tex`);
+    const main = await readFile(join(directory, "main.tex"), "utf8");
+    assert.ok(main.includes("content"));
+    assert.ok((await readFile(join(directory, "content.tex"), "utf8")).includes("架空 山田"));
+    assert.ok((await readFile(join(directory, style))).length > 0);
+    assert.equal(
+      JSON.parse(await readFile(join(directory, "manifest.json"), "utf8")).engine,
+      "lualatex",
+    );
+    await runFile(
+      "/Library/TeX/texbin/latexmk",
+      [
+        "-norc",
+        "-lualatex",
+        "-no-shell-escape",
+        "-interaction=nonstopmode",
+        "-halt-on-error",
+        "main.tex",
+      ],
+      {
+        cwd: directory,
+        env: { ...process.env, PATH: "/Library/TeX/texbin:/usr/bin:/bin" },
+        timeout: 60000,
+        maxBuffer: 1048576,
+      },
+    );
+    assert.ok(
+      (await readFile(join(directory, "main.pdf"))).subarray(0, 5).equals(Buffer.from("%PDF-")),
+    );
+  }
   await browser.$(".draft-editor input").setValue("架空 終了確認");
   const closeRequest = await browser.executeAsync((done) => {
     window.__TAURI_INTERNALS__

@@ -17,6 +17,7 @@ pub fn run() {
             commands::documents::generate_document,
             commands::documents::cancel_generation,
             commands::documents::list_templates,
+            commands::exports::export_documents,
             commands::read_pdf,
             commands::files::open_project,
             commands::files::save_project,

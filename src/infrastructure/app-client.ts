@@ -43,6 +43,13 @@ export interface GeneratedDocument {
   kind: DocumentKind;
   jobId: string;
 }
+export type OutputFormat = "pdf" | "tex";
+export interface ExportResult {
+  kind: DocumentKind;
+  status: "saved" | "skipped" | "failed";
+  displayName: string;
+  error: string | null;
+}
 export interface TemplateManifest {
   id: string;
   version: string;
@@ -64,6 +71,12 @@ export interface AppClient {
     jobId: string,
   ): Promise<GeneratedDocument>;
   cancelGeneration(jobId: string): Promise<boolean>;
+  exportDocuments(
+    project: Project,
+    kinds: DocumentKind[],
+    format: OutputFormat,
+    onProgress: (phase: JobPhase) => void,
+  ): Promise<ExportResult[] | null>;
   importPhoto(): Promise<ImportedPhoto | null>;
   onCloseRequested(handler: () => void): Promise<() => void>;
   requestClose(): Promise<void>;
@@ -101,6 +114,12 @@ export const tauriClient: AppClient = {
     });
   },
   cancelGeneration: (jobId) => invoke("cancel_generation", { jobId }),
+  exportDocuments: (project, kinds, format, onProgress) => {
+    const validated = validateProject(project);
+    const progress = new Channel<JobPhase>();
+    progress.onmessage = onProgress;
+    return invoke("export_documents", { project: validated, kinds, format, progress });
+  },
   importPhoto: () => invoke("import_photo"),
   onCloseRequested: (handler) => listen("resume-studio:request-close", handler),
   requestClose: () => invoke("request_app_close", { quit: true }),
