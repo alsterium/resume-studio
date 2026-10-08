@@ -140,9 +140,18 @@ async function presentTestApp() {
     app.pid && app.exitCode === null && app.signalCode === null,
     "Owned test app is not running",
   );
-  // Activation changes native window visibility; no RAF/renderer stubs are used.
-  // The exact bundle is the one whose child process this harness already owns.
-  await runFile("/usr/bin/open", ["-a", appBundle], { timeout: 5000 });
+  // Activate the owned process directly; Launch Services can select another
+  // instance with the same bundle identifier. No RAF/renderer stubs are used.
+  await runFile(
+    "/usr/bin/osascript",
+    [
+      "-l",
+      "JavaScript",
+      "-e",
+      `ObjC.import("AppKit"); const owned = $.NSRunningApplication.runningApplicationWithProcessIdentifier(${app.pid}); owned.unhide; owned.activateWithOptions($.NSApplicationActivateIgnoringOtherApps | $.NSApplicationActivateAllWindows);`,
+    ],
+    { timeout: 5000 },
+  );
   await browser.waitUntil(
     async () => await browser.execute(() => document.visibilityState === "visible"),
     { timeout: 10000, interval: 200, timeoutMsg: "Owned test WebView remained hidden" },
@@ -247,6 +256,87 @@ async function captureLayout(id) {
   await delay(350); // Wait for Radix transitions and the native compositor.
   await browser.saveScreenshot(join(directory, `${id}.png`));
 }
+
+async function verifyAutoPdf() {
+  const waitForPdf = async (label) => {
+    await presentTestApp();
+    let lastState;
+    await browser
+      .waitUntil(
+        async () => {
+          const state = await browser.execute(
+            (title) => ({
+              job: document.querySelector('[aria-label="生成状態"]')?.textContent,
+              failure: document.querySelector('[role="alert"]')?.textContent,
+              visibility: document.visibilityState,
+              stale: document.querySelector(".stale-notice")?.textContent,
+              canvas: document.querySelector("canvas")?.dataset.renderedPage,
+              name: document.querySelector(".draft-editor input")?.value,
+              title: document.querySelector("#document-title")?.textContent,
+              ready:
+                document.querySelector('[aria-label="生成状態"]')?.textContent ===
+                  `${title}：生成完了` &&
+                !document.querySelector(".stale-notice") &&
+                document.querySelector("canvas")?.dataset.renderedPage === "1",
+            }),
+            label,
+          );
+          lastState = state;
+          if (state.failure) throw new Error(JSON.stringify(state));
+          if (state.visibility === "hidden") await presentTestApp();
+          return state.ready;
+        },
+        { timeout: 90000, timeoutMsg: `Automatic ${label} PDF did not finish` },
+      )
+      .catch((failure) => {
+        throw new Error(`${failure.message}: ${JSON.stringify(lastState)}`);
+      });
+  };
+  await selectDocument("履歴書");
+  await browser.$('[aria-label="設定"]').click();
+  const checkbox = await browser.$(".auto-pdf-option input");
+  assert.equal(await checkbox.isSelected(), false);
+  await checkbox.click();
+  await browser.$("button=ダイアログを閉じる").click();
+  await browser.$('[role="dialog"]').waitForExist({ reverse: true, timeout: 5000 });
+  await waitForPdf("履歴書");
+  assert.equal(await browser.execute(() => localStorage.getItem("resume-studio.auto-pdf")), "true");
+  await selectDocument("職務経歴書");
+  await waitForPdf("職務経歴書");
+  await browser.$(".draft-editor input").setValue("架空 自動更新");
+  await browser.$(".stale-notice").waitForExist({ timeout: 1000 });
+  await waitForPdf("職務経歴書");
+  // Reopen the existing JSON through the actual UI; auto-generation uses the loaded snapshot.
+  await browser.$("button=開く").click();
+  await browser.$("button=保存せず続行").click();
+  await browser.waitUntil(
+    async () => (await browser.$(".draft-editor input").getValue()) === "架空 山田",
+    { timeout: 30000 },
+  );
+  await waitForPdf("職務経歴書");
+  await selectDocument("履歴書");
+  await waitForPdf("履歴書");
+  await browser.$('[aria-label="設定"]').click();
+  assert.equal(await browser.$(".auto-pdf-option input").isSelected(), true);
+  await browser.$(".auto-pdf-option input").click();
+  await browser.$("button=ダイアログを閉じる").click();
+  await browser.$('[role="dialog"]').waitForExist({ reverse: true, timeout: 5000 });
+  assert.equal(
+    await browser.execute(() => localStorage.getItem("resume-studio.auto-pdf")),
+    "false",
+  );
+  await browser.execute(() => {
+    document.querySelector("canvas").dataset.autoOffProof = "retained";
+  });
+  await browser.$(".draft-editor input").setValue("架空 自動OFF");
+  await delay(2500);
+  assert.equal(
+    await browser.execute(() => document.querySelector("canvas")?.dataset.autoOffProof),
+    "retained",
+  );
+  assert.ok(await browser.$(".stale-notice").isExisting());
+  console.log("AUTO_PDF: PASS (opt-in, both initial previews, idle editing, reopen, preference)");
+}
 async function captureDocumentSections(title) {
   if (!process.env.RESUME_STUDIO_UI_QA_DIR) return;
   await selectDocument(title);
@@ -292,6 +382,14 @@ async function expandEditorSections() {
 }
 async function selectDocument(title) {
   await browser.$("button=" + title).click();
+  await browser.waitUntil(
+    async () => {
+      if ((await browser.$("#document-title").getText()) === title) return true;
+      await browser.$("button=" + title).click();
+      return false;
+    },
+    { timeout: 5000, interval: 200, timeoutMsg: `Document tab did not select ${title}` },
+  );
   await expandEditorSections();
 }
 async function projectAction(title) {
@@ -311,6 +409,13 @@ async function projectAction(title) {
 try {
   browser = await connect();
   await presentTestApp();
+  // Keep the manual-flow scenario deterministic when rerunning after an interrupted auto test.
+  await browser.$('[aria-label="設定"]').click();
+  const autoOption = await browser.$(".auto-pdf-option input");
+  if (await autoOption.isSelected()) await autoOption.click();
+  await browser.$("button=ダイアログを閉じる").click();
+  await browser.$('[role="dialog"]').waitForExist({ reverse: true, timeout: 5000 });
+  await browser.$('[aria-label="履歴書PDF更新"]').waitForEnabled({ timeout: 90000 });
   await browser.$(".draft-editor input").waitForExist({ timeout: 30000 });
   await browser.execute(() => {
     // PDF.js must also work when the host WebKit lacks this newer Map API.
@@ -828,6 +933,7 @@ try {
   );
   assert.equal(await browser.$('[role="alert"]').isExisting(), false);
   await browser.$("button=ダイアログを閉じる").click();
+  await browser.$('[role="dialog"]').waitForExist({ reverse: true, timeout: 5000 });
   await browser.$("button=書き出し").click();
   await captureLayout("export");
   // Export the current snapshot through real Rust commands and storage.
@@ -927,6 +1033,8 @@ try {
     );
   }
   await browser.$("button=ダイアログを閉じる").click();
+  await browser.$('[role="dialog"]').waitForExist({ reverse: true, timeout: 5000 });
+  await verifyAutoPdf();
   await browser.$(".draft-editor input").setValue("架空 終了確認");
   const closeRequest = await browser.executeAsync((done) => {
     window.__TAURI_INTERNALS__

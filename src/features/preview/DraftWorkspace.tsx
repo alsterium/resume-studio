@@ -55,6 +55,7 @@ import { DiscardDialog } from "../files/DiscardDialog";
 import { HistoryEditor, ProfileEditor, ResumeEditor } from "../resume/ResumeEditor";
 import { CareerEditor } from "../career/CareerEditor";
 import { TemplatePicker } from "./TemplatePicker";
+import { readAutoPdfPreference, writeAutoPdfPreference, useAutoPdf } from "./useAutoPdf";
 
 type PendingAction = "new" | "open" | "close";
 type Preview = {
@@ -108,6 +109,9 @@ export function DraftWorkspace({
   }, []);
   const [exportOpen, setExportOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [autoPdf, setAutoPdf] = useState(readAutoPdfPreference);
+  const [preferenceMessage, setPreferenceMessage] = useState<string | null>(null);
+  const [composing, setComposing] = useState(false);
   const exportTrigger = useRef<HTMLButtonElement>(null);
   const settingsTrigger = useRef<HTMLButtonElement>(null);
   const [session, setSession] = useState(() => beginSession(newProject()));
@@ -146,6 +150,15 @@ export function DraftWorkspace({
   const mounted = useRef(true);
   const selectedKind = document === "履歴書" ? "resume" : "career";
   const pdf = documentPdfs[selectedKind] ?? draftPdf;
+  const markPdfAttempt = useAutoPdf({
+    enabled: autoPdf,
+    blocked: busy || fileBusy || opening || pending !== null,
+    composing,
+    kind: selectedKind,
+    projectKey: `${project.projectId}:${editorKey}`,
+    revision: session.revision,
+    generate: updateDocument,
+  });
 
   useEffect(() => {
     mounted.current = true;
@@ -180,17 +193,19 @@ export function DraftWorkspace({
   }, [client]);
 
   useEffect(() => {
-    let composing = false;
+    let compositionActive = false;
     const startComposition = () => {
-      composing = true;
+      compositionActive = true;
+      setComposing(true);
     };
     const endComposition = () => {
-      composing = false;
+      compositionActive = false;
+      setComposing(false);
     };
     const keydown = (event: KeyboardEvent) => {
       if (
         event.defaultPrevented ||
-        composing ||
+        compositionActive ||
         event.isComposing ||
         event.keyCode === 229 ||
         event.altKey ||
@@ -390,6 +405,7 @@ export function DraftWorkspace({
 
   async function updateDocument() {
     if (jobRunning.current) return;
+    markPdfAttempt();
     jobRunning.current = true;
     const snapshot = session;
     const kind = selectedKind;
@@ -518,6 +534,7 @@ export function DraftWorkspace({
     setJob((current) => (current ? { ...current, phase: "cancelling" } : current));
     try {
       await client.cancelGeneration(jobId);
+      markPdfAttempt();
     } catch (failure) {
       if (mounted.current && activeJob.current === jobId) {
         cancellationRequested.current = false;
@@ -864,9 +881,9 @@ export function DraftWorkspace({
                 <FileText aria-hidden="true" />
                 <h3>書類の仕上がりを確認</h3>
                 <p>
-                  左の項目を編集し、「PDF更新」で
-                  <br />
-                  プレビューを表示します。
+                  {autoPdf
+                    ? "入力が止まると、自動でプレビューを更新します。"
+                    : "左の項目を編集し、「PDF更新」でプレビューを表示します。"}
                 </p>
               </div>
             </div>
@@ -937,8 +954,29 @@ export function DraftWorkspace({
         >
           <DialogHeader>
             <DialogTitle>設定</DialogTitle>
-            <DialogDescription>PDFを生成するための環境を確認できます。</DialogDescription>
+            <DialogDescription>PDFの自動更新と生成環境を設定できます。</DialogDescription>
           </DialogHeader>
+          <label className="auto-pdf-option">
+            <input
+              type="checkbox"
+              checked={autoPdf}
+              onChange={(event) => {
+                const enabled = event.target.checked;
+                setAutoPdf(enabled);
+                setPreferenceMessage(
+                  writeAutoPdfPreference(enabled)
+                    ? null
+                    : "設定を保存できませんでした。この起動中だけ適用します。",
+                );
+              }}
+            />
+            PDFを自動生成する
+          </label>
+          <p className="field-hint">
+            読み込み後・各書類の初回表示時と、入力が2秒止まった時に表示中の書類を更新します。
+            JSONの保存は手動です。
+          </p>
+          {preferenceMessage && <output>{preferenceMessage}</output>}
           <TexDiagnosticsPanel client={client} />
           <output>{versionLabel}</output>
         </DialogContent>

@@ -58,3 +58,9 @@ jsdomはレイアウトを計算しないため、ResizeObserverとPointerEvent�
 `pnpm build:e2e`後の`pnpm test:e2e`は実macOS WKWebViewで書類タブ・項目・メニュー・モーダルを操作し、実TeX生成、PDF.js描画、生成中の編集、停止、診断、JSONとPDF/TeXの保存、終了確認を検証する。`RESUME_STUDIO_UI_QA_DIR=/private/tmp/resume-ui-qa pnpm test:e2e`で架空入力の画面スクリーンショットを保存できる。成果物は目視QA用でリポジトリへ同梱しない。日付／selectの操作は既存ADRのnative setter adapterを使い、本番IPCとレンダラは置換しない。
 
 T38の検証結果: `pnpm check`で116件（Node 9 / UI結合36 / UI単体12 / Rust 59）とdoc-testが成功。実WebView E2Eはデスクトップの境界寸法、キーボードでの幅変更、680pxでの上下配置、PDF幅合わせも検証する。埋め込みWebDriverのクリックはMouseEventのため、PointerEventで開くRadixメニューは実際のArrowDownキー経路を使う。Dialogの存在とフォーカス、ネイティブ描画の完了を待って確認する。検証用ビルドと通常の`pnpm tauri build --debug`も成功した。
+
+## 自動PDF生成（T41）
+
+`auto-pdf.test.tsx`はTauri mockIPC・描画コンポーネントの代替・仮想時間で既定OFF、設定保持、読込/再読込、両書類初回表示、連続入力のdebounce、IME待機、生成中の編集の後続反映、OFF、失敗/キャンセルの再試行抑止、停止要求失敗後の追従、手動更新を確認する。実WebViewの`AUTO_PDF`は設定ON、両書類の初回生成、入力停止後の実TeX/PDF描画、JSON再読込での生成、OFF設定を確認する。物理IMEは既存の手動受け入れ境界と同じ。
+
+実WebViewの操作はダイアログ閉鎖完了と書類タブの実際の切替を待つ。前面化はAppKitで検証が所有するPIDを直接指定し、描画・RAFは置換しない。

@@ -42,7 +42,7 @@ TSとRustが共通Schema／fixtureで構造を検証し、日付・期間・ID�
 
 編集revisionと保存済みrevisionを分け、保存開始後の追加編集を未保存として維持する。生成結果にはprojectId／revision／kind／jobIdを付け、別プロジェクトや古いジョブの結果を採用しない。各書類の最後の成功PDFを維持し、編集後は更新前と表示する。新規・開くでは生成結果をクリアする。
 
-本文の書式はTiptapで即時表示する。厳密な紙面はPDF.js legacyの同梱workerで描画する。外部CDNを使用しない。共有PDFWorkerはruntimeが所有し、書類切替ではtransportだけを後始末する。フォーム／配列操作の全体Undo、PDF直接編集、自動保存、自動生成はMVP対象外。
+本文の書式はTiptapで即時表示する。厳密な紙面はPDF.js legacyの同梱workerで描画する。外部CDNを使用しない。共有PDFWorkerはruntimeが所有し、書類切替ではtransportだけを後始末する。フォーム／配列操作の全体Undo、PDF直接編集、自動保存はMVP対象外。自動PDF生成（T41）は既定OFFのアプリ設定としてlocalStorageへ保存し、Project JSONには含めない。読込/書類初回表示は即時、編集後は2秒のdebounceとIME待機で表示中の書類を生成する。projectId＋セッション世代＋書類種別＋revisionで生成試行を記録し、同じ内容の失敗/停止を再試行しない。既存の生成経路を直列で使い、生成中の追加編集は終了後に最新snapshotで再生成する。OFFは待機だけを解除し、実行中ジョブは既存の停止操作で終了する。
 
 ## テンプレートとコンパイル
 

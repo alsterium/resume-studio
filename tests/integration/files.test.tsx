@@ -1,5 +1,5 @@
 import { openSummary, projectMenu } from "../ui-navigation";
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { mockIPC } from "@tauri-apps/api/mocks";
 import { expect, test } from "vitest";
@@ -143,7 +143,7 @@ test("保存キーが最新の入力を保存し、IME・連続キー・確認�
     project: { profile: { name: "架空 保存名 追記" } },
   });
   await screen.findByText("JSONを保存しました。");
-  expect(screen.getByLabelText("保存状態")).toHaveTextContent("保存済み");
+  await waitFor(() => expect(screen.getByLabelText("保存状態")).toHaveTextContent("保存済み"));
   await user.click(screen.getByLabelText("本文"));
   await user.keyboard("{Control>}s{/Control}");
   expect(saves).toHaveLength(3);

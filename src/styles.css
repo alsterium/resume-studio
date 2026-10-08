@@ -544,6 +544,15 @@ select {
   font-weight: 600;
   margin-bottom: 12px;
 }
+.auto-pdf-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+}
+.auto-pdf-option input {
+  accent-color: #18181b;
+}
 .settings-dialog details {
   border: 1px solid #e4e4e7;
   border-radius: 6px;
