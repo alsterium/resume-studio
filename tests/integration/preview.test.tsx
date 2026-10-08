@@ -583,3 +583,91 @@ test("見開きは2ページを描画し、奇数の最終ページから戻り�
     expect(screen.getByLabelText("生成されたPDFページ")).toHaveAttribute("data-rendered-page", "2"),
   );
 });
+
+test("手動・自動の再生成と書類切替でも書類ごとの見開き・倍率設定を保持する", async () => {
+  const user = userEvent.setup();
+  mockIPC((command, rawArgs) => {
+    const args = rawArgs as Record<string, unknown>;
+    if (command === "generate_document")
+      return {
+        resultId: args.jobId,
+        jobId: args.jobId,
+        projectId: (args.project as typeof fullProject).projectId,
+        kind: args.kind,
+        revision: args.revision,
+      };
+    if (command === "read_pdf") return new Uint8Array([2]).buffer;
+    throw new Error(command);
+  });
+  const view = render(<DraftWorkspace client={tauriClient} />);
+  const rendered = async () => {
+    await waitFor(() =>
+      expect(screen.getByLabelText("生成されたPDFページ")).toHaveAttribute(
+        "data-rendered-page",
+        "1",
+      ),
+    );
+  };
+  const regenerated = async (previous: HTMLElement) => {
+    await waitFor(() => expect(screen.getByLabelText("生成されたPDFページ")).not.toBe(previous), {
+      timeout: 5000,
+    });
+    await rendered();
+  };
+  try {
+    await user.click(screen.getByRole("button", { name: "履歴書PDF更新" }));
+    await rendered();
+    expect(screen.getByRole("button", { name: "見開き" })).toHaveAttribute("aria-pressed", "true");
+    await user.click(screen.getByRole("button", { name: "見開き" }));
+    await user.selectOptions(screen.getByLabelText("表示倍率"), "1.5");
+    let previous = screen.getByLabelText("生成されたPDFページ");
+    await user.click(screen.getByRole("button", { name: "履歴書PDF更新" }));
+    await regenerated(previous);
+    expect(screen.getByRole("button", { name: "見開き" })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.queryByLabelText("生成されたPDFページ 2")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("表示倍率")).toHaveValue("1.5");
+    expect(screen.getByLabelText("生成されたPDFページ")).toHaveAttribute("width", "900");
+    await user.click(screen.getByRole("tab", { name: "職務経歴書" }));
+    await user.click(screen.getByRole("button", { name: "職務経歴書PDF更新" }));
+    await rendered();
+    expect(screen.getByRole("button", { name: "見開き" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByLabelText("表示倍率")).toHaveValue("fit");
+    await user.selectOptions(screen.getByLabelText("表示倍率"), "0.75");
+    await user.click(screen.getByRole("button", { name: "見開き" }));
+    await user.click(screen.getByRole("tab", { name: "履歴書" }));
+    await rendered();
+    expect(screen.getByRole("button", { name: "見開き" })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByLabelText("表示倍率")).toHaveValue("1.5");
+    previous = screen.getByLabelText("生成されたPDFページ");
+    await user.click(screen.getByRole("button", { name: "設定" }));
+    await user.click(screen.getByRole("checkbox", { name: "PDFを自動生成する" }));
+    await user.keyboard("{Escape}");
+    await regenerated(previous);
+    previous = screen.getByLabelText("生成されたPDFページ");
+    await user.type(screen.getByLabelText("氏名"), "架空の自動再生成");
+    await regenerated(previous);
+    expect(screen.getByLabelText("表示倍率")).toHaveValue("1.5");
+    expect(screen.getByLabelText("生成されたPDFページ")).toHaveAttribute("width", "900");
+    expect(screen.getByRole("button", { name: "見開き" })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.queryByLabelText("生成されたPDFページ 2")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "見開き" }));
+    previous = screen.getByLabelText("生成されたPDFページ");
+    await user.click(screen.getByRole("button", { name: "履歴書PDF更新" }));
+    await regenerated(previous);
+    expect(screen.getByRole("button", { name: "見開き" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByLabelText("生成されたPDFページ 2")).toBeInTheDocument();
+    await user.selectOptions(screen.getByLabelText("表示倍率"), "fit");
+    previous = screen.getByLabelText("生成されたPDFページ");
+    await user.click(screen.getByRole("button", { name: "履歴書PDF更新" }));
+    await regenerated(previous);
+    expect(screen.getByLabelText("表示倍率")).toHaveValue("fit");
+    await user.click(screen.getByRole("tab", { name: "職務経歴書" }));
+    await rendered();
+    expect(screen.getByRole("button", { name: "見開き" })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByLabelText("表示倍率")).toHaveValue("0.75");
+    expect(screen.getByLabelText("生成されたPDFページ")).toHaveAttribute("width", "450");
+  } finally {
+    view.unmount();
+    localStorage.removeItem("resume-studio.auto-pdf");
+  }
+});

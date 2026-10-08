@@ -7,19 +7,30 @@ export function PdfPreview({
   bytes,
   standardPages,
   fitToWidth = false,
+  spread: controlledSpread,
+  onSpreadChange,
+  zoom: controlledZoom,
+  onZoomChange,
 }: {
   bytes: Uint8Array;
   standardPages?: number;
   fitToWidth?: boolean;
+  spread?: boolean;
+  onSpreadChange?: (spread: boolean) => void;
+  zoom?: "fit" | number;
+  onZoomChange?: (zoom: "fit" | number) => void;
 }) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const secondCanvas = useRef<HTMLCanvasElement>(null);
   const paper = useRef<HTMLDivElement>(null);
-  const [spread, setSpread] = useState(fitToWidth);
-  const [fit, setFit] = useState(fitToWidth);
+  const [localSpread, setLocalSpread] = useState(fitToWidth);
+  const spread = controlledSpread ?? localSpread;
+  const [localFit, setFit] = useState(fitToWidth);
+  const fit = controlledZoom === undefined ? localFit : controlledZoom === "fit";
   const [document, setDocument] = useState<PDFDocumentProxy | null>(null);
   const [page, setPage] = useState(1);
-  const [scale, setScale] = useState(1);
+  const [localScale, setScale] = useState(1);
+  const scale = typeof controlledZoom === "number" ? controlledZoom : localScale;
   const [rendered, setRendered] = useState<{ page: number; scale: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -143,6 +154,7 @@ export function PdfPreview({
             onChange={(event) => {
               setFit(event.target.value === "fit");
               if (event.target.value !== "fit") setScale(Number(event.target.value));
+              onZoomChange?.(event.target.value === "fit" ? "fit" : Number(event.target.value));
             }}
           >
             <option value="fit">画面に合わせる</option>
@@ -158,7 +170,10 @@ export function PdfPreview({
           size="sm"
           aria-pressed={spread}
           disabled={!document}
-          onClick={() => setSpread(!spread)}
+          onClick={() => {
+            setLocalSpread(!spread);
+            onSpreadChange?.(!spread);
+          }}
         >
           {spread ? <Columns2 aria-hidden="true" /> : <FileText aria-hidden="true" />}見開き
         </Button>

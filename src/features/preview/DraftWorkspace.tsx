@@ -138,6 +138,14 @@ export function DraftWorkspace({
   const [error, setError] = useState<string | null>(null);
   const [draftPdf, setDraftPdf] = useState<Preview | null>(null);
   const [documentPdfs, setDocumentPdfs] = useState<Partial<Record<DocumentKind, Preview>>>({});
+  const [spreadByDocument, setSpreadByDocument] = useState<Record<DocumentKind, boolean>>({
+    resume: true,
+    career: true,
+  });
+  const [zoomByDocument, setZoomByDocument] = useState<Record<DocumentKind, "fit" | number>>({
+    resume: "fit",
+    career: "fit",
+  });
   const [job, setJob] = useState<{
     document: string;
     phase: JobPhase | "reading" | "cancelling";
@@ -871,6 +879,14 @@ export function DraftWorkspace({
           {pdf ? (
             <PdfPreview
               fitToWidth
+              spread={spreadByDocument[selectedKind]}
+              onSpreadChange={(spread) =>
+                setSpreadByDocument((current) => ({ ...current, [selectedKind]: spread }))
+              }
+              zoom={zoomByDocument[selectedKind]}
+              onZoomChange={(zoom) =>
+                setZoomByDocument((current) => ({ ...current, [selectedKind]: zoom }))
+              }
               key={pdf.id}
               bytes={pdf.bytes}
               standardPages={pdf.document === "履歴書" ? 2 : undefined}
