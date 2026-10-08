@@ -161,6 +161,7 @@ async function verifyWorkspaceLayout() {
       };
     });
   const before = await dimensions();
+  await verifyScrollBoundaries();
   assert.ok(Math.abs(before.editor.width - 410) < 3, JSON.stringify(before));
   assert.ok(
     before.preview.width >= 360 && before.overflow <= before.viewport,
@@ -183,6 +184,7 @@ async function verifyWorkspaceLayout() {
     { timeout: 5000 },
   );
   await captureLayout("compact");
+  await verifyScrollBoundaries(true);
   await browser.setWindowSize(rect.width, rect.height);
   await browser.waitUntil(async () => (await dimensions()).preview.width >= 360, { timeout: 5000 });
   await browser.waitUntil(
@@ -195,7 +197,47 @@ async function verifyWorkspaceLayout() {
       }),
     { timeout: 5000, timeoutMsg: "Fit preview overflowed its panel" },
   );
-  console.log("UI_LAYOUT: PASS (desktop bounds, keyboard resizing, compact stacking, PDF fit)");
+  console.log(
+    "UI_LAYOUT: PASS (desktop bounds, keyboard resizing, compact stacking, PDF fit, fixed root and internal scrolling)",
+  );
+}
+
+async function verifyScrollBoundaries(requireOverflow = false) {
+  const state = await browser.execute(() => {
+    window.scrollTo(100, 100);
+    const root = document.scrollingElement;
+    return {
+      root: {
+        top: root.scrollTop,
+        left: root.scrollLeft,
+        height: root.scrollHeight,
+        viewportHeight: innerHeight,
+        overscroll: getComputedStyle(document.documentElement).overscrollBehavior,
+      },
+      panels: [".inspector-scroll", ".pdf-paper"].map((selector) => {
+        const element = document.querySelector(selector);
+        const previous = element.scrollTop;
+        element.scrollTop = 40;
+        const result = {
+          selector,
+          top: element.scrollTop,
+          overflow: element.scrollHeight > element.clientHeight,
+          overscroll: getComputedStyle(element).overscrollBehavior,
+        };
+        element.scrollTop = previous;
+        return result;
+      }),
+    };
+  });
+  assert.equal(state.root.top, 0, JSON.stringify(state));
+  assert.equal(state.root.left, 0, JSON.stringify(state));
+  assert.ok(state.root.height <= state.root.viewportHeight, JSON.stringify(state));
+  assert.equal(state.root.overscroll, "none", JSON.stringify(state));
+  for (const panel of state.panels) {
+    assert.equal(panel.overscroll, "none", JSON.stringify(state));
+    if (requireOverflow) assert.ok(panel.overflow, JSON.stringify(state));
+    if (panel.overflow) assert.ok(panel.top > 0, JSON.stringify(state));
+  }
 }
 
 async function captureLayout(id) {
