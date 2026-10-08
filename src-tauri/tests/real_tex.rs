@@ -1082,3 +1082,47 @@ fn independent_career_qualification_dates_render_in_pdf() {
     );
     save_layout_qa("independent-career-qualification", &bundle, &artifact.bytes);
 }
+
+#[test]
+#[cfg(target_os = "macos")]
+fn dynamic_today_dates_and_age_render_in_both_pdfs() {
+    use chrono::Datelike;
+    use resume_studio_lib::{
+        domain::{dates::age_on_date, project::DocumentDateMode, validation::parse_project},
+        generator::{documents::generate_project, templates::DocumentKind},
+    };
+    let mut project =
+        parse_project(include_bytes!("../../tests/fixtures/project-full.json")).unwrap();
+    project.templates.resume.version = "1.2.0".into();
+    project.templates.career.version = "1.1.0".into();
+    project.document_date = "1999-12-31".into();
+    project.document_date_mode = Some(DocumentDateMode::Today);
+    let now = chrono::Local::now();
+    let today = now.format("%Y-%m-%d").to_string();
+    let expected = format!("{}年{}月{}日", now.year(), now.month(), now.day());
+    for kind in [DocumentKind::Resume, DocumentKind::Career] {
+        let bundle = generate_project(&project, kind).unwrap();
+        let artifact = compile(&TexRuntime::discover(), &bundle).unwrap();
+        let compact = extracted_pdf_text(&artifact.bytes)
+            .split_whitespace()
+            .collect::<String>();
+        assert!(compact.contains(&expected), "{compact}");
+        assert!(!compact.contains("1999年12月31日"), "{compact}");
+        if kind == DocumentKind::Resume {
+            assert!(
+                compact.contains(&format!(
+                    "満{}歳",
+                    age_on_date(&project.profile.birth_date, &today).unwrap()
+                )),
+                "{compact}"
+            );
+        }
+        assert!(
+            !artifact.log.contains("Missing character:"),
+            "{}",
+            artifact.log
+        );
+        save_layout_qa(&format!("dynamic-today-{kind:?}"), &bundle, &artifact.bytes);
+    }
+    assert_eq!(project.document_date, "1999-12-31");
+}

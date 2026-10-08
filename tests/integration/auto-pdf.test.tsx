@@ -4,6 +4,7 @@ import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { DraftWorkspace } from "../../src/features/preview/DraftWorkspace";
 import { tauriClient, type GeneratedDocument } from "../../src/infrastructure/app-client";
 import { AUTO_PDF_STORAGE_KEY } from "../../src/features/preview/useAutoPdf";
+import type { Project } from "../../src/domain/project";
 import fullProject from "../fixtures/project-full.json";
 
 // Scheduling tests cover the IPC snapshot/read boundary; native E2E renders the PDF.
@@ -192,4 +193,25 @@ test("失敗・キャンセルで無限再試行せず、手動更新と次の�
   fireEvent.change(screen.getByLabelText("氏名"), { target: { value: "新しい編集" } });
   await tick(2000);
   expect(requests).toHaveLength(6);
+});
+
+test("今日モードは日跨ぎで表示日付と自動PDFを更新し、指定日モードでは再生成しない", async () => {
+  vi.setSystemTime(new Date(2027, 0, 1, 23, 59, 59));
+  localStorage.setItem(AUTO_PDF_STORAGE_KEY, "true");
+  render(<DraftWorkspace client={tauriClient} />);
+  await tick();
+  fireEvent.change(screen.getByLabelText("書類日付の設定"), { target: { value: "today" } });
+  await tick(2000);
+  expect(screen.getByLabelText("書類日付")).toHaveValue("2027-01-02");
+  const count = requests.length;
+  await tick(24 * 60 * 60 * 1000);
+  expect(screen.getByLabelText("書類日付")).toHaveValue("2027-01-03");
+  await tick(2000);
+  expect(requests.length).toBeGreaterThan(count);
+  expect((requests.at(-1)!.project as Project).documentDateMode).toBe("today");
+  fireEvent.change(screen.getByLabelText("書類日付の設定"), { target: { value: "fixed" } });
+  await tick(2000);
+  const fixedCount = requests.length;
+  await tick(24 * 60 * 60 * 1000 + 2000);
+  expect(requests).toHaveLength(fixedCount);
 });

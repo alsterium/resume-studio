@@ -29,6 +29,7 @@ export function useAutoPdf({
   projectKey,
   revision,
   generate,
+  dateKey = "",
 }: {
   enabled: boolean;
   blocked: boolean;
@@ -37,10 +38,11 @@ export function useAutoPdf({
   projectKey: string;
   revision: number;
   generate: () => Promise<void>;
+  dateKey?: string;
 }) {
   const attempts = useRef(new Map<DocumentKind, string>());
   const callback = useRef(generate);
-  const token = `${projectKey}:${revision}`;
+  const token = `${projectKey}:${revision}:${dateKey}`;
   useEffect(() => {
     callback.current = generate;
   });

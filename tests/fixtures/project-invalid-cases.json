@@ -234,5 +234,10 @@
     "name": "職務経歴書資格の配列型",
     "path": ["career", "qualifications"],
     "value": null
+  },
+  {
+    "name": "未知の書類日付モード",
+    "path": ["documentDateMode"],
+    "value": "automatic"
   }
 ]

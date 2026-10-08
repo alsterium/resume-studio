@@ -8,11 +8,20 @@ pub struct Project {
     pub project_id: String,
     pub title: String,
     pub document_date: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub document_date_mode: Option<DocumentDateMode>,
     pub profile: Profile,
     pub resume: Resume,
     pub career: Career,
     pub templates: Templates,
     pub assets: Vec<Asset>,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum DocumentDateMode {
+    Fixed,
+    Today,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -143,4 +152,14 @@ pub struct Asset {
     pub id: String,
     pub media_type: String,
     pub base64: String,
+}
+
+impl Project {
+    pub fn effective_document_date(&self, today: &str) -> String {
+        if self.document_date_mode == Some(DocumentDateMode::Today) {
+            today.to_owned()
+        } else {
+            self.document_date.clone()
+        }
+    }
 }

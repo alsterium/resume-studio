@@ -1,8 +1,8 @@
 import { expandSections } from "../ui-navigation";
-import { render, screen, fireEvent, within } from "@testing-library/react";
+import { render, screen, fireEvent, within, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { mockIPC } from "@tauri-apps/api/mocks";
-import { expect, test } from "vitest";
+import { expect, test, vi } from "vitest";
 import { DraftWorkspace } from "../../src/features/preview/DraftWorkspace";
 import { tauriClient } from "../../src/infrastructure/app-client";
 import { validateProject } from "../../src/domain/validate-project";
@@ -149,4 +149,53 @@ test("上限200行で追加を止め、先頭・末尾の移動を無効にす�
   expect(screen.getByRole("button", { name: "学歴 200 下へ" })).toBeDisabled();
   await user.click(screen.getByRole("button", { name: "学歴 200 削除" }));
   expect(screen.getByRole("button", { name: "学歴を追加" })).toBeEnabled();
+});
+
+test("今日の日付設定を保存復元し、日付変更時の表示と年齢を更新して指定日へ戻せる", async () => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date(2027, 0, 1, 12));
+  let saved: Project | undefined;
+  mockIPC((command, raw) => {
+    if (command === "open_project")
+      return { project: saved, fileId: "date", displayName: "日付.json" };
+    if (command === "save_project") {
+      saved = structuredClone(validateProject((raw as { project: unknown }).project));
+      return { fileId: "date", displayName: "日付.json" };
+    }
+    throw new Error(command);
+  });
+  const user = userEvent.setup();
+  const view = render(<DraftWorkspace client={tauriClient} />);
+  try {
+    fireEvent.change(screen.getByLabelText("書類日付"), { target: { value: "2020-04-01" } });
+    fireEvent.change(screen.getByLabelText("生年月日"), { target: { value: "2000-01-02" } });
+    await user.selectOptions(screen.getByLabelText("書類日付の設定"), "today");
+    expect(screen.getByLabelText("書類日付")).toBeDisabled();
+    expect(screen.getByLabelText("書類日付")).toHaveValue("2027-01-01");
+    expect(screen.getByLabelText("満年齢")).toHaveTextContent("満26歳");
+    await user.click(screen.getByRole("button", { name: "保存" }));
+    expect(saved?.documentDateMode).toBe("today");
+    expect(saved?.documentDate).toBe("2020-04-01");
+    vi.setSystemTime(new Date(2027, 0, 2, 12));
+    fireEvent(window, new Event("focus"));
+    await waitFor(() => expect(screen.getByLabelText("書類日付")).toHaveValue("2027-01-02"));
+    expect(screen.getByLabelText("満年齢")).toHaveTextContent("満27歳");
+    expect(screen.getByLabelText("保存状態")).toHaveTextContent("保存済み");
+    await user.click(screen.getByRole("button", { name: "開く" }));
+    expect(screen.getByLabelText("書類日付の設定")).toHaveValue("today");
+    expect(screen.getByLabelText("書類日付")).toHaveValue("2027-01-02");
+    await user.click(screen.getByRole("tab", { name: "職務経歴書" }));
+    expect(screen.getByLabelText("書類日付の設定")).toHaveValue("today");
+    await user.selectOptions(screen.getByLabelText("書類日付の設定"), "fixed");
+    expect(screen.getByLabelText("書類日付")).toBeEnabled();
+    expect(screen.getByLabelText("書類日付")).toHaveValue("2020-04-01");
+    fireEvent.change(screen.getByLabelText("書類日付"), { target: { value: "" } });
+    await user.selectOptions(screen.getByLabelText("書類日付の設定"), "today");
+    await user.click(screen.getByRole("button", { name: "保存" }));
+    expect(saved?.documentDateMode).toBe("today");
+    expect(saved?.documentDate).toBe("2027-01-02");
+  } finally {
+    view.unmount();
+    vi.useRealTimers();
+  }
 });

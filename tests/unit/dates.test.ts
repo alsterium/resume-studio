@@ -13,3 +13,18 @@ test("年齢は書類日付時点の誕生日境界で求め、不正・未来�
   for (const row of cases.ages)
     expect(ageOnDate(row.birthDate, row.documentDate), JSON.stringify(row)).toBe(row.expected);
 });
+
+test("今日モードだけローカル日付を解決し、指定日と元のデータを保持する", async () => {
+  const { localDate, effectiveDocumentDate } = await import("../../src/domain/dates");
+  const now = new Date(2027, 0, 1, 0, 5);
+  expect(localDate(now)).toBe("2027-01-01");
+  const fixed = { documentDate: "2020-04-01" };
+  expect(effectiveDocumentDate(fixed, "2027-01-01")).toBe("2020-04-01");
+  expect(effectiveDocumentDate({ ...fixed, documentDateMode: "fixed" }, "2027-01-01")).toBe(
+    "2020-04-01",
+  );
+  const dynamic = { ...fixed, documentDateMode: "today" as const };
+  expect(effectiveDocumentDate(dynamic, "2027-01-01")).toBe("2027-01-01");
+  expect(effectiveDocumentDate(dynamic, "2027-01-02")).toBe("2027-01-02");
+  expect(dynamic.documentDate).toBe("2020-04-01");
+});

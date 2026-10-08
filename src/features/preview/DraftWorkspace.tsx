@@ -56,6 +56,7 @@ import { HistoryEditor, ProfileEditor, ResumeEditor } from "../resume/ResumeEdit
 import { CareerEditor } from "../career/CareerEditor";
 import { TemplatePicker } from "./TemplatePicker";
 import { readAutoPdfPreference, writeAutoPdfPreference, useAutoPdf } from "./useAutoPdf";
+import { useLocalDate } from "../../components/useLocalDate";
 
 type PendingAction = "new" | "open" | "close";
 type Preview = {
@@ -116,6 +117,7 @@ export function DraftWorkspace({
   const settingsTrigger = useRef<HTMLButtonElement>(null);
   const [session, setSession] = useState(() => beginSession(newProject()));
   const project = session.project;
+  const today = useLocalDate();
   const dirty = hasUnsavedChanges(session);
   const currentSession = useRef(session);
   const closeHandler = useRef<() => void>(() => {});
@@ -169,6 +171,7 @@ export function DraftWorkspace({
     kind: selectedKind,
     projectKey: `${project.projectId}:${editorKey}`,
     revision: session.revision,
+    dateKey: project.documentDateMode === "today" ? today : "",
     generate: updateDocument,
   });
 

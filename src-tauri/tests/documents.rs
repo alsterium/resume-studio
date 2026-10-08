@@ -303,3 +303,32 @@ fn career_uses_independent_qualifications_and_formats_acquisition_months() {
         assert!(!resume.contains("職務経歴書専用資格"));
     }
 }
+
+#[test]
+fn today_mode_resolves_the_local_date_and_age_for_both_documents() {
+    use resume_studio_lib::domain::{dates::age_on_date, project::DocumentDateMode};
+    let mut project =
+        parse_project(include_bytes!("../../tests/fixtures/project-full.json")).unwrap();
+    project.document_date_mode = Some(DocumentDateMode::Today);
+    project.document_date = "2000-01-01".into();
+    let now = chrono::Local::now();
+    let today = now.format("%Y-%m-%d").to_string();
+    use chrono::Datelike;
+    let date = format!("{}年{}月{}日", now.year(), now.month(), now.day());
+    for kind in [DocumentKind::Resume, DocumentKind::Career] {
+        let content = generate_project(&project, kind)
+            .unwrap()
+            .content_tex
+            .replace("\\allowbreak{}", "")
+            .replace("%\n", "");
+        assert!(content.contains(&date), "{content}");
+        assert!(!content.contains("2000年1月1日"));
+        if kind == DocumentKind::Resume {
+            assert!(content.contains(&format!(
+                "満{}歳",
+                age_on_date(&project.profile.birth_date, &today).unwrap()
+            )));
+        }
+    }
+    assert_eq!(project.document_date, "2000-01-01");
+}

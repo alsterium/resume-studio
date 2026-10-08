@@ -137,3 +137,23 @@ fn legacy_qualifications_are_copied_once_with_unique_ids_and_empty_is_explicit()
         assert!(parse_project(&serde_json::to_vec(&value).unwrap()).is_err());
     }
 }
+
+#[test]
+fn document_date_modes_roundtrip_and_resolve_without_overwriting_the_fixed_date() {
+    let mut value = full();
+    for mode in ["fixed", "today"] {
+        value["documentDateMode"] = mode.into();
+        let project = parse_project(&serde_json::to_vec(&value).unwrap()).unwrap();
+        let restored = parse_project(&encode_project(&project).unwrap()).unwrap();
+        assert_eq!(
+            restored.effective_document_date("2027-01-01"),
+            if mode == "today" {
+                "2027-01-01"
+            } else {
+                "2026-10-06"
+            }
+        );
+        assert_eq!(restored.document_date, "2026-10-06");
+        assert_eq!(restored.document_date_mode, project.document_date_mode);
+    }
+}

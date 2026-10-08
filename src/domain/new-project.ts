@@ -1,4 +1,5 @@
 import type { BodyDoc, Project } from "./project";
+import { localDate } from "./dates";
 
 export function createId(prefix: string): string {
   const id = Array.from(crypto.getRandomValues(new Uint8Array(16)), (value) =>
@@ -8,12 +9,7 @@ export function createId(prefix: string): string {
 }
 
 export function newProject(): Project {
-  const today = new Date();
-  const documentDate = [
-    today.getFullYear(),
-    String(today.getMonth() + 1).padStart(2, "0"),
-    String(today.getDate()).padStart(2, "0"),
-  ].join("-");
+  const documentDate = localDate();
   const body = (): BodyDoc => ({ type: "doc", content: [{ type: "paragraph" }] });
   return {
     schemaVersion: 1,

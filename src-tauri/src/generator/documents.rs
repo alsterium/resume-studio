@@ -340,8 +340,10 @@ pub fn generate_project(project: &Project, kind: DocumentKind) -> Result<Generat
             }
         }
     }
+    let date =
+        project.effective_document_date(&chrono::Local::now().format("%Y-%m-%d").to_string());
     let model = DocumentModel {
-        date: &project.document_date,
+        date: &date,
         profile: &project.profile,
         photo,
         content: match kind {

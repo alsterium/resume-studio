@@ -306,3 +306,7 @@ T43では表示中ページも書類ごとに保持する。新しいPDFを読�
 ## 職務経歴書の独立資格（T44）
 
 資格編集の共通UIは選択書類のqualificationsへ接続する。データはresume/careerで分離し、新規は空欄。旧JSONのcareer.qualifications省略だけをTS/Rustで独立配列へ正規化し、全行IDとの衝突を避ける。generatorはcareer.qualificationsだけを職務経歴書へ出力し、年月を「N年M月 取得」へ整形する。未入力は取得表記も省略する。
+
+## 動的な書類日付（T45）
+
+基本情報の書類日付設定で指定日/今日を選ぶ。省略時は指定日で、documentDateModeだけを追加保存し元のdocumentDateは切替時に保持する。UIはローカル日付を日跨ぎと復帰時に再評価して満年齢へ反映する。Rust generatorはPDF生成/書き出し時にchrono::Localから当日を解決し、両書類の日付と履歴書の年齢に同じ値を使う。日跨ぎは編集revisionを変更せず、今日モードだけ自動PDFの試行キーに当日を含めて追従する。

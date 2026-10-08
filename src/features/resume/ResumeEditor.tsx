@@ -4,7 +4,8 @@ import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { ArrowUp, ArrowDown, Trash2, Plus } from "lucide-react";
 import type { BodyDoc, Contact, HistoryRow, Project } from "../../domain/project";
-import { ageOnDate, isYearMonth } from "../../domain/dates";
+import { ageOnDate, isYearMonth, effectiveDocumentDate, parseDate } from "../../domain/dates";
+import { useLocalDate } from "../../components/useLocalDate";
 import { createId } from "../../domain/new-project";
 import { BodyEditor } from "../../editor/BodyEditor";
 
@@ -241,7 +242,9 @@ export function ProfileEditor({
   children?: ReactNode;
 }) {
   const profile = project.profile;
-  const age = ageOnDate(profile.birthDate, project.documentDate);
+  const today = useLocalDate();
+  const date = effectiveDocumentDate(project, today);
+  const age = ageOnDate(profile.birthDate, date);
   return (
     <fieldset disabled={disabled}>
       <legend className="sr-only">基本情報</legend>
@@ -255,15 +258,38 @@ export function ProfileEditor({
         />
       </label>
       <label>
+        書類日付の設定
+        <select
+          value={project.documentDateMode ?? "fixed"}
+          onChange={(event) =>
+            onChange({
+              ...project,
+              documentDateMode: event.target.value as "fixed" | "today",
+              documentDate:
+                event.target.value === "today" && !parseDate(project.documentDate)
+                  ? today
+                  : project.documentDate,
+            })
+          }
+        >
+          <option value="fixed">日付を指定する</option>
+          <option value="today">今日の日付を使う</option>
+        </select>
+      </label>
+      <label>
         書類日付
         <Input
           type="date"
           min="0001-01-01"
           max="9999-12-31"
-          value={project.documentDate}
+          disabled={project.documentDateMode === "today"}
+          value={date}
           onChange={(event) => onChange({ ...project, documentDate: event.target.value })}
         />
       </label>
+      {project.documentDateMode === "today" && (
+        <p className="field-hint">PDF生成・書き出し時の今日の日付を使います。</p>
+      )}
       <label>
         氏名ふりがな
         <Input

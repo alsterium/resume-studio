@@ -81,3 +81,5 @@ latexmk -norc -lualatex -interaction=nonstopmode -halt-on-error -latexoption=-no
 ```
 
 職務経歴書は`resume`を`career`へ変えて別の新規ディレクトリを指定する。Rust結合テストは正式全項目・書式・版拒否・写真資源・実FS保存を検証し、`pnpm test:tex`は空／全項目の両書類をアプリと同じ隔離コンパイルと展開後の単体コンパイルで確認する。実macOS E2Eは保存・再起動後の両書類を画面操作から生成し、実PDFの文字とPDF.js描画を確認する。
+
+T45のtodayモードは生成・書き出し時の端末ローカル日付を解決し、履歴書・職務経歴書の書類日付に使う。履歴書の満年齢も同じ日付で計算する。fixed/省略は保存された指定日を使う。

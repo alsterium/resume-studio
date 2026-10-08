@@ -20,3 +20,18 @@ export function ageOnDate(birthDate: string, documentDate: string): number | nul
   const birthdayReached = asOf[1] > birth[1] || (asOf[1] === birth[1] && asOf[2] >= birth[2]);
   return asOf[0] - birth[0] - Number(!birthdayReached);
 }
+
+export function localDate(now = new Date()): string {
+  return [
+    now.getFullYear(),
+    String(now.getMonth() + 1).padStart(2, "0"),
+    String(now.getDate()).padStart(2, "0"),
+  ].join("-");
+}
+
+export function effectiveDocumentDate(
+  project: { documentDate: string; documentDateMode?: "fixed" | "today" },
+  today = localDate(),
+): string {
+  return project.documentDateMode === "today" ? today : project.documentDate;
+}

@@ -59,6 +59,12 @@
       },
       "maxItems": 4,
       "minItems": 0
+    },
+    "documentDateMode": {
+      "enum": [
+        "fixed",
+        "today"
+      ]
     }
   },
   "definitions": {

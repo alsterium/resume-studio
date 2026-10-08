@@ -70,6 +70,7 @@ export interface Project {
   projectId: string;
   title: string;
   documentDate: string;
+  documentDateMode?: "fixed" | "today";
   profile: Profile;
   resume: {
     education: HistoryRow[];
