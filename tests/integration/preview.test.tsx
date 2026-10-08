@@ -317,6 +317,7 @@ vi.mock("../../src/infrastructure/pdf-runtime", () => ({
         numPages: bytes[0] === 2 ? 2 : 3,
         getPage: async (page: number) => {
           renderer.page(page);
+          if (page < 1 || page > (bytes[0] === 2 ? 2 : 3)) throw new Error("Invalid PDF page");
           return {
             getViewport: ({ scale }: { scale: number }) => ({
               width: 600 * scale,
@@ -666,6 +667,90 @@ test("手動・自動の再生成と書類切替でも書類ごとの見開き�
     expect(screen.getByRole("button", { name: "見開き" })).toHaveAttribute("aria-pressed", "false");
     expect(screen.getByLabelText("表示倍率")).toHaveValue("0.75");
     expect(screen.getByLabelText("生成されたPDFページ")).toHaveAttribute("width", "450");
+  } finally {
+    view.unmount();
+    localStorage.removeItem("resume-studio.auto-pdf");
+  }
+});
+
+test("PDF再生成と書類切替で表示ページを保持し、ページ数減少時は最終ページへ補正する", async () => {
+  const user = userEvent.setup();
+  let pages = 3;
+  mockIPC((command, rawArgs) => {
+    const args = rawArgs as Record<string, unknown>;
+    if (command === "generate_document")
+      return {
+        resultId: args.jobId,
+        jobId: args.jobId,
+        projectId: (args.project as typeof fullProject).projectId,
+        kind: args.kind,
+        revision: args.revision,
+      };
+    if (command === "read_pdf") return new Uint8Array([pages]).buffer;
+    throw new Error(command);
+  });
+  const view = render(<DraftWorkspace client={tauriClient} />);
+  const displayed = async (page: number, count = pages) => {
+    await waitFor(() => {
+      expect(screen.getByLabelText("ページ番号")).toHaveTextContent(`${page} / ${count}`);
+      expect(screen.getByLabelText("生成されたPDFページ")).toHaveAttribute(
+        "data-rendered-page",
+        String(page),
+      );
+    });
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  };
+  const regenerated = async (previous: HTMLElement, page: number) => {
+    await waitFor(() => expect(screen.getByLabelText("生成されたPDFページ")).not.toBe(previous), {
+      timeout: 5000,
+    });
+    await displayed(page);
+  };
+  try {
+    await user.click(screen.getByRole("button", { name: "履歴書PDF更新" }));
+    await displayed(1);
+    await user.click(screen.getByRole("button", { name: "見開き" }));
+    await user.click(screen.getByRole("button", { name: "次のページ" }));
+    await displayed(2);
+    await user.selectOptions(screen.getByLabelText("表示倍率"), "1.5");
+    let previous = screen.getByLabelText("生成されたPDFページ");
+    await user.click(screen.getByRole("button", { name: "履歴書PDF更新" }));
+    await regenerated(previous, 2);
+    expect(screen.getByRole("button", { name: "見開き" })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByLabelText("表示倍率")).toHaveValue("1.5");
+    await user.click(screen.getByRole("tab", { name: "職務経歴書" }));
+    await user.click(screen.getByRole("button", { name: "職務経歴書PDF更新" }));
+    await displayed(1);
+    await user.click(screen.getByRole("button", { name: "次のページ" }));
+    await displayed(3);
+    await user.click(screen.getByRole("tab", { name: "履歴書" }));
+    await displayed(2);
+    previous = screen.getByLabelText("生成されたPDFページ");
+    await user.click(screen.getByRole("button", { name: "設定" }));
+    await user.click(screen.getByRole("checkbox", { name: "PDFを自動生成する" }));
+    await user.keyboard("{Escape}");
+    await regenerated(previous, 2);
+    previous = screen.getByLabelText("生成されたPDFページ");
+    await user.type(screen.getByLabelText("氏名"), "架空のページ保持");
+    await regenerated(previous, 2);
+    await user.click(screen.getByRole("tab", { name: "職務経歴書" }));
+    await displayed(3);
+    // 自動更新がある場合も同じページを表示する。
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "職務経歴書PDF更新" })).toBeEnabled(),
+    );
+    pages = 2;
+    previous = screen.getByLabelText("生成されたPDFページ");
+    await user.click(screen.getByRole("button", { name: "職務経歴書PDF更新" }));
+    await regenerated(previous, 2);
+    await user.click(screen.getByRole("tab", { name: "履歴書" }));
+    await displayed(2, 3);
+    await user.click(screen.getByRole("tab", { name: "職務経歴書" }));
+    await displayed(2);
+    pages = 3;
+    previous = screen.getByLabelText("生成されたPDFページ");
+    await user.click(screen.getByRole("button", { name: "職務経歴書PDF更新" }));
+    await regenerated(previous, 2);
   } finally {
     view.unmount();
     localStorage.removeItem("resume-studio.auto-pdf");

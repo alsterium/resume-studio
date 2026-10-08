@@ -146,6 +146,10 @@ export function DraftWorkspace({
     resume: "fit",
     career: "fit",
   });
+  const [pageByDocument, setPageByDocument] = useState<Record<DocumentKind, number>>({
+    resume: 1,
+    career: 1,
+  });
   const [job, setJob] = useState<{
     document: string;
     phase: JobPhase | "reading" | "cancelling";
@@ -879,6 +883,10 @@ export function DraftWorkspace({
           {pdf ? (
             <PdfPreview
               fitToWidth
+              page={pageByDocument[selectedKind]}
+              onPageChange={(page) =>
+                setPageByDocument((current) => ({ ...current, [selectedKind]: page }))
+              }
               spread={spreadByDocument[selectedKind]}
               onSpreadChange={(spread) =>
                 setSpreadByDocument((current) => ({ ...current, [selectedKind]: spread }))

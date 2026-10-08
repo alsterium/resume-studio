@@ -11,6 +11,8 @@ export function PdfPreview({
   onSpreadChange,
   zoom: controlledZoom,
   onZoomChange,
+  page: controlledPage,
+  onPageChange,
 }: {
   bytes: Uint8Array;
   standardPages?: number;
@@ -19,6 +21,8 @@ export function PdfPreview({
   onSpreadChange?: (spread: boolean) => void;
   zoom?: "fit" | number;
   onZoomChange?: (zoom: "fit" | number) => void;
+  page?: number;
+  onPageChange?: (page: number) => void;
 }) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const secondCanvas = useRef<HTMLCanvasElement>(null);
@@ -28,11 +32,23 @@ export function PdfPreview({
   const [localFit, setFit] = useState(fitToWidth);
   const fit = controlledZoom === undefined ? localFit : controlledZoom === "fit";
   const [document, setDocument] = useState<PDFDocumentProxy | null>(null);
-  const [page, setPage] = useState(1);
+  const [localPage, setLocalPage] = useState(1);
+  const requestedPage = controlledPage ?? localPage;
+  const page = document ? Math.max(1, Math.min(document.numPages, requestedPage)) : requestedPage;
   const [localScale, setScale] = useState(1);
   const scale = typeof controlledZoom === "number" ? controlledZoom : localScale;
   const [rendered, setRendered] = useState<{ page: number; scale: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const pageSelection = useRef({ page: requestedPage, onPageChange });
+
+  useEffect(() => {
+    pageSelection.current = { page: requestedPage, onPageChange };
+  }, [requestedPage, onPageChange]);
+
+  const changePage = (next: number) => {
+    setLocalPage(next);
+    onPageChange?.(next);
+  };
 
   useEffect(() => {
     const container = paper.current;
@@ -67,7 +83,13 @@ export function PdfPreview({
         if (!active) return;
         task = loadPdf(bytes);
         const pdf = await task.promise;
-        if (active) setDocument(pdf);
+        if (active) {
+          const selection = pageSelection.current;
+          const nextPage = Math.max(1, Math.min(pdf.numPages, selection.page));
+          setDocument(pdf);
+          setLocalPage(nextPage);
+          if (nextPage !== selection.page) selection.onPageChange?.(nextPage);
+        }
       })
       .catch((failure: unknown) => {
         if (active) {
@@ -130,7 +152,7 @@ export function PdfPreview({
           aria-label="前のページ"
           type="button"
           disabled={!document || page === 1}
-          onClick={() => setPage(Math.max(1, page - (spread ? 2 : 1)))}
+          onClick={() => changePage(Math.max(1, page - (spread ? 2 : 1)))}
         >
           <ChevronLeft aria-hidden="true" />
         </Button>
@@ -143,7 +165,7 @@ export function PdfPreview({
           aria-label="次のページ"
           type="button"
           disabled={!document || page + (spread ? 1 : 0) >= document.numPages}
-          onClick={() => setPage(Math.min(document?.numPages ?? 1, page + (spread ? 2 : 1)))}
+          onClick={() => changePage(Math.min(document?.numPages ?? 1, page + (spread ? 2 : 1)))}
         >
           <ChevronRight aria-hidden="true" />
         </Button>
