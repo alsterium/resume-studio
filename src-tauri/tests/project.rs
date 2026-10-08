@@ -107,3 +107,33 @@ fn nested_lists_and_total_body_nodes_are_bounded() {
         json!({"type":"doc","content":vec![json!({"type":"paragraph"});10000]});
     assert!(parse_project(&serde_json::to_vec(&value).unwrap()).is_err());
 }
+
+#[test]
+fn legacy_qualifications_are_copied_once_with_unique_ids_and_empty_is_explicit() {
+    let mut value = full();
+    value["career"]
+        .as_object_mut()
+        .unwrap()
+        .remove("qualifications");
+    value["career"]["skills"][0]["id"] = "career-qualification-legacy-1".into();
+    let mut project = parse_project(&serde_json::to_vec(&value).unwrap()).unwrap();
+    assert_eq!(
+        project.career.qualifications[0].id,
+        "career-qualification-legacy-2"
+    );
+    project.career.qualifications[0].text = "独立資格".into();
+    assert_eq!(project.resume.qualifications[0].text, "架空資格");
+    let restored = parse_project(&encode_project(&project).unwrap()).unwrap();
+    assert_eq!(restored.career.qualifications[0].text, "独立資格");
+    project.career.qualifications.clear();
+    assert!(parse_project(&encode_project(&project).unwrap())
+        .unwrap()
+        .career
+        .qualifications
+        .is_empty());
+    for (key, bad) in [("yearMonth", "2024-13"), ("id", "qualification-1")] {
+        let mut value = full();
+        value["career"]["qualifications"][0][key] = bad.into();
+        assert!(parse_project(&serde_json::to_vec(&value).unwrap()).is_err());
+    }
+}

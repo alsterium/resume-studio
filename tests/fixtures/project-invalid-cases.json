@@ -219,5 +219,20 @@
     "name": "必須項目欠落",
     "path": ["career", "positions", 0, "projects", 0, "responsibilities"],
     "remove": true
+  },
+  {
+    "name": "職務経歴書資格の不正年月",
+    "path": ["career", "qualifications", 0, "yearMonth"],
+    "value": "2024-13"
+  },
+  {
+    "name": "両書類資格のID重複",
+    "path": ["career", "qualifications", 0, "id"],
+    "value": "qualification-1"
+  },
+  {
+    "name": "職務経歴書資格の配列型",
+    "path": ["career", "qualifications"],
+    "value": null
   }
 ]

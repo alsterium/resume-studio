@@ -275,3 +275,31 @@ fn reference_revisions_export_both_documents_without_changing_their_content() {
         assert_eq!(manifest["version"], version);
     }
 }
+
+#[test]
+fn career_uses_independent_qualifications_and_formats_acquisition_months() {
+    let mut project =
+        parse_project(include_bytes!("../../tests/fixtures/project-full.json")).unwrap();
+    project.career.qualifications[0].text = "職務経歴書専用資格".into();
+    project.career.qualifications[0].year_month = "2020-04".into();
+    for date in ["2020-04", ""] {
+        project.career.qualifications[0].year_month = date.into();
+        let career = generate_project(&project, DocumentKind::Career)
+            .unwrap()
+            .content_tex
+            .replace("\\allowbreak{}", "")
+            .replace("%\n", "");
+        assert!(career.contains("職務経歴書専用資格"));
+        assert!(!career.contains("架空資格"));
+        assert!(career.contains(if date.is_empty() {
+            "\\CareerSkill{職務経歴書専用資格}{}"
+        } else {
+            "\\CareerSkill{職務経歴書専用資格}{2020年4月 取得}"
+        }));
+        let resume = generate_project(&project, DocumentKind::Resume)
+            .unwrap()
+            .content_tex;
+        assert!(resume.contains("架空資格"));
+        assert!(!resume.contains("職務経歴書専用資格"));
+    }
+}

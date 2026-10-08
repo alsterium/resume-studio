@@ -71,3 +71,28 @@ test("深すぎる本文とリスト、要素数超過、循環入力を拒否�
   cyclic.child = cyclic;
   expect(() => validateProject(cyclic)).toThrow();
 });
+
+test("旧JSONの資格を独立データへ移し、明示的な空欄と書類別の検証を維持する", () => {
+  const copy = structuredClone(full);
+  const career: Omit<typeof copy.career, "qualifications"> & {
+    qualifications?: typeof copy.career.qualifications;
+  } = { ...copy.career };
+  delete career.qualifications;
+  const legacy = { ...copy, career };
+  legacy.career.skills[0].id = "career-qualification-legacy-1";
+  const restored = validateProject(legacy);
+  expect(restored.career.qualifications).toEqual([
+    { ...full.resume.qualifications[0], id: "career-qualification-legacy-2" },
+  ]);
+  expect(legacy.career.qualifications).toBeUndefined();
+  restored.career.qualifications[0].text = "職務経歴書専用";
+  expect(restored.resume.qualifications[0].text).toBe("架空資格");
+  restored.career.qualifications = [];
+  expect(validateProject(restored).career.qualifications).toEqual([]);
+  for (const field of ["yearMonth", "id"] as const) {
+    const invalid = structuredClone(full);
+    invalid.career.qualifications[0][field] =
+      field === "yearMonth" ? "2024-13" : invalid.resume.qualifications[0].id;
+    expect(() => validateProject(invalid)).toThrow();
+  }
+});

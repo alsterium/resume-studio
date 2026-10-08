@@ -21,10 +21,15 @@ pub fn parse_project(bytes: &[u8]) -> Result<Project, String> {
     if bytes.len() > MAX_PROJECT_BYTES {
         return Err("JSONは20MiB以内にしてください。".into());
     }
-    let value: Value = serde_json::from_slice(bytes).map_err(|_| "JSONを読み込めませんでした。")?;
+    let mut value: Value =
+        serde_json::from_slice(bytes).map_err(|_| "JSONを読み込めませんでした。")?;
     let mut stack = vec![(&value, 0)];
+    let mut reserved_ids = HashSet::new();
     let mut count = 0;
     while let Some((value, depth)) = stack.pop() {
+        if let Some(id) = value.get("id").and_then(Value::as_str) {
+            reserved_ids.insert(id.to_owned());
+        }
         count += 1;
         if count > 200000 || depth > 64 {
             return Err("JSONの構造が上限を超えています。".into());
@@ -37,6 +42,21 @@ pub fn parse_project(bytes: &[u8]) -> Result<Project, String> {
     }
     if !SCHEMA.is_valid(&value) {
         return Err("プロジェクトの構造または版に対応していません。".into());
+    }
+    if value["career"].get("qualifications").is_none() {
+        let mut rows = value["resume"]["qualifications"].clone();
+        let mut sequence = 1;
+        for row in rows.as_array_mut().expect("validated rows") {
+            let id = loop {
+                let candidate = format!("career-qualification-legacy-{sequence}");
+                sequence += 1;
+                if reserved_ids.insert(candidate.clone()) {
+                    break candidate;
+                }
+            };
+            row["id"] = id.into();
+        }
+        value["career"]["qualifications"] = rows;
     }
     let project: Project =
         serde_json::from_value(value).map_err(|_| "プロジェクトの型が不正です。")?;
@@ -84,6 +104,7 @@ fn validate_semantics(project: &Project) -> Result<(), String> {
         &project.resume.education,
         &project.resume.employment,
         &project.resume.qualifications,
+        &project.career.qualifications,
     ] {
         for row in rows {
             insert_id(&mut ids, &row.id)?;

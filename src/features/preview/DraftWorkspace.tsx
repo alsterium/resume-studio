@@ -802,13 +802,16 @@ export function DraftWorkspace({
                   <EditorSection value="qualifications" title="免許・資格">
                     <HistoryEditor
                       title="免許・資格"
-                      rows={project.resume.qualifications}
+                      rows={project[selectedKind].qualifications}
                       disabled={editorDisabled}
                       onChange={(qualifications) =>
-                        updateProject({ ...project, resume: { ...project.resume, qualifications } })
+                        updateProject({
+                          ...project,
+                          [selectedKind]: { ...project[selectedKind], qualifications },
+                        })
                       }
                     />
-                    <p className="field-hint">免許・資格は両書類で共用します。</p>
+                    <p className="field-hint">{document}に掲載する免許・資格を入力します。</p>
                   </EditorSection>
                 </Accordion>
               </EditorNavigationContext>

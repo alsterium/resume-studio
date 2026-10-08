@@ -266,7 +266,14 @@
           "type": "paragraph"
         }
       ]
-    }
+    },
+    "qualifications": [
+      {
+        "id": "career-qualification-1",
+        "yearMonth": "2013-10",
+        "text": "架空資格"
+      }
+    ]
   },
   "templates": {
     "resume": {

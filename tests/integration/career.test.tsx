@@ -16,7 +16,7 @@ function savedArgs(args: unknown): Project {
   return structuredClone(validateProject(args.project));
 }
 
-test("会社→案件・スキルの全項目を編集し、並べ替え・共通資格・保存再読込で値と書式を維持する", async () => {
+test("会社→案件・スキルの全項目を編集し、並べ替え・職務経歴書資格・保存再読込で値と書式を維持する", async () => {
   let saved: Project | undefined;
   mockIPC((command, args) => {
     if (command === "plugin:app|version") return "0.1.0";
@@ -96,10 +96,12 @@ test("会社→案件・スキルの全項目を編集し、並べ替え・共�
   await user.click(screen.getByRole("button", { name: "スキル 3 削除" }));
   await user.type(screen.getByLabelText("自己PR"), "自己PR末尾");
   await user.click(screen.getByRole("button", { name: "免許・資格を追加" }));
-  await user.type(screen.getByLabelText("免許・資格 1 内容"), "共通資格");
+  await user.type(screen.getByLabelText("免許・資格 1 内容"), "職務経歴書資格");
   await user.click(screen.getByRole("tab", { name: "履歴書" }));
   await expandSections(user);
-  expect(screen.getByLabelText("免許・資格 1 内容")).toHaveValue("共通資格");
+  expect(screen.queryByLabelText("免許・資格 1 内容")).not.toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "免許・資格を追加" }));
+  await user.type(screen.getByLabelText("免許・資格 1 内容"), "履歴書資格");
   await user.click(screen.getByRole("tab", { name: "職務経歴書" }));
   await expandSections(user);
   await user.click(screen.getByRole("button", { name: "保存" }));
@@ -134,7 +136,8 @@ test("会社→案件・スキルの全項目を編集し、並べ替え・共�
     ["スキル1", "説明1"],
     ["スキル2", "説明2"],
   ]);
-  expect(saved?.resume.qualifications[0].text).toBe("共通資格");
+  expect(saved?.resume.qualifications[0].text).toBe("履歴書資格");
+  expect(saved?.career.qualifications[0].text).toBe("職務経歴書資格");
   expect(JSON.stringify(saved?.career.summary)).toContain("職務要約末尾");
   expect(JSON.stringify(saved?.career.selfPromotion)).toContain("自己PR末尾");
   await user.selectOptions(screen.getByLabelText("編集する会社"), saved!.career.positions[1].id);
@@ -147,6 +150,9 @@ test("会社→案件・スキルの全項目を編集し、並べ替え・共�
   expect(screen.getByLabelText("会社名")).toHaveValue("架空会社A");
   expect(screen.getByLabelText("業務内容").querySelector("strong")).toHaveTextContent("業務末尾");
   expect(screen.getByLabelText("自己PR")).toHaveTextContent("自己PR末尾");
+  expect(
+    screen.getAllByLabelText("免許・資格 1 内容").map((input) => (input as HTMLInputElement).value),
+  ).toContain("職務経歴書資格");
   expect(screen.getByLabelText("保存状態")).toHaveTextContent("保存済み");
   await user.click(screen.getByRole("button", { name: "新規" }));
   expect(screen.queryByLabelText("会社名")).toBeNull();

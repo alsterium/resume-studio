@@ -67,6 +67,8 @@ pub struct Career {
     pub summary: BodyNode,
     pub positions: Vec<Position>,
     pub skills: Vec<Skill>,
+    #[serde(default)]
+    pub qualifications: Vec<HistoryRow>,
     pub self_promotion: BodyNode,
 }
 

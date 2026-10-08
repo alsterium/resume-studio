@@ -36,7 +36,7 @@ TeX変換はRustだけで実装する。フロントは編集・表示、Rustは
 
 ## 編集データと状態
 
-JSONはschemaVersion 1。共通基本情報、履歴書、職務経歴書、限定本文AST、写真base64、テンプレートID／版を保持する。PDF、TeX、ログ、保存パス、年齢は保持しない。1ファイルを移動して再開できる。未知のSchema版や属性を拒否し、migrationは未実装。
+JSONはschemaVersion 1。共通基本情報、履歴書、職務経歴書、限定本文AST、写真base64、テンプレートID／版を保持する。PDF、TeX、ログ、保存パス、年齢は保持しない。1ファイルを移動して再開できる。未知のSchema版や属性を拒否し、別schemaVersionのmigrationは未実装。T44の資格はresume/careerの独立配列で、旧v1のcareer.qualifications省略時だけ読込時に値をコピーする。
 
 TSとRustが共通Schema／fixtureで構造を検証し、日付・期間・ID・UTF-8容量を意味検証する。Rustは画像実体もデコードして確認する。写真は向きを反映し最大600×800pxへ縮小、元Exifを保持せず再エンコードする。詳しい上限は[JSON仕様](PROJECT_JSON.md)。
 

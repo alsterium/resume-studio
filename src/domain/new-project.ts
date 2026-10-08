@@ -38,7 +38,13 @@ export function newProject(): Project {
       motivation: body(),
       preferences: body(),
     },
-    career: { summary: body(), positions: [], skills: [], selfPromotion: body() },
+    career: {
+      summary: body(),
+      positions: [],
+      skills: [],
+      qualifications: [],
+      selfPromotion: body(),
+    },
     templates: {
       resume: { id: "resume-standard", version: "1.2.0" },
       career: { id: "career-standard", version: "1.1.0" },

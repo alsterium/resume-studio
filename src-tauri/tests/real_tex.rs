@@ -1046,3 +1046,39 @@ fn fictional_japanese_and_special_characters_compile_with_real_tex() {
         }
     }
 }
+
+#[test]
+#[cfg(target_os = "macos")]
+fn independent_career_qualification_dates_render_in_pdf() {
+    use resume_studio_lib::{
+        domain::validation::parse_project,
+        generator::{documents::generate_project, templates::DocumentKind},
+    };
+    let mut project =
+        parse_project(include_bytes!("../../tests/fixtures/project-full.json")).unwrap();
+    project.templates.career.version = "1.1.0".into();
+    project.career.qualifications[0].text = "職務経歴書専用資格".into();
+    project.career.qualifications[0].year_month = "2020-04".into();
+    project
+        .career
+        .qualifications
+        .push(resume_studio_lib::domain::project::HistoryRow {
+            id: "career-undated".into(),
+            year_month: String::new(),
+            text: "取得年月未入力資格".into(),
+        });
+    let bundle = generate_project(&project, DocumentKind::Career).unwrap();
+    let artifact = compile(&TexRuntime::discover(), &bundle).unwrap();
+    let text = extracted_pdf_text(&artifact.bytes);
+    let compact = text.split_whitespace().collect::<String>();
+    assert!(compact.contains("職務経歴書専用資格"), "{text}");
+    assert!(compact.contains("2020年4月取得"), "{text}");
+    assert!(compact.contains("取得年月未入力資格"), "{text}");
+    assert!(!compact.contains("架空資格"), "{text}");
+    assert!(
+        !artifact.log.contains("Missing character:"),
+        "{}",
+        artifact.log
+    );
+    save_layout_qa("independent-career-qualification", &bundle, &artifact.bytes);
+}

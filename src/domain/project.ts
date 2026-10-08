@@ -82,6 +82,7 @@ export interface Project {
     summary: BodyDoc;
     positions: Position[];
     skills: Skill[];
+    qualifications: HistoryRow[];
     selfPromotion: BodyDoc;
   };
   templates: { resume: TemplateRef; career: TemplateRef };

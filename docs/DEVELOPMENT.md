@@ -302,3 +302,7 @@ Web上の多摩通信社／shigioのTeX履歴書を参照し、標準履歴書1.
 見開きON/OFFと画面に合わせる/指定倍率は履歴書・職務経歴書ごとにDraftWorkspaceで保持し、PdfPreviewへ制御値として渡す。PDFのresultIdによる再マウントは維持し、表示設定は手動/自動の再生成や書類切替でも維持する。Project JSONや保存revisionには含めない。
 
 T43では表示中ページも書類ごとに保持する。新しいPDFを読み込んだ後、保持した番号を実際のページ数以内に補正してから描画する。ページ数が減った場合は最終ページを表示し、その番号を保持する。見開きONでも先頭の表示ページ番号を保持する。
+
+## 職務経歴書の独立資格（T44）
+
+資格編集の共通UIは選択書類のqualificationsへ接続する。データはresume/careerで分離し、新規は空欄。旧JSONのcareer.qualifications省略だけをTS/Rustで独立配列へ正規化し、全行IDとの衝突を避ける。generatorはcareer.qualificationsだけを職務経歴書へ出力し、年月を「N年M月 取得」へ整形する。未入力は取得表記も省略する。

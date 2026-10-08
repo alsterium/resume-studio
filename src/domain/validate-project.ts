@@ -12,9 +12,17 @@ function invalid(message: string): never {
 export function validateProject(value: unknown): Project {
   // Bound recursive schema validation and stringify, including cyclic JS input.
   const stack = [{ value, depth: 0 }];
+  const reservedIds = new Set<string>();
   let count = 0;
   while (stack.length) {
     const current = stack.pop()!;
+    if (
+      current.value &&
+      typeof current.value === "object" &&
+      "id" in current.value &&
+      typeof current.value.id === "string"
+    )
+      reservedIds.add(current.value.id);
     if (++count > 200000 || current.depth > 64) invalid("JSONの構造が上限を超えています。");
     if (current.value !== null && typeof current.value === "object")
       for (const child of Object.values(current.value))
@@ -23,7 +31,18 @@ export function validateProject(value: unknown): Project {
   if (encoder.encode(JSON.stringify(value) ?? "").length > MAX_PROJECT_BYTES)
     invalid("JSONは20MiB以内にしてください。");
   if (!validateSchema(value)) invalid("プロジェクトの構造または版に対応していません。");
-  const project = value;
+  const project: Project = { ...value, career: { ...value.career } };
+  if (project.career.qualifications === undefined) {
+    let sequence = 1;
+    project.career.qualifications = project.resume.qualifications.map((row) => {
+      let id: string;
+      do {
+        id = `career-qualification-legacy-${sequence++}`;
+      } while (reservedIds.has(id));
+      reservedIds.add(id);
+      return { ...row, id };
+    });
+  }
   if (!parseDate(project.documentDate)) invalid("書類日付が不正です。");
   if (project.profile.birthDate && !parseDate(project.profile.birthDate))
     invalid("生年月日が不正です。");
@@ -45,6 +64,7 @@ export function validateProject(value: unknown): Project {
     project.resume.education,
     project.resume.employment,
     project.resume.qualifications,
+    project.career.qualifications,
   ])
     for (const row of rows) {
       id(row.id);

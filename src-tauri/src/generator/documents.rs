@@ -21,7 +21,18 @@ struct DocumentModel<'a> {
     profile: &'a Profile,
     content: DocumentContent<'a>,
     photo: Option<String>,
-    qualifications: &'a [HistoryRow],
+}
+
+fn qualification_date(value: &str) -> String {
+    if value.is_empty() {
+        return String::new();
+    }
+    let (year, month) = value.split_once('-').expect("validated year-month");
+    format!(
+        "{}年{}月 取得",
+        year.parse::<u16>().unwrap(),
+        month.parse::<u8>().unwrap()
+    )
 }
 
 fn command(output: &mut String, name: &str, args: &[String]) {
@@ -204,13 +215,13 @@ fn render(model: &DocumentModel<'_>) -> Result<String, String> {
                     &[display_text(&label), display_text(&skill.description)],
                 );
             }
-            for qualification in model.qualifications {
+            for qualification in &career.qualifications {
                 command(
                     &mut output,
                     "CareerSkill",
                     &[
                         display_text(&qualification.text),
-                        display_text(&qualification.year_month),
+                        display_text(&qualification_date(&qualification.year_month)),
                     ],
                 );
             }
@@ -333,7 +344,6 @@ pub fn generate_project(project: &Project, kind: DocumentKind) -> Result<Generat
         date: &project.document_date,
         profile: &project.profile,
         photo,
-        qualifications: &project.resume.qualifications,
         content: match kind {
             DocumentKind::Resume => DocumentContent::Resume(&project.resume),
             DocumentKind::Career => DocumentContent::Career(&project.career),
