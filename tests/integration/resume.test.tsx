@@ -169,7 +169,7 @@ test("今日の日付設定を保存復元し、日付変更時の表示と年�
   try {
     fireEvent.change(screen.getByLabelText("書類日付"), { target: { value: "2020-04-01" } });
     fireEvent.change(screen.getByLabelText("生年月日"), { target: { value: "2000-01-02" } });
-    await user.selectOptions(screen.getByLabelText("書類日付の設定"), "today");
+    await user.click(screen.getByRole("checkbox", { name: "今日の日付を使う" }));
     expect(screen.getByLabelText("書類日付")).toBeDisabled();
     expect(screen.getByLabelText("書類日付")).toHaveValue("2027-01-01");
     expect(screen.getByLabelText("満年齢")).toHaveTextContent("満26歳");
@@ -182,15 +182,15 @@ test("今日の日付設定を保存復元し、日付変更時の表示と年�
     expect(screen.getByLabelText("満年齢")).toHaveTextContent("満27歳");
     expect(screen.getByLabelText("保存状態")).toHaveTextContent("保存済み");
     await user.click(screen.getByRole("button", { name: "開く" }));
-    expect(screen.getByLabelText("書類日付の設定")).toHaveValue("today");
+    expect(screen.getByRole("checkbox", { name: "今日の日付を使う" })).toBeChecked();
     expect(screen.getByLabelText("書類日付")).toHaveValue("2027-01-02");
     await user.click(screen.getByRole("tab", { name: "職務経歴書" }));
-    expect(screen.getByLabelText("書類日付の設定")).toHaveValue("today");
-    await user.selectOptions(screen.getByLabelText("書類日付の設定"), "fixed");
+    expect(screen.getByRole("checkbox", { name: "今日の日付を使う" })).toBeChecked();
+    await user.click(screen.getByRole("checkbox", { name: "今日の日付を使う" }));
     expect(screen.getByLabelText("書類日付")).toBeEnabled();
     expect(screen.getByLabelText("書類日付")).toHaveValue("2020-04-01");
     fireEvent.change(screen.getByLabelText("書類日付"), { target: { value: "" } });
-    await user.selectOptions(screen.getByLabelText("書類日付の設定"), "today");
+    await user.click(screen.getByRole("checkbox", { name: "今日の日付を使う" }));
     await user.click(screen.getByRole("button", { name: "保存" }));
     expect(saved?.documentDateMode).toBe("today");
     expect(saved?.documentDate).toBe("2027-01-02");

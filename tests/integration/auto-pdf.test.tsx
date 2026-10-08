@@ -200,7 +200,7 @@ test("今日モードは日跨ぎで表示日付と自動PDFを更新し、指�
   localStorage.setItem(AUTO_PDF_STORAGE_KEY, "true");
   render(<DraftWorkspace client={tauriClient} />);
   await tick();
-  fireEvent.change(screen.getByLabelText("書類日付の設定"), { target: { value: "today" } });
+  fireEvent.click(screen.getByRole("checkbox", { name: "今日の日付を使う" }));
   await tick(2000);
   expect(screen.getByLabelText("書類日付")).toHaveValue("2027-01-02");
   const count = requests.length;
@@ -209,7 +209,7 @@ test("今日モードは日跨ぎで表示日付と自動PDFを更新し、指�
   await tick(2000);
   expect(requests.length).toBeGreaterThan(count);
   expect((requests.at(-1)!.project as Project).documentDateMode).toBe("today");
-  fireEvent.change(screen.getByLabelText("書類日付の設定"), { target: { value: "fixed" } });
+  fireEvent.click(screen.getByRole("checkbox", { name: "今日の日付を使う" }));
   await tick(2000);
   const fixedCount = requests.length;
   await tick(24 * 60 * 60 * 1000 + 2000);

@@ -257,24 +257,22 @@ export function ProfileEditor({
           onChange={(event) => onChange({ ...project, title: event.target.value })}
         />
       </label>
-      <label>
-        書類日付の設定
-        <select
-          value={project.documentDateMode ?? "fixed"}
+      <label className="checkbox-label">
+        <Input
+          type="checkbox"
+          checked={project.documentDateMode === "today"}
           onChange={(event) =>
             onChange({
               ...project,
-              documentDateMode: event.target.value as "fixed" | "today",
+              documentDateMode: event.target.checked ? "today" : "fixed",
               documentDate:
-                event.target.value === "today" && !parseDate(project.documentDate)
+                event.target.checked && !parseDate(project.documentDate)
                   ? today
                   : project.documentDate,
             })
           }
-        >
-          <option value="fixed">日付を指定する</option>
-          <option value="today">今日の日付を使う</option>
-        </select>
+        />
+        今日の日付を使う
       </label>
       <label>
         書類日付
