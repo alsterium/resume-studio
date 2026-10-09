@@ -26,6 +26,8 @@
 \newbox\rs@frame
 \newbox\rs@rowText
 \newbox\rs@kanaText
+\newbox\rs@birthText
+\newbox\rs@genderText
 \newdimen\rs@profileWidth
 \newdimen\rs@width
 \newdimen\rs@year
@@ -79,15 +81,27 @@
   \rs@height=\dimexpr\ht\rs@slice+\dp\rs@slice\relax
   \ifdim\rs@height<#1\relax\rs@height=#1\relax\fi
   \vbox to\rs@height{\hsize=\dimexpr\rs@profileWidth-2\fboxrule\relax\vfil\unvbox\rs@slice\vfil}}
+% Birth date and age share a cell; optional gender has a full-height divider.
+\newcommand{\rs@birthRow}[3]{%
+  \setbox\rs@birthText=\vbox{\rs@cell{99mm}{\fontsize{10.5pt}{14pt}\selectfont\centering
+    #1 生\def\rs@age{#2}\ifx\rs@age\@empty\else\quad（#2）\fi}}%
+  \setbox\rs@genderText=\vbox{\rs@cell{\dimexpr\hsize-99mm-.4pt\relax}{\centering #3}}%
+  % Empty values still reserve their full column width.
+  \wd\rs@birthText=99mm
+  \wd\rs@genderText=\dimexpr\hsize-99mm-.4pt\relax
+  \rs@height=14mm
+  \@for\rs@box:=\rs@birthText,\rs@genderText\do{%
+    \ifdim\dimexpr\ht\rs@box+\dp\rs@box\relax>\rs@height
+      \rs@height=\dimexpr\ht\rs@box+\dp\rs@box\relax\fi}%
+  \hbox to\hsize{%
+    \vbox to\rs@height{\vfil\box\rs@birthText\vfil}\vrule width.4pt
+    \vbox to\rs@height{\vfil\box\rs@genderText\vfil}}}
 \newcommand{\ResumeProfile}[6]{%
   \setbox\rs@profile=\vbox{\hsize=\dimexpr\rs@profileWidth-2\fboxrule\relax
     \rs@mincell{6.5mm}{\rs@labelled{ふりがな}{\rs@fitKana{#1}}}\rs@dottedRule
     \rs@mincell{18mm}{\rs@centeredLabelled{名前}{{\fontsize{15.75pt}{22pt}\selectfont #2}}}%
     \hrule height.4pt
-    \rs@mincell{14mm}{\hbox to\hsize{%
-      \vtop{\vskip0pt\hsize=99mm\rs@cell{\hsize}{\fontsize{10.5pt}{14pt}\selectfont\raggedleft #3 生\quad #4}}%
-      \hskip.4pt
-      \vtop{\vskip0pt\hsize=\dimexpr\hsize-99mm-.4pt\relax\rs@cell{\hsize}{\centering #5}}}}}%
+    \rs@birthRow{#3}{#4}{#5}}%
   \ifdim\dimexpr\ht\rs@profile+\dp\rs@profile\relax>50mm
     \rs@appendMetadata{基本情報}{ふりがな\quad #1\par 氏名\quad #2\par
       生年月日\quad #3\quad #4\par 任意の性別表示\quad #5}%

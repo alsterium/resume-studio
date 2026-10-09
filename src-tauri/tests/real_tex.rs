@@ -155,6 +155,16 @@ fn resume_form_keeps_two_base_pages_and_preserves_overflow_in_section_order() {
         );
         let pages = inspected_pdf_pages(&artifact.bytes);
         assert_eq!(pages.len(), 2, "{pages:?}");
+        let profile_text = pages[0]["text"]
+            .as_str()
+            .unwrap()
+            .split_whitespace()
+            .collect::<String>();
+        if project.profile.name.is_empty() {
+            assert!(!profile_text.contains("（）"), "{profile_text}");
+        } else {
+            assert!(profile_text.contains("（満36歳）"), "{profile_text}");
+        }
         assert!(pages[0]["text"].as_str().unwrap().contains("学歴・職歴"));
         for label in ["免許・資格", "志望動機", "本人希望欄"] {
             assert!(pages[1]["text"].as_str().unwrap().contains(label));
@@ -385,6 +395,7 @@ fn resume_fixed_rows_shrink_only_overflowing_text() {
         .map(|p| p["text"].as_str().unwrap())
         .collect::<String>();
     let normalized = text.split_whitespace().collect::<String>();
+    assert!(normalized.contains("（満36歳）"), "{text}");
     for expected in [
         short,
         long.as_str(),
