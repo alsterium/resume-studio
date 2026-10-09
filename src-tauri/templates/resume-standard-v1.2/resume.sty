@@ -1,5 +1,5 @@
 \NeedsTeXFormat{LaTeX2e}
-\ProvidesPackage{resume}[2026/10/07 Resume Studio reference resume]
+\ProvidesPackage{resume}[2026/10/09 Resume Studio reference resume]
 \RequirePackage[left=18mm,right=18mm,top=18mm,bottom=18mm]{geometry}
 \RequirePackage{graphicx}
 \pagestyle{empty}
@@ -15,11 +15,16 @@
 \newbox\rs@preferences
 \newbox\rs@metadata
 \newbox\rs@profile
+\newbox\rs@contactKana
+\newbox\rs@phone
+\newdimen\rs@phoneHeight
 \newbox\rs@contactLeft
 \newbox\rs@contactRight
 \newbox\rs@contact
 \newbox\rs@slice
 \newbox\rs@frame
+\newbox\rs@rowText
+\newdimen\rs@profileWidth
 \newdimen\rs@width
 \newdimen\rs@year
 \newdimen\rs@month
@@ -34,6 +39,7 @@
 \newcommand{\ResumeMotivationHeight}{49mm}
 \newcommand{\ResumePreferenceHeight}{49mm}
 \AtBeginDocument{\rs@width=\dimexpr\textwidth-2\fboxrule\relax
+  \rs@profileWidth=\dimexpr.70\rs@width+1.5\fboxrule+.2pt\relax
   \rs@year=.12\rs@width \rs@month=.08\rs@width
   \rs@body=\dimexpr\rs@width-\rs@year-\rs@month\relax
   \fontsize{11.25pt}{19pt}\selectfont
@@ -56,41 +62,49 @@
   \vtop{\vskip0pt\hsize=21mm\rs@cell{\hsize}{\fontsize{9pt}{11pt}\selectfont #1}}%
   \vtop{\vskip0pt\hsize=\dimexpr\hsize-21mm\relax\rs@cell{\hsize}{#2}}}}
 \newcommand{\rs@mincell}[2]{%
-  \setbox\rs@slice=\vbox{\hsize=\dimexpr120mm-2\fboxrule\relax #2}%
+  \setbox\rs@slice=\vbox{\hsize=\dimexpr\rs@profileWidth-2\fboxrule\relax #2}%
   \rs@height=\dimexpr\ht\rs@slice+\dp\rs@slice\relax
   \ifdim\rs@height<#1\relax\rs@height=#1\relax\fi
-  \vbox to\rs@height{\hsize=\dimexpr120mm-2\fboxrule\relax\vfil\unvbox\rs@slice\vfil}}
+  \vbox to\rs@height{\hsize=\dimexpr\rs@profileWidth-2\fboxrule\relax\vfil\unvbox\rs@slice\vfil}}
 \newcommand{\ResumeProfile}[6]{%
-  \setbox\rs@profile=\vbox{\hsize=\dimexpr120mm-2\fboxrule\relax
+  \setbox\rs@profile=\vbox{\hsize=\dimexpr\rs@profileWidth-2\fboxrule\relax
     \rs@mincell{6.5mm}{\rs@labelled{ふりがな}{\fontsize{9pt}{11pt}\selectfont #1}}\rs@dottedRule
     \rs@mincell{18mm}{\rs@labelled{名前}{{\fontsize{15.75pt}{22pt}\selectfont #2}}}%
     \hrule height.4pt
     \rs@mincell{14mm}{\hbox to\hsize{%
       \vtop{\vskip0pt\hsize=99mm\rs@cell{\hsize}{\fontsize{10.5pt}{14pt}\selectfont\raggedleft #3 生\quad #4}}%
-      \vrule width.4pt
+      \hskip.4pt
       \vtop{\vskip0pt\hsize=\dimexpr\hsize-99mm-.4pt\relax\rs@cell{\hsize}{\centering #5}}}}}%
   \ifdim\dimexpr\ht\rs@profile+\dp\rs@profile\relax>50mm
     \rs@appendMetadata{基本情報}{ふりがな\quad #1\par 氏名\quad #2\par
       生年月日\quad #3\quad #4\par 任意の性別表示\quad #5}%
-    \setbox\rs@profile=\vbox to39mm{\hsize=\dimexpr120mm-2\fboxrule\relax
+    \setbox\rs@profile=\vbox to39mm{\hsize=\dimexpr\rs@profileWidth-2\fboxrule\relax
       \rs@cell{\hsize}{基本情報\par この欄に収まらないため、続紙に全文を記載しています。}\vfil}%
   \fi
   \rs@height=\dimexpr\ht\rs@profile+\dp\rs@profile\relax
   \ifdim\rs@height<39mm \rs@height=39mm\fi
   \setbox\rs@profile=\vbox to\rs@height{\unvbox\rs@profile\vfil}%
   \noindent\hbox to\textwidth{%
-    \vtop{\vskip0pt\hsize=120mm\noindent\fbox{\box\rs@profile}\par}\hskip12mm
+    \vtop{\vskip0pt\hsize=\rs@profileWidth\noindent\fbox{\box\rs@profile}\par}\hskip\dimexpr132mm-\rs@profileWidth\relax
     \vtop{\vskip0pt\vskip-6mm\vbox to40mm{\hsize=30mm
       \vfil\hbox to30mm{\hfil #6\hfil}\vfil}}\hfil}\par}
 \newcommand{\ResumeContact}[6]{%
   \def\rs@title{#1}\def\rs@addressTitle{現住所}%
   \ifx\rs@title\rs@addressTitle\rs@height=24mm\else\rs@height=20mm\fi
-  \setbox\rs@contactLeft=\vbox{\hsize=.70\rs@width\vskip1mm
-    \rs@labelled{ふりがな}{\fontsize{9pt}{11pt}\selectfont #4}\vskip1.5mm\rs@dottedRule\vskip1mm
+  % Share the first-row height so the phone and kana dividers align exactly.
+  \setbox\rs@contactKana=\vbox{\hsize=.70\rs@width\vskip1mm
+    \rs@labelled{ふりがな}{\fontsize{9pt}{11pt}\selectfont #4}\vskip1.5mm}%
+  \setbox\rs@phone=\vbox{\hsize=\dimexpr.30\rs@width-.4pt\relax
+    \rs@cell{\hsize}{\fontsize{9pt}{11pt}\selectfont 電話\quad #5}}%
+  \rs@phoneHeight=\dimexpr\ht\rs@contactKana+\dp\rs@contactKana\relax
+  \ifdim\dimexpr\ht\rs@phone+\dp\rs@phone+1mm\relax>\rs@phoneHeight
+    \rs@phoneHeight=\dimexpr\ht\rs@phone+\dp\rs@phone+1mm\relax\fi
+  \setbox\rs@contactLeft=\vbox{\hsize=.70\rs@width
+    \vbox to\rs@phoneHeight{\unvbox\rs@contactKana\vfil}\rs@dottedRule\vskip1mm
     \rs@labelled{#1}{\fontsize{10.5pt}{12pt}\selectfont 〒#2\par #3}}
-  \setbox\rs@contactRight=\vbox{\hsize=\dimexpr.30\rs@width-.4pt\relax\vskip1mm
-    \rs@cell{\hsize}{\fontsize{10.5pt}{12pt}\selectfont 電話\quad #5}\hrule height.4pt
-    \rs@cell{\hsize}{\fontsize{9pt}{11pt}\selectfont Email\par #6}}
+  \setbox\rs@contactRight=\vbox{\hsize=\dimexpr.30\rs@width-.4pt\relax
+    \vbox to\rs@phoneHeight{\vfil\box\rs@phone\vfil}\nointerlineskip\hrule height.4pt
+    \vskip1mm\rs@cell{\hsize}{\fontsize{9pt}{11pt}\selectfont Email\par #6}}
   \ifdim\dimexpr\ht\rs@contactLeft+\dp\rs@contactLeft\relax>\rs@height
     \rs@height=\dimexpr\ht\rs@contactLeft+\dp\rs@contactLeft\relax\fi
   \ifdim\dimexpr\ht\rs@contactRight+\dp\rs@contactRight\relax>\rs@height
@@ -107,15 +121,20 @@
       \vrule width.4pt
       \vtop{\vskip0pt\vbox to\rs@height{\hsize=\dimexpr.30\rs@width-.4pt\relax\unvbox\rs@contactRight\vfil}}}}\par
   \fi}
-% Each history paragraph remains a vertical list of individual lines. TeX may
-% split a multi-line row; an oversized row is never an indivisible table cell.
+% Measure each entry at the normal font size. Only entries wider than the
+% content column shrink proportionally; every row includes its rule in 9.5mm.
 \newcommand{\rs@row}[3]{%
   \hsize=\rs@width\linewidth=\hsize
-  \leftskip=\dimexpr\rs@year+\rs@month+2mm\relax\rightskip=2mm
-  \baselineskip=\ResumeRowHeight\relax\lineskiplimit=-1000pt
-  \vrule width0pt height6.2mm depth3.3mm\llap{\hbox to\dimexpr\rs@year+\rs@month+2mm\relax{%
-    \hbox to\rs@year{\hfil #1\hfil}\hbox to\rs@month{\hfil #2\hfil}\hskip2mm}}#3\strut\par
-  \penalty0\nointerlineskip\hbox{\vrule width\rs@width height.5pt}}
+  \setbox\rs@rowText=\hbox{\fontsize{11.25pt}{19pt}\selectfont #3}%
+  \nointerlineskip\vbox to\ResumeRowHeight{%
+    \vfil\hbox to\rs@width{%
+      \hbox to\rs@year{\hfil #1\hfil}\hbox to\rs@month{\hfil #2\hfil}%
+      \hskip2mm\hbox to\dimexpr\rs@body-4mm\relax{%
+        \ifdim\wd\rs@rowText>\dimexpr\rs@body-4mm\relax
+          \resizebox{\dimexpr\rs@body-4mm\relax}{!}{\box\rs@rowText}%
+        \else\unhbox\rs@rowText\fi\hfil}\hskip2mm}%
+    \vfil\hrule width\rs@width height.5pt}%
+  \penalty0}
 \newcommand{\rs@section}[1]{\rs@row{}{}{\hfill #1\hfill\mbox{}}}
 \newcommand{\ResumeHistoryBegin}[1]{%
   \def\rs@title{#1}\def\rs@qualTitle{免許・資格}%
@@ -134,8 +153,7 @@
 \newcommand{\rs@endHistory}{%
   \global\setbox\rs@target=\vbox{\unvbox\rs@target
     % Keep the final item with its closing label: no page containing only 以上.
-    \setbox\rs@slice=\lastbox\unpenalty\penalty10000
-    \nointerlineskip\box\rs@slice\penalty10000\rs@row{}{}{\hfill 以上}}}
+    \unpenalty\penalty10000\rs@row{}{}{\hfill 以上}}}
 \newcommand{\ResumeHistoryEnd}{%
   \ifx\rs@target\rs@qualifications
     \rs@endHistory
@@ -180,7 +198,7 @@
 \newcommand{\rs@bodyFrame}[4]{%
   \rs@split{#1}{#2}%
   \noindent\fbox{\vbox{\hsize=\rs@width
-    \rs@cell{\hsize}{\fontsize{9pt}{11pt}\selectfont #3\space #4\vspace{1mm}}%
+    \vskip1mm\rs@cell{\hsize}{\fontsize{9pt}{11pt}\selectfont #3\space #4\vspace{1mm}}%
     \hbox{\hskip2mm\vbox to#2{\hsize=\dimexpr\rs@width-4mm\relax
       \unvbox\rs@slice\vfil}\hskip2mm}}}\par}
 \newcommand{\rs@continueTable}[2]{%

@@ -164,8 +164,8 @@ fn resume_form_keeps_two_base_pages_and_preserves_overflow_in_section_order() {
 
     let mut value: serde_json::Value =
         serde_json::from_str(include_str!("../../tests/fixtures/project-full.json")).unwrap();
-    // A single row exceeds the first table region: it must split, rather than disappear
-    // inside an indivisible tabular cell. All input remains below schema limits.
+    // A very long entry must shrink inside a fixed row without losing any text.
+    // Extra row counts and long free-form bodies still continue onto later pages.
     value["resume"]["education"] = serde_json::json!([
         {"id":"long-education","yearMonth":"2012-03","text":"長い学校名と学習内容。".repeat(70)}
     ]);
@@ -316,6 +316,122 @@ fn resume_form_keeps_two_base_pages_and_preserves_overflow_in_section_order() {
     }
 }
 
+#[test]
+#[cfg(target_os = "macos")]
+fn resume_fixed_rows_shrink_only_overflowing_text() {
+    use resume_studio_lib::{
+        domain::validation::parse_project,
+        generator::{documents::generate_project, templates::DocumentKind},
+    };
+    let mut value: serde_json::Value =
+        serde_json::from_str(include_str!("../../tests/fixtures/project-full.json")).unwrap();
+    let short = "短い学校名";
+    let long = format!("長い学校名{}末尾", "日本語とEnglishの学習内容".repeat(8));
+    let ascii = format!("QUAL{}TAIL", "W".repeat(160));
+    value["resume"]["education"] = serde_json::json!([
+        {"id":"short","yearMonth":"2012-03","text":short},
+        {"id":"long","yearMonth":"2013-03","text":long}
+    ]);
+    value["resume"]["employment"] = serde_json::json!([
+        {"id":"job-long","yearMonth":"2014-04","text":long}
+    ]);
+    value["resume"]["qualifications"] = serde_json::json!([
+        {"id":"qual-long","yearMonth":"2015-04","text":ascii}
+    ]);
+    let mut project = parse_project(&serde_json::to_vec(&value).unwrap()).unwrap();
+    project.templates.resume.version = "1.2.0".into();
+    let mut bundle = generate_project(&project, DocumentKind::Resume).unwrap();
+    // Measure real TeX boxes, including the closing label and rule, rather than
+    // checking macro source. Every row must occupy exactly the fixed row height.
+    bundle.content_tex = format!(
+        r"\makeatletter
+\begingroup
+\setbox0=\vbox{{\rs@row{{2012}}{{03}}{{短い学校名}}}}
+\ifdim\dimexpr\ht0+\dp0\relax=\ResumeRowHeight\else\errmessage{{short row height}}\fi
+\setbox0=\vbox{{\rs@row{{}}{{}}{{\hfill 以上}}}}
+\ifdim\dimexpr\ht0+\dp0\relax=\ResumeRowHeight\else\errmessage{{closing row height}}\fi
+\setbox0=\vbox{{\rs@row{{2013}}{{03}}{{{long}}}}}
+\ifdim\dimexpr\ht0+\dp0\relax=\ResumeRowHeight\else\errmessage{{long row height}}\fi
+\endgroup
+\makeatother
+{}",
+        bundle.content_tex
+    );
+    let artifact = compile(&TexRuntime::discover(), &bundle).unwrap();
+    assert!(!artifact.log.contains("Overfull"), "{}", artifact.log);
+    assert!(
+        !artifact.log.contains("Missing character:"),
+        "{}",
+        artifact.log
+    );
+    save_layout_qa("fixed-rows", &bundle, &artifact.bytes);
+    let pages = inspected_pdf_pages(&artifact.bytes);
+    assert_eq!(pages.len(), 2);
+    assert_a4(&pages);
+    let text = pages
+        .iter()
+        .map(|p| p["text"].as_str().unwrap())
+        .collect::<String>();
+    let normalized = text.split_whitespace().collect::<String>();
+    for expected in [short, long.as_str(), ascii.as_str()] {
+        assert!(normalized.contains(expected), "missing {expected}: {text}");
+    }
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("main.pdf");
+    fs::write(&path, &artifact.bytes).unwrap();
+    let output = std::process::Command::new("/usr/bin/swift")
+        .args([
+            "-e",
+            r#"
+import Foundation
+import PDFKit
+let doc = PDFDocument(url: URL(fileURLWithPath: CommandLine.arguments[1]))!
+var measurements: [String: [Double]] = [:]
+for label in CommandLine.arguments.dropFirst(2) {
+    for index in 0..<doc.pageCount {
+        let page = doc.page(at: index)!
+        let range = ((page.string ?? "") as NSString).range(of: label)
+        if range.location != NSNotFound, let selection = page.selection(for: range) {
+            let rect = selection.bounds(for: page)
+            measurements[label] = [rect.minX, rect.maxX, rect.height]
+            break
+        }
+    }
+}
+print(String(data: try! JSONSerialization.data(withJSONObject: measurements), encoding: .utf8)!)
+"#,
+            &path.to_string_lossy(),
+            short,
+            "長い学校名",
+            "QUAL",
+            "電話",
+            "現住所",
+        ])
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let measured: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    // PDFKit reports nominal font heights for transformed glyphs, so compare
+    // physical glyph widths to verify the proportional reduction.
+    let width =
+        |label: &str| measured[label][1].as_f64().unwrap() - measured[label][0].as_f64().unwrap();
+    assert!(width("長い学校名") < width(short) * 0.7, "{measured}");
+    assert!(width("QUAL") < width(short) * 0.7, "{measured}");
+    assert!(
+        (width("電話") / 2.0 - width("現住所") / 3.0).abs() < 0.2,
+        "{measured}"
+    );
+    for label in ["長い学校名", "QUAL"] {
+        let left = measured[label][0].as_f64().unwrap();
+        let right = measured[label][1].as_f64().unwrap();
+        assert!(left >= 153.0 && right <= 539.0, "{measured}");
+    }
+}
+
 #[cfg(target_os = "macos")]
 fn inspected_pdf_pages(bytes: &[u8]) -> Vec<serde_json::Value> {
     let directory = tempfile::tempdir().unwrap();
@@ -407,6 +523,8 @@ fn maximum_fixed_fields_wrap_and_resume_moves_oversized_contacts_to_continuation
         value["resume"][key][0]["text"] = serde_json::json!(text);
         resume_fields.push(text);
     }
+    value["career"]["qualifications"] = value["resume"]["qualifications"].clone();
+    value["career"]["qualifications"][0]["id"] = serde_json::json!("career-maximum-qualification");
     let mut career_fields = vec![
         resume_fields[0].clone(),
         resume_fields.last().unwrap().clone(),
