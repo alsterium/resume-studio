@@ -8,12 +8,13 @@
 \setlength{\parindent}{0pt}
 \setlength{\parskip}{0pt}
 \setlength{\fboxsep}{0pt}
-\setlength{\fboxrule}{.8pt}
+\setlength{\fboxrule}{1.2pt}
 \newbox\rs@history
 \newbox\rs@qualifications
 \newbox\rs@motivation
 \newbox\rs@preferences
 \newbox\rs@metadata
+\newbox\rs@photo
 \newbox\rs@profile
 \newbox\rs@contactKana
 \newbox\rs@phone
@@ -84,10 +85,23 @@
   \rs@height=\dimexpr\ht\rs@profile+\dp\rs@profile\relax
   \ifdim\rs@height<39mm \rs@height=39mm\fi
   \setbox\rs@profile=\vbox to\rs@height{\unvbox\rs@profile\vfil}%
+  \global\setbox\rs@photo=\hbox{#6}}
+% The stepped outline leaves the photo outside the name block. Contacts share
+% one outer border with that block; only the birth-date boundary is thick.
+\newcommand{\rs@identityFrame}{%
   \noindent\hbox to\textwidth{%
-    \vtop{\vskip0pt\hsize=\rs@profileWidth\noindent\fbox{\box\rs@profile}\par}\hskip\dimexpr132mm-\rs@profileWidth\relax
+    \vtop{\vskip0pt\vbox{\hrule height\fboxrule
+      \hbox{\vrule width\fboxrule\box\rs@profile\vrule width\fboxrule}}}%
+    \hskip\dimexpr132mm-\rs@profileWidth\relax
     \vtop{\vskip0pt\vskip-6mm\vbox to40mm{\hsize=30mm
-      \vfil\hbox to30mm{\hfil #6\hfil}\vfil}}\hfil}\par}
+      \vfil\hbox to30mm{\hfil\box\rs@photo\hfil}\vfil}}\hfil}\par
+  \nointerlineskip\hrule height\fboxrule
+  \nointerlineskip\hbox{\vrule width\fboxrule\box\rs@contact\vrule width\fboxrule}%
+  \nointerlineskip\hrule height\fboxrule\par}
+\newcommand{\rs@appendContact}[1]{%
+  \global\setbox\rs@contact=\vbox{\hsize=\rs@width
+    \ifvoid\rs@contact\else\unvbox\rs@contact\nointerlineskip\hrule height.4pt\fi
+    \nointerlineskip #1}}
 \newcommand{\ResumeContact}[6]{%
   \def\rs@title{#1}\def\rs@addressTitle{現住所}%
   \ifx\rs@title\rs@addressTitle\rs@height=24mm\else\rs@height=20mm\fi
@@ -112,14 +126,14 @@
   \ifdim\rs@height>55mm
     \rs@appendMetadata{#1}{住所ふりがな\quad #4\par 郵便番号\quad #2\par
       住所\quad #3\par 電話\quad #5\par メール\quad #6}%
-    \noindent\fbox{\vbox{\hsize=\rs@width
+    \rs@appendContact{\vbox{\hsize=\rs@width
       \rs@cell{\hsize}{\vspace{2mm}#1\par
-        この欄に収まらないため、続紙に全文を記載しています。\vspace{2mm}}}}\par
+        この欄に収まらないため、続紙に全文を記載しています。\vspace{2mm}}}}
   \else
-    \noindent\fbox{\hbox to\rs@width{%
+    \rs@appendContact{\hbox to\rs@width{%
       \vtop{\vskip0pt\vbox to\rs@height{\hsize=.70\rs@width\unvbox\rs@contactLeft\vfil}}%
       \vrule width.4pt
-      \vtop{\vskip0pt\vbox to\rs@height{\hsize=\dimexpr.30\rs@width-.4pt\relax\unvbox\rs@contactRight\vfil}}}}\par
+      \vtop{\vskip0pt\vbox to\rs@height{\hsize=\dimexpr.30\rs@width-.4pt\relax\unvbox\rs@contactRight\vfil}}}}
   \fi}
 % Measure each entry at the normal font size. Only entries wider than the
 % content column shrink proportionally; every row includes its rule in 9.5mm.
@@ -212,6 +226,7 @@
     \rs@bodyFrame{#1}{225mm}{#2（続き）}{}%
   \repeat}
 \newcommand{\ResumeFinish}{%
+  \rs@identityFrame
   \vspace{1.5mm}\par\penalty0
   % Fill page one; long contacts reduce the table without losing content.
   \rs@height=\dimexpr\textheight-\pagetotal-11.5mm\relax
