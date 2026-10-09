@@ -25,6 +25,7 @@
 \newbox\rs@slice
 \newbox\rs@frame
 \newbox\rs@rowText
+\newbox\rs@kanaText
 \newdimen\rs@profileWidth
 \newdimen\rs@width
 \newdimen\rs@year
@@ -62,6 +63,17 @@
 \newcommand{\rs@labelled}[2]{\hbox to\hsize{%
   \vtop{\vskip0pt\hsize=21mm\rs@cell{\hsize}{\fontsize{9pt}{11pt}\selectfont #1}}%
   \vtop{\vskip0pt\hsize=\dimexpr\hsize-21mm\relax\rs@cell{\hsize}{#2}}}}
+% The name label and name value share their vertical center, even at different
+% font sizes or when the value wraps. Other labels retain their top alignment.
+\newcommand{\rs@centeredLabelled}[2]{\hbox to\hsize{\m@th$%
+  \vcenter{\hsize=21mm\rs@cell{\hsize}{\fontsize{9pt}{11pt}\selectfont #1}}%
+  \vcenter{\hsize=\dimexpr\hsize-21mm\relax\rs@cell{\hsize}{#2}}$}}
+\newcommand{\rs@fitKana}[1]{%
+  \leavevmode
+  \setbox\rs@kanaText=\hbox{\fontsize{9pt}{11pt}\selectfont #1}%
+  \ifdim\wd\rs@kanaText>\dimexpr\hsize-4mm\relax
+    \resizebox{\dimexpr\hsize-4mm\relax}{!}{\box\rs@kanaText}%
+  \else\box\rs@kanaText\fi}
 \newcommand{\rs@mincell}[2]{%
   \setbox\rs@slice=\vbox{\hsize=\dimexpr\rs@profileWidth-2\fboxrule\relax #2}%
   \rs@height=\dimexpr\ht\rs@slice+\dp\rs@slice\relax
@@ -69,8 +81,8 @@
   \vbox to\rs@height{\hsize=\dimexpr\rs@profileWidth-2\fboxrule\relax\vfil\unvbox\rs@slice\vfil}}
 \newcommand{\ResumeProfile}[6]{%
   \setbox\rs@profile=\vbox{\hsize=\dimexpr\rs@profileWidth-2\fboxrule\relax
-    \rs@mincell{6.5mm}{\rs@labelled{ふりがな}{\fontsize{9pt}{11pt}\selectfont #1}}\rs@dottedRule
-    \rs@mincell{18mm}{\rs@labelled{名前}{{\fontsize{15.75pt}{22pt}\selectfont #2}}}%
+    \rs@mincell{6.5mm}{\rs@labelled{ふりがな}{\rs@fitKana{#1}}}\rs@dottedRule
+    \rs@mincell{18mm}{\rs@centeredLabelled{名前}{{\fontsize{15.75pt}{22pt}\selectfont #2}}}%
     \hrule height.4pt
     \rs@mincell{14mm}{\hbox to\hsize{%
       \vtop{\vskip0pt\hsize=99mm\rs@cell{\hsize}{\fontsize{10.5pt}{14pt}\selectfont\raggedleft #3 生\quad #4}}%
@@ -107,7 +119,7 @@
   \ifx\rs@title\rs@addressTitle\rs@height=24mm\else\rs@height=20mm\fi
   % Share the first-row height so the phone and kana dividers align exactly.
   \setbox\rs@contactKana=\vbox{\hsize=.70\rs@width\vskip1mm
-    \rs@labelled{ふりがな}{\fontsize{9pt}{11pt}\selectfont #4}\vskip1.5mm}%
+    \rs@labelled{ふりがな}{\rs@fitKana{#4}}\vskip1.5mm}%
   \setbox\rs@phone=\vbox{\hsize=\dimexpr.30\rs@width-.4pt\relax
     \rs@cell{\hsize}{\fontsize{9pt}{11pt}\selectfont 電話\quad #5}}%
   \rs@phoneHeight=\dimexpr\ht\rs@contactKana+\dp\rs@contactKana\relax

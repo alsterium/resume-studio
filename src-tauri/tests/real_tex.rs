@@ -328,6 +328,18 @@ fn resume_fixed_rows_shrink_only_overflowing_text() {
     let short = "短い学校名";
     let long = format!("長い学校名{}末尾", "日本語とEnglishの学習内容".repeat(8));
     let ascii = format!("QUAL{}TAIL", "W".repeat(160));
+    let name_kana = format!("なまえ{}おわり", "かくうのなまえふりがな".repeat(10));
+    let address_kana = format!(
+        "げんじゅうしょ{}おわり",
+        "かくうのじゅうしょふりがな".repeat(10)
+    );
+    let alternate_kana = format!(
+        "べつれんらくさき{}おわり",
+        "かくうのべつれんらくさき".repeat(10)
+    );
+    value["profile"]["nameKana"] = serde_json::json!(name_kana);
+    value["profile"]["addressKana"] = serde_json::json!(address_kana);
+    value["profile"]["alternateContact"]["addressKana"] = serde_json::json!(alternate_kana);
     value["resume"]["education"] = serde_json::json!([
         {"id":"short","yearMonth":"2012-03","text":short},
         {"id":"long","yearMonth":"2013-03","text":long}
@@ -373,7 +385,14 @@ fn resume_fixed_rows_shrink_only_overflowing_text() {
         .map(|p| p["text"].as_str().unwrap())
         .collect::<String>();
     let normalized = text.split_whitespace().collect::<String>();
-    for expected in [short, long.as_str(), ascii.as_str()] {
+    for expected in [
+        short,
+        long.as_str(),
+        ascii.as_str(),
+        name_kana.as_str(),
+        address_kana.as_str(),
+        alternate_kana.as_str(),
+    ] {
         assert!(normalized.contains(expected), "missing {expected}: {text}");
     }
     let directory = tempfile::tempdir().unwrap();
@@ -406,6 +425,9 @@ print(String(data: try! JSONSerialization.data(withJSONObject: measurements), en
             "QUAL",
             "電話",
             "現住所",
+            "なまえ",
+            "げんじゅうしょ",
+            "べつれんらくさき",
         ])
         .output()
         .unwrap();
@@ -416,7 +438,7 @@ print(String(data: try! JSONSerialization.data(withJSONObject: measurements), en
     );
     let measured: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
     // PDFKit reports nominal font heights for transformed glyphs, so compare
-    // physical glyph widths to verify the proportional reduction.
+    // physical selection widths to verify the proportional reduction.
     let width =
         |label: &str| measured[label][1].as_f64().unwrap() - measured[label][0].as_f64().unwrap();
     assert!(width("長い学校名") < width(short) * 0.7, "{measured}");
@@ -425,6 +447,12 @@ print(String(data: try! JSONSerialization.data(withJSONObject: measurements), en
         (width("電話") / 2.0 - width("現住所") / 3.0).abs() < 0.2,
         "{measured}"
     );
+    for label in ["なまえ", "げんじゅうしょ", "べつれんらくさき"] {
+        assert!(
+            width(label) / (label.chars().count() as f64) < width("電話") / 2.0 * 0.85,
+            "{measured}"
+        );
+    }
     for label in ["長い学校名", "QUAL"] {
         let left = measured[label][0].as_f64().unwrap();
         let right = measured[label][1].as_f64().unwrap();
