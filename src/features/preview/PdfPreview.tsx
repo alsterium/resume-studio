@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import type { PDFDocumentProxy, RenderTask } from "pdfjs-dist";
 import { Button } from "../../components/ui/button";
-import { ChevronLeft, ChevronRight, Columns2, FileText } from "lucide-react";
+import { ButtonGroup, ButtonGroupText } from "../../components/ui/button-group";
+import { ChevronLeft, ChevronRight, Columns2, FileText, Minus, Plus, Maximize } from "lucide-react";
 
 export function PdfPreview({
   bytes,
@@ -39,7 +40,139 @@ export function PdfPreview({
   const scale = typeof controlledZoom === "number" ? controlledZoom : localScale;
   const [rendered, setRendered] = useState<{ page: number; scale: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [pinching, setPinching] = useState(false);
   const pageSelection = useRef({ page: requestedPage, onPageChange });
+  const zoomState = useRef({ scale, onZoomChange });
+  const zoomAnchor = useRef<{
+    x: number;
+    y: number;
+    left: number;
+    top: number;
+    scale: number;
+  } | null>(null);
+
+  useEffect(() => {
+    zoomState.current = { scale, onZoomChange };
+  }, [scale, onZoomChange]);
+
+  function changeZoom(next: "fit" | number, point?: { x: number; y: number }) {
+    if (typeof next === "number") {
+      if (!Number.isFinite(next)) return;
+      next = Math.round(Math.max(0.25, Math.min(2, next)) * 1000) / 1000;
+      const container = paper.current;
+      if (container) {
+        const rect = container.getBoundingClientRect();
+        const x = point ? point.x - rect.left : container.clientWidth / 2;
+        const y = point ? point.y - rect.top : container.clientHeight / 2;
+        // Retain the original anchor until the pending PDF render finishes.
+        zoomAnchor.current ??= {
+          x,
+          y,
+          left: container.scrollLeft,
+          top: container.scrollTop,
+          scale: zoomState.current.scale,
+        };
+      }
+      zoomState.current.scale = next;
+      setScale(next);
+    } else {
+      zoomAnchor.current = null;
+    }
+    setFit(next === "fit");
+    zoomState.current.onZoomChange?.(next);
+  }
+
+  useEffect(() => {
+    const container = paper.current;
+    const anchor = zoomAnchor.current;
+    if (!container || !anchor || !rendered || rendered.scale !== scale) return;
+    const ratio = scale / anchor.scale;
+    container.scrollLeft = (anchor.left + anchor.x) * ratio - anchor.x;
+    container.scrollTop = (anchor.top + anchor.y) * ratio - anchor.y;
+    zoomAnchor.current = null;
+  }, [rendered, scale]);
+
+  useEffect(() => {
+    const container = paper.current;
+    if (!container || !document) return;
+    let gestureScale: number | null = null;
+    let touchStart: { distance: number; scale: number } | null = null;
+    let wheelEnd: ReturnType<typeof setTimeout> | undefined;
+    const point = (event: MouseEvent) => ({ x: event.clientX, y: event.clientY });
+    const wheel = (event: WheelEvent) => {
+      if (!event.ctrlKey) return;
+      event.preventDefault();
+      if (gestureScale !== null) return;
+      setPinching(true);
+      clearTimeout(wheelEnd);
+      wheelEnd = setTimeout(() => setPinching(false), 180);
+      const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? container.clientHeight : 1;
+      changeZoom(zoomState.current.scale * Math.exp(-event.deltaY * unit * 0.01), point(event));
+    };
+    // WKWebView/Safari trackpads emit cumulative GestureEvent.scale values.
+    const gestureStart = (event: Event) => {
+      event.preventDefault();
+      gestureScale = zoomState.current.scale;
+      clearTimeout(wheelEnd);
+      setPinching(true);
+    };
+    const gestureChange = (event: Event) => {
+      event.preventDefault();
+      const gesture = event as MouseEvent & { scale: number };
+      if (gestureScale !== null) changeZoom(gestureScale * gesture.scale, point(gesture));
+    };
+    const gestureEnd = (event: Event) => {
+      event.preventDefault();
+      gestureScale = null;
+      touchStart = null;
+      setPinching(false);
+    };
+    const distance = (touches: TouchList) =>
+      Math.hypot(touches[0].clientX - touches[1].clientX, touches[0].clientY - touches[1].clientY);
+    const startTouch = (event: TouchEvent) => {
+      if (event.touches.length !== 2) {
+        touchStart = null;
+        if (gestureScale === null) setPinching(false);
+        return;
+      }
+      event.preventDefault();
+      touchStart = { distance: distance(event.touches), scale: zoomState.current.scale };
+      clearTimeout(wheelEnd);
+      setPinching(true);
+    };
+    const moveTouch = (event: TouchEvent) => {
+      if (event.touches.length !== 2 || !touchStart) return;
+      event.preventDefault();
+      if (gestureScale !== null || touchStart.distance === 0) return;
+      changeZoom((touchStart.scale * distance(event.touches)) / touchStart.distance, {
+        x: (event.touches[0].clientX + event.touches[1].clientX) / 2,
+        y: (event.touches[0].clientY + event.touches[1].clientY) / 2,
+      });
+    };
+    const endTouch = () => {
+      touchStart = null;
+      if (gestureScale === null) setPinching(false);
+    };
+    container.addEventListener("wheel", wheel, { passive: false });
+    container.addEventListener("gesturestart", gestureStart, { passive: false });
+    container.addEventListener("gesturechange", gestureChange, { passive: false });
+    container.addEventListener("gestureend", gestureEnd, { passive: false });
+    container.addEventListener("touchstart", startTouch, { passive: false });
+    container.addEventListener("touchmove", moveTouch, { passive: false });
+    container.addEventListener("touchend", endTouch);
+    container.addEventListener("touchcancel", endTouch);
+    return () => {
+      clearTimeout(wheelEnd);
+      container.removeEventListener("wheel", wheel);
+      container.removeEventListener("gesturestart", gestureStart);
+      container.removeEventListener("gesturechange", gestureChange);
+      container.removeEventListener("gestureend", gestureEnd);
+      container.removeEventListener("touchstart", startTouch);
+      container.removeEventListener("touchmove", moveTouch);
+      container.removeEventListener("touchend", endTouch);
+      container.removeEventListener("touchcancel", endTouch);
+    };
+  }, [document]);
 
   useEffect(() => {
     pageSelection.current = { page: requestedPage, onPageChange };
@@ -169,24 +302,6 @@ export function PdfPreview({
         >
           <ChevronRight aria-hidden="true" />
         </Button>
-        <label>
-          表示倍率
-          <select
-            value={fit ? "fit" : scale}
-            onChange={(event) => {
-              setFit(event.target.value === "fit");
-              if (event.target.value !== "fit") setScale(Number(event.target.value));
-              onZoomChange?.(event.target.value === "fit" ? "fit" : Number(event.target.value));
-            }}
-          >
-            <option value="fit">画面に合わせる</option>
-            {[0.5, 0.75, 1, 1.25, 1.5, 2].map((value) => (
-              <option key={value} value={value}>
-                {value * 100}%
-              </option>
-            ))}
-          </select>
-        </label>
         <Button
           variant="outline"
           size="sm"
@@ -207,23 +322,70 @@ export function PdfPreview({
         </output>
       )}
       {error && <p role="alert">{error}</p>}
-      <div className="pdf-paper" ref={paper}>
-        <div className="pdf-pages">
-          <canvas
-            ref={canvas}
-            aria-label="生成されたPDFページ"
-            data-rendered-page={rendered?.page}
-            data-rendered-scale={rendered?.scale}
-          />
-          {spread && document && page < document.numPages && (
+      <div className="preview-viewport">
+        <div className="pdf-paper" ref={paper}>
+          <div className="pdf-pages">
             <canvas
-              ref={secondCanvas}
-              aria-label={`生成されたPDFページ ${page + 1}`}
-              data-rendered-page={rendered ? page + 1 : undefined}
+              ref={canvas}
+              aria-label="生成されたPDFページ"
+              data-rendered-page={rendered?.page}
               data-rendered-scale={rendered?.scale}
             />
-          )}
+            {spread && document && page < document.numPages && (
+              <canvas
+                ref={secondCanvas}
+                aria-label={`生成されたPDFページ ${page + 1}`}
+                data-rendered-page={rendered ? page + 1 : undefined}
+                data-rendered-scale={rendered?.scale}
+              />
+            )}
+          </div>
         </div>
+        <ButtonGroup
+          aria-label="プレビューのズーム操作"
+          className="preview-zoom"
+          data-pinching={pinching}
+        >
+          <Button
+            type="button"
+            variant="outline"
+            size="icon-lg"
+            aria-label="縮小"
+            title="縮小"
+            disabled={!document || scale <= 0.25}
+            onClick={() => changeZoom(Math.max(0.25, Math.floor((scale - 0.001) * 4) / 4))}
+          >
+            <Minus aria-hidden="true" />
+          </Button>
+          <ButtonGroupText asChild className="preview-zoom-value">
+            <output aria-label="表示倍率" data-zoom-mode={fit ? "fit" : "manual"}>
+              {Math.round(scale * 100)}%
+            </output>
+          </ButtonGroupText>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon-lg"
+            aria-label="拡大"
+            title="拡大"
+            disabled={!document || scale >= 2}
+            onClick={() => changeZoom(Math.min(2, Math.floor((scale + 0.001) * 4) / 4 + 0.25))}
+          >
+            <Plus aria-hidden="true" />
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon-lg"
+            aria-label="画面に合わせる"
+            title="画面に合わせる"
+            aria-pressed={fit}
+            disabled={!document}
+            onClick={() => changeZoom("fit")}
+          >
+            <Maximize aria-hidden="true" />
+          </Button>
+        </ButtonGroup>
       </div>
     </section>
   );

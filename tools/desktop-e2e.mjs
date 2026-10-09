@@ -723,13 +723,34 @@ try {
   } finally {
     await pdfTask.destroy();
   }
-  // The embedded driver's option click does not dispatch select change in WKWebView.
-  // Drive the native value setter and DOM event; the PDF renderer remains real.
-  await browser.execute(() => {
-    const select = document.querySelector(".preview-controls select");
-    Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value").set.call(select, "1.5");
-    select.dispatchEvent(new Event("change", { bubbles: true }));
-  });
+  const overlayGeometry = () =>
+    browser.execute(() => {
+      const zoom = document.querySelector(".preview-zoom");
+      const viewport = document.querySelector(".preview-viewport");
+      const z = zoom.getBoundingClientRect();
+      const v = viewport.getBoundingClientRect();
+      return {
+        right: v.right - z.right,
+        bottom: v.bottom - z.bottom,
+        colors: Array.from(zoom.children).map((el) => getComputedStyle(el).borderTopColor),
+        hint: viewport.textContent.includes("ピンチで"),
+      };
+    });
+  const beforeZoom = await overlayGeometry();
+  assert.ok(
+    Math.abs(beforeZoom.right - 24) < 1 && Math.abs(beforeZoom.bottom - 24) < 1,
+    JSON.stringify(beforeZoom),
+  );
+  assert.equal(new Set(beforeZoom.colors).size, 1, JSON.stringify(beforeZoom));
+  assert.equal(beforeZoom.hint, false);
+  // Exercise the visible shadcn buttons with real WebView clicks.
+  while (
+    Number(await browser.execute(() => document.querySelector("canvas")?.dataset.renderedScale)) >
+    0.25
+  ) {
+    await browser.$('[aria-label="縮小"]').click();
+  }
+  for (let i = 0; i < 5; i++) await browser.$('[aria-label="拡大"]').click();
   await browser.waitUntil(
     async () => {
       const state = await browser.execute(() => ({
@@ -742,6 +763,91 @@ try {
     { timeout: 30000 },
   );
   assert.ok((await browser.execute(() => document.querySelector("canvas").width)) > first.width);
+  await browser.execute(() => {
+    const paper = document.querySelector(".pdf-paper");
+    paper.scrollTop = 200;
+    paper.scrollLeft = 100;
+  });
+  assert.deepEqual(await overlayGeometry(), beforeZoom);
+  // The embedded driver dispatches DOM mousemove without native :hover state.
+  // Verify the hover rule and the equivalent keyboard focus presentation.
+  const hoverOpacity = await browser.execute(() => {
+    for (const sheet of document.styleSheets) {
+      for (const rule of sheet.cssRules) {
+        if (rule.selectorText?.includes(".preview-zoom:hover")) return rule.style.opacity;
+      }
+    }
+  });
+  assert.equal(hoverOpacity, "1");
+  await browser.execute(() => document.activeElement?.blur());
+  await browser.execute(() => document.querySelector('[aria-label="拡大"]').focus());
+  await browser.waitUntil(
+    async () =>
+      await browser.execute(
+        () => getComputedStyle(document.querySelector(".preview-zoom")).opacity === "1",
+      ),
+    { timeout: 3000 },
+  );
+  await captureLayout("zoom-overlay");
+  await browser.execute(() => document.activeElement?.blur());
+  await browser.waitUntil(
+    async () =>
+      await browser.execute(
+        () => getComputedStyle(document.querySelector(".preview-zoom")).opacity === "0.55",
+      ),
+    { timeout: 3000 },
+  );
+  await captureLayout("zoom-overlay-idle");
+  await browser.$(".preview-zoom").moveTo();
+  // Synthesized WebKit events verify the actual listener and PDF.js rendering.
+  // Physical trackpad gestures remain a separate manual acceptance boundary.
+  await browser.execute(() => {
+    const paper = document.querySelector(".pdf-paper");
+    for (const [type, scale] of [
+      ["gesturestart", 1],
+      ["gesturechange", 0.5],
+    ]) {
+      const event = new Event(type, { bubbles: true, cancelable: true });
+      Object.assign(event, { scale, clientX: 700, clientY: 300 });
+      paper.dispatchEvent(event);
+    }
+  });
+  await browser.waitUntil(
+    async () =>
+      await browser.execute(
+        () => document.querySelector("canvas")?.dataset.renderedScale === "0.75",
+      ),
+    { timeout: 30000 },
+  );
+  await browser.waitUntil(
+    async () =>
+      await browser.execute(
+        () =>
+          document.querySelector(".preview-zoom").dataset.pinching === "true" &&
+          getComputedStyle(document.querySelector(".preview-zoom")).opacity === "0.55",
+      ),
+    { timeout: 3000 },
+  );
+  await captureLayout("zoom-overlay-pinching");
+  await browser.execute(() =>
+    document
+      .querySelector(".pdf-paper")
+      .dispatchEvent(new Event("gestureend", { bubbles: true, cancelable: true })),
+  );
+  await browser.$('[aria-label="画面に合わせる"]').click();
+  await browser.waitUntil(
+    async () =>
+      await browser.execute(
+        () =>
+          document.querySelector('[aria-label="画面に合わせる"]').getAttribute("aria-pressed") ===
+          "true",
+      ),
+    { timeout: 5000 },
+  );
+  console.log(
+    "PREVIEW_ZOOM: PASS (buttons, WebKit events, real PDF rendering, fixed overlay, equal borders, hover rule/focus/idle/pinch opacity)",
+  );
+
   await browser.$("button=テンプレート一覧を確認").click();
   await browser.waitUntil(
     async () =>

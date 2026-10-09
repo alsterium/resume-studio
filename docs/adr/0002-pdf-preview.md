@@ -7,3 +7,13 @@ PDF.js 6.4.299を採用し、Node 22.14.0との互換性を公式npmパッケー
 [PDF.js公式API](https://mozilla.github.io/pdf.js/api/draft/module-pdfjsLib.html)と[ページ移動の公式例](https://github.com/mozilla/pdf.js/blob/master/examples/learning/prevnext.html)に従い、getDocument・getPage・canvas renderを利用する。Uint8Arrayはworkerへ移譲されるためコピーを渡す。ページ変更時は前のrender taskを中断し、破棄時はloading taskを破棄する。
 
 実macOS WebViewで日本語・特殊文字を含む複数ページPDFを描画し、拡大とページ移動を確認した。Wasm画像デコードは無効とし、写真対応のT13で改めて検証する。
+
+## ズーム操作（T53）
+
+shadcn/uiのButtonとButtonGroupを使い、−・実倍率・＋・幅合わせをプレビューの右下24pxへ固定する。スクロール領域とオーバーレイの親を分け、紙面のスクロールに追従させない。案内文を表示せず、倍率とボタンの枠線は共通色にする。倍率は25〜200%、ボタンは25%刻み。幅合わせの実倍率から指定倍率へ切り替え、書類別設定の既存契約を維持する。
+
+WKWebView/Safariのgesturestart/change/end、Ctrl付きwheel、2指TouchEventをプレビュー領域だけで処理する。通常wheel・1指スクロールは抑止しない。WebKitの累積scaleは開始時倍率へ掛け、同時wheel/touchで二重拡大しない。描画完了後に操作位置を基準にスクロールを補正する。リスナーは破棄時に解除する。
+
+参照：[shadcn ButtonGroup](https://ui.shadcn.com/docs/components/radix/button-group)、[公式ソース](https://github.com/shadcn-ui/ui/blob/main/apps/v4/registry/new-york-v4/ui/button-group.tsx)、[MDN wheel](https://developer.mozilla.org/en-US/docs/Web/API/Element/wheel_event)、[MDN gesturechange](https://developer.mozilla.org/en-US/docs/Web/API/Element/gesturechange_event)。既存Radix系UIに合わせて公式ButtonGroup/Textを追加し、追加依存は不要。
+
+操作パネルは通常opacity 0.55、hover/focus-within時は1、ピンチ中は優先して0.55。Ctrl付きwheelの最終イベントから180msでピンチ状態を解除する。表示切替は150ms、reduced-motionではアニメーションなし。透明度を下げても操作可能。

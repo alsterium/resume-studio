@@ -32,7 +32,10 @@
         const pageCount = Number(document.querySelector('[aria-label="ページ番号"]').textContent.split("/")[1]);
         if (pageCount < 2) throw new Error("not multipage");
         originalWidth = canvas.width;
-        setValue(document.querySelector("select"), HTMLSelectElement.prototype, "1.5", "change");
+        document.querySelector('[aria-label="拡大"]').click();
+        stage = 25;
+      } else if (stage === 25 && canvas?.dataset.renderedScale === "1.25") {
+        document.querySelector('[aria-label="拡大"]').click();
         stage = 3;
       } else if (stage === 3 && canvas?.dataset.renderedScale === "1.5") {
         if (canvas.width <= originalWidth || !hasInk(canvas)) throw new Error("zoom failed");

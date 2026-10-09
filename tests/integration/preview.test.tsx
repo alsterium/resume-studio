@@ -1,5 +1,5 @@
 import { openSummary, projectMenu } from "../ui-navigation";
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { Channel } from "@tauri-apps/api/core";
 import type { GeneratedDocument, JobPhase } from "../../src/infrastructure/app-client";
 import userEvent from "@testing-library/user-event";
@@ -9,6 +9,15 @@ import { DraftWorkspace } from "../../src/features/preview/DraftWorkspace";
 import { PdfPreview } from "../../src/features/preview/PdfPreview";
 import { tauriClient } from "../../src/infrastructure/app-client";
 import fullProject from "../fixtures/project-full.json";
+
+async function setZoom(user: ReturnType<typeof userEvent.setup>, target: number) {
+  for (let step = 0; step < 8; step++) {
+    const current = Number(screen.getByLabelText("表示倍率").textContent?.replace("%", "")) / 100;
+    if (current === target) return;
+    await user.click(screen.getByRole("button", { name: current > target ? "縮小" : "拡大" }));
+  }
+  expect(screen.getByLabelText("表示倍率")).toHaveTextContent(String(target * 100) + "%");
+}
 
 test("待機中と実行中の生成を停止し、後始末の完了まで待って成功PDFを保持する", async () => {
   const user = userEvent.setup();
@@ -381,7 +390,7 @@ test("入力をIPCで生成し、結果IDから読込・ページ移動・拡大
   await waitFor(() =>
     expect(screen.getByLabelText("生成されたPDFページ")).toHaveAttribute("data-rendered-page", "2"),
   );
-  await user.selectOptions(screen.getByLabelText("表示倍率"), "1.5");
+  await setZoom(user, 1.5);
   await waitFor(() =>
     expect(screen.getByLabelText("生成されたPDFページ")).toHaveAttribute("width", "900"),
   );
@@ -572,7 +581,7 @@ test("見開きは2ページを描画し、奇数の最終ページから戻り�
   await user.click(screen.getByRole("button", { name: "前のページ" }));
   await user.click(screen.getByRole("button", { name: "見開き" }));
   expect(screen.queryByLabelText("生成されたPDFページ 2")).not.toBeInTheDocument();
-  await user.selectOptions(screen.getByLabelText("表示倍率"), "1.5");
+  await setZoom(user, 1.5);
   await waitFor(() =>
     expect(screen.getByLabelText("生成されたPDFページ")).toHaveAttribute(
       "data-rendered-scale",
@@ -620,25 +629,28 @@ test("手動・自動の再生成と書類切替でも書類ごとの見開き�
     await rendered();
     expect(screen.getByRole("button", { name: "見開き" })).toHaveAttribute("aria-pressed", "true");
     await user.click(screen.getByRole("button", { name: "見開き" }));
-    await user.selectOptions(screen.getByLabelText("表示倍率"), "1.5");
+    await setZoom(user, 1.5);
     let previous = screen.getByLabelText("生成されたPDFページ");
     await user.click(screen.getByRole("button", { name: "履歴書PDF更新" }));
     await regenerated(previous);
     expect(screen.getByRole("button", { name: "見開き" })).toHaveAttribute("aria-pressed", "false");
     expect(screen.queryByLabelText("生成されたPDFページ 2")).not.toBeInTheDocument();
-    expect(screen.getByLabelText("表示倍率")).toHaveValue("1.5");
+    expect(screen.getByLabelText("表示倍率")).toHaveTextContent("150%");
     expect(screen.getByLabelText("生成されたPDFページ")).toHaveAttribute("width", "900");
     await user.click(screen.getByRole("tab", { name: "職務経歴書" }));
     await user.click(screen.getByRole("button", { name: "職務経歴書PDF更新" }));
     await rendered();
     expect(screen.getByRole("button", { name: "見開き" })).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByLabelText("表示倍率")).toHaveValue("fit");
-    await user.selectOptions(screen.getByLabelText("表示倍率"), "0.75");
+    expect(screen.getByRole("button", { name: "画面に合わせる" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    await setZoom(user, 0.75);
     await user.click(screen.getByRole("button", { name: "見開き" }));
     await user.click(screen.getByRole("tab", { name: "履歴書" }));
     await rendered();
     expect(screen.getByRole("button", { name: "見開き" })).toHaveAttribute("aria-pressed", "false");
-    expect(screen.getByLabelText("表示倍率")).toHaveValue("1.5");
+    expect(screen.getByLabelText("表示倍率")).toHaveTextContent("150%");
     previous = screen.getByLabelText("生成されたPDFページ");
     await user.click(screen.getByRole("button", { name: "設定" }));
     await user.click(screen.getByRole("checkbox", { name: "PDFを自動生成する" }));
@@ -647,7 +659,7 @@ test("手動・自動の再生成と書類切替でも書類ごとの見開き�
     previous = screen.getByLabelText("生成されたPDFページ");
     await user.type(screen.getByLabelText("氏名"), "架空の自動再生成");
     await regenerated(previous);
-    expect(screen.getByLabelText("表示倍率")).toHaveValue("1.5");
+    expect(screen.getByLabelText("表示倍率")).toHaveTextContent("150%");
     expect(screen.getByLabelText("生成されたPDFページ")).toHaveAttribute("width", "900");
     expect(screen.getByRole("button", { name: "見開き" })).toHaveAttribute("aria-pressed", "false");
     expect(screen.queryByLabelText("生成されたPDFページ 2")).not.toBeInTheDocument();
@@ -657,15 +669,18 @@ test("手動・自動の再生成と書類切替でも書類ごとの見開き�
     await regenerated(previous);
     expect(screen.getByRole("button", { name: "見開き" })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByLabelText("生成されたPDFページ 2")).toBeInTheDocument();
-    await user.selectOptions(screen.getByLabelText("表示倍率"), "fit");
+    await user.click(screen.getByRole("button", { name: "画面に合わせる" }));
     previous = screen.getByLabelText("生成されたPDFページ");
     await user.click(screen.getByRole("button", { name: "履歴書PDF更新" }));
     await regenerated(previous);
-    expect(screen.getByLabelText("表示倍率")).toHaveValue("fit");
+    expect(screen.getByRole("button", { name: "画面に合わせる" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
     await user.click(screen.getByRole("tab", { name: "職務経歴書" }));
     await rendered();
     expect(screen.getByRole("button", { name: "見開き" })).toHaveAttribute("aria-pressed", "false");
-    expect(screen.getByLabelText("表示倍率")).toHaveValue("0.75");
+    expect(screen.getByLabelText("表示倍率")).toHaveTextContent("75%");
     expect(screen.getByLabelText("生成されたPDFページ")).toHaveAttribute("width", "450");
   } finally {
     view.unmount();
@@ -712,12 +727,12 @@ test("PDF再生成と書類切替で表示ページを保持し、ページ数�
     await user.click(screen.getByRole("button", { name: "見開き" }));
     await user.click(screen.getByRole("button", { name: "次のページ" }));
     await displayed(2);
-    await user.selectOptions(screen.getByLabelText("表示倍率"), "1.5");
+    await setZoom(user, 1.5);
     let previous = screen.getByLabelText("生成されたPDFページ");
     await user.click(screen.getByRole("button", { name: "履歴書PDF更新" }));
     await regenerated(previous, 2);
     expect(screen.getByRole("button", { name: "見開き" })).toHaveAttribute("aria-pressed", "false");
-    expect(screen.getByLabelText("表示倍率")).toHaveValue("1.5");
+    expect(screen.getByLabelText("表示倍率")).toHaveTextContent("150%");
     await user.click(screen.getByRole("tab", { name: "職務経歴書" }));
     await user.click(screen.getByRole("button", { name: "職務経歴書PDF更新" }));
     await displayed(1);
@@ -755,4 +770,123 @@ test("PDF再生成と書類切替で表示ページを保持し、ページ数�
     view.unmount();
     localStorage.removeItem("resume-studio.auto-pdf");
   }
+});
+
+test("右下のズーム操作は境界・幅合わせ・キーボード操作に対応する", async () => {
+  const user = userEvent.setup();
+  render(<PdfPreview bytes={new Uint8Array([2])} />);
+  await waitFor(() => expect(screen.getByLabelText("ページ番号")).toHaveTextContent("1 / 2"));
+  const group = screen.getByRole("group", { name: "プレビューのズーム操作" });
+  expect(group).toHaveAttribute("data-slot", "button-group");
+  expect(group.parentElement).toHaveClass("preview-viewport");
+  expect(group.parentElement?.querySelector(".pdf-paper")).toBeInTheDocument();
+  expect(screen.queryByText("ピンチで拡大・縮小")).not.toBeInTheDocument();
+  await setZoom(user, 2);
+  expect(screen.getByRole("button", { name: "拡大" })).toBeDisabled();
+  await setZoom(user, 0.25);
+  expect(screen.getByRole("button", { name: "縮小" })).toBeDisabled();
+  screen.getByRole("button", { name: "拡大" }).focus();
+  await user.keyboard("{Enter}");
+  expect(screen.getByLabelText("表示倍率")).toHaveTextContent("50%");
+  const paper = group.parentElement!.querySelector(".pdf-paper")!;
+  Object.defineProperty(paper, "clientWidth", { configurable: true, value: 648 });
+  await user.click(screen.getByRole("button", { name: "画面に合わせる" }));
+  await waitFor(() => expect(screen.getByLabelText("表示倍率")).toHaveTextContent("100%"));
+  expect(screen.getByRole("button", { name: "画面に合わせる" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await user.click(screen.getByRole("button", { name: "拡大" }));
+  expect(screen.getByLabelText("表示倍率")).toHaveTextContent("125%");
+  expect(screen.getByRole("button", { name: "画面に合わせる" })).toHaveAttribute(
+    "aria-pressed",
+    "false",
+  );
+});
+
+test("ピンチはPDFだけを拡大し通常スクロールを妨げず、WebKitとwheelの重複を防ぐ", async () => {
+  render(<PdfPreview bytes={new Uint8Array([2])} />);
+  await waitFor(() => expect(screen.getByLabelText("ページ番号")).toHaveTextContent("1 / 2"));
+  const canvas = screen.getByLabelText("生成されたPDFページ");
+  const paper = canvas.closest(".pdf-paper")!;
+  const gesture = (type: string, scale = 1) => {
+    const event = new Event(type, { bubbles: true, cancelable: true });
+    Object.assign(event, { scale, clientX: 100, clientY: 100 });
+    fireEvent(paper, event);
+    return event;
+  };
+  const normal = new WheelEvent("wheel", { deltaY: 50, bubbles: true, cancelable: true });
+  fireEvent(paper, normal);
+  expect(normal.defaultPrevented).toBe(false);
+  expect(screen.getByLabelText("表示倍率")).toHaveTextContent("100%");
+  gesture("gesturestart");
+  expect(screen.getByRole("group", { name: "プレビューのズーム操作" })).toHaveAttribute(
+    "data-pinching",
+    "true",
+  );
+  gesture("gesturechange", 1.5);
+  fireEvent.wheel(paper, { ctrlKey: true, deltaY: -20 });
+  expect(screen.getByLabelText("表示倍率")).toHaveTextContent("150%");
+  gesture("gesturechange", 1.25); // Cumulative from start, not from the last change.
+  await waitFor(() => expect(canvas).toHaveAttribute("data-rendered-scale", "1.25"));
+  gesture("gestureend");
+  expect(screen.getByRole("group", { name: "プレビューのズーム操作" })).toHaveAttribute(
+    "data-pinching",
+    "false",
+  );
+  const wheel = new WheelEvent("wheel", {
+    ctrlKey: true,
+    deltaY: -1000,
+    bubbles: true,
+    cancelable: true,
+  });
+  fireEvent(paper, wheel);
+  expect(screen.getByRole("group", { name: "プレビューのズーム操作" })).toHaveAttribute(
+    "data-pinching",
+    "true",
+  );
+  expect(wheel.defaultPrevented).toBe(true);
+  await waitFor(() => expect(canvas).toHaveAttribute("data-rendered-scale", "2"));
+  fireEvent.wheel(paper, { ctrlKey: true, deltaY: 1000 });
+  await waitFor(() => expect(canvas).toHaveAttribute("data-rendered-scale", "0.25"));
+  await waitFor(() =>
+    expect(screen.getByRole("group", { name: "プレビューのズーム操作" })).toHaveAttribute(
+      "data-pinching",
+      "false",
+    ),
+  );
+  gesture("gesturestart");
+  gesture("gesturechange", Number.NaN);
+  gesture("gestureend");
+  expect(screen.getByLabelText("表示倍率")).toHaveTextContent("25%");
+});
+
+test("2指タッチで拡大縮小し、指が離れた後の1指操作を維持する", async () => {
+  render(<PdfPreview bytes={new Uint8Array([2])} />);
+  await waitFor(() => expect(screen.getByLabelText("ページ番号")).toHaveTextContent("1 / 2"));
+  const canvas = screen.getByLabelText("生成されたPDFページ");
+  const paper = canvas.closest(".pdf-paper")!;
+  const touches = (width: number) => [
+    { clientX: 100, clientY: 100 },
+    { clientX: 100 + width, clientY: 100 },
+  ];
+  fireEvent.touchStart(paper, { touches: touches(100) });
+  expect(screen.getByRole("group", { name: "プレビューのズーム操作" })).toHaveAttribute(
+    "data-pinching",
+    "true",
+  );
+  fireEvent.touchMove(paper, { touches: touches(150) });
+  await waitFor(() => expect(canvas).toHaveAttribute("data-rendered-scale", "1.5"));
+  fireEvent.touchMove(paper, { touches: touches(50) });
+  await waitFor(() => expect(canvas).toHaveAttribute("data-rendered-scale", "0.5"));
+  fireEvent.touchCancel(paper);
+  expect(screen.getByRole("group", { name: "プレビューのズーム操作" })).toHaveAttribute(
+    "data-pinching",
+    "false",
+  );
+  const single = new Event("touchmove", { bubbles: true, cancelable: true });
+  Object.assign(single, { touches: [{ clientX: 200, clientY: 100 }] });
+  fireEvent(paper, single);
+  expect(single.defaultPrevented).toBe(false);
+  expect(screen.getByLabelText("表示倍率")).toHaveTextContent("50%");
 });
