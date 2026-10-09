@@ -83,7 +83,7 @@
   \vbox to\rs@height{\hsize=\dimexpr\rs@profileWidth-2\fboxrule\relax\vfil\unvbox\rs@slice\vfil}}
 % Birth date and age share a cell; optional gender has a full-height divider.
 \newcommand{\rs@birthRow}[3]{%
-  \setbox\rs@birthText=\vbox{\rs@cell{99mm}{\fontsize{10.5pt}{14pt}\selectfont\centering
+  \setbox\rs@birthText=\vbox{\rs@cell{99mm}{\fontsize{10.5pt}{14pt}\selectfont\raggedleft\rightskip=2mm
     #1 生\def\rs@age{#2}\ifx\rs@age\@empty\else\quad（#2）\fi}}%
   \setbox\rs@genderText=\vbox{\rs@cell{\dimexpr\hsize-99mm-.4pt\relax}{\centering #3}}%
   % Empty values still reserve their full column width.
