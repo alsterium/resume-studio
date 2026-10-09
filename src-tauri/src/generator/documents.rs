@@ -63,7 +63,7 @@ fn history(output: &mut String, title: &str, rows: &[HistoryRow]) {
             "ResumeHistoryRow",
             &[
                 display_text(year),
-                display_text(month),
+                display_text(month.trim_start_matches('0')),
                 display_text(&row.text),
             ],
         );

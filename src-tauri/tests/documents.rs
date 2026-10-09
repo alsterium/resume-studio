@@ -9,6 +9,33 @@ use resume_studio_lib::{
 use std::{fs, io::ErrorKind};
 
 #[test]
+fn resume_history_months_omit_padding_and_preserve_empty_dates() {
+    let mut value: serde_json::Value =
+        serde_json::from_slice(include_bytes!("../../tests/fixtures/project-empty.json")).unwrap();
+    for field in ["education", "employment", "qualifications"] {
+        value["resume"][field] = serde_json::json!([
+            {"id":format!("{field}-feb"),"yearMonth":"2020-02","text":format!("{field} February")},
+            {"id":format!("{field}-oct"),"yearMonth":"2020-10","text":format!("{field} October")},
+            {"id":format!("{field}-empty"),"yearMonth":"","text":format!("{field} empty")}
+        ]);
+    }
+    let project = parse_project(&serde_json::to_vec(&value).unwrap()).unwrap();
+    let bundle = generate_project(&project, DocumentKind::Resume).unwrap();
+    let displayed = bundle.content_tex.replace("\\allowbreak{}", "");
+    for field in ["education", "employment", "qualifications"] {
+        for (year, month, text) in [
+            ("2020", "2", "February"),
+            ("2020", "10", "October"),
+            ("", "", "empty"),
+        ] {
+            assert!(displayed.contains(&format!(
+                "\\ResumeHistoryRow{{{year}}}{{{month}}}{{{field} {text}}}"
+            )));
+        }
+    }
+}
+
+#[test]
 fn formal_documents_preserve_fields_and_export_owned_resources() {
     let project = parse_project(include_bytes!("../../tests/fixtures/project-full.json")).unwrap();
     for kind in [DocumentKind::Resume, DocumentKind::Career] {
@@ -50,7 +77,7 @@ fn formal_documents_preserve_fields_and_export_owned_resources() {
                 }
                 assert!(bundle
                     .content_tex
-                    .contains("\\ResumeHistoryRow{2012}{04}{架空株式会社 入社}"));
+                    .contains("\\ResumeHistoryRow{2012}{4}{架空株式会社 入社}"));
                 assert!(!bundle.content_tex.contains("CareerCompany"));
             }
             DocumentKind::Career => {

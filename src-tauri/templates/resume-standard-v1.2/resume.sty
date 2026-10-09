@@ -134,8 +134,11 @@
   % Share the first-row height so the phone and kana dividers align exactly.
   \setbox\rs@contactKana=\vbox{\hsize=.70\rs@width\vskip1mm
     \rs@labelled{ふりがな}{\rs@fitKana{#4}}\vskip1.5mm}%
-  \setbox\rs@phone=\vbox{\hsize=\dimexpr.30\rs@width-.4pt\relax
-    \rs@cell{\hsize}{\fontsize{9pt}{11pt}\selectfont 電話\quad #5}}%
+  % Center the digits separately from the taller Japanese label.
+  \setbox\rs@phone=\hbox{\fontsize{9pt}{11pt}\selectfont\hskip2mm\m@th$%
+    \vcenter{\hbox{電話}}\hskip3mm
+    \vcenter{\hsize=\dimexpr.30\rs@width-.4pt-4mm-3mm-2em\relax
+      \linewidth=\hsize\raggedright #5\par}$\hskip2mm}%
   \rs@phoneHeight=\dimexpr\ht\rs@contactKana+\dp\rs@contactKana\relax
   \ifdim\dimexpr\ht\rs@phone+\dp\rs@phone+1mm\relax>\rs@phoneHeight
     \rs@phoneHeight=\dimexpr\ht\rs@phone+\dp\rs@phone+1mm\relax\fi
