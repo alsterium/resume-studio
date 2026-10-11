@@ -1052,16 +1052,10 @@ try {
     select.dispatchEvent(new Event("change", { bubbles: true }));
   });
   await browser.$("button=書き出す").click();
-  await browser.waitUntil(
-    async () => {
-      const results = await browser.$('[aria-label="書き出し結果"]');
-      return (
-        (await results.isExisting()) &&
-        (await results.getText()).includes("職務経歴書.pdf：保存しました")
-      );
-    },
-    { timeout: 90000 },
-  );
+  assert.equal(await browser.$('button[aria-busy="true"] .animate-spin').isExisting(), true);
+  await browser.$('[role="dialog"]').waitForExist({ reverse: true, timeout: 90000 });
+  assert.equal(await browser.$('[aria-label="書き出し"] .lucide-check').isExisting(), true);
+  assert.equal(await browser.$('[aria-label="書き出し結果"]').isExisting(), false);
   const exportedPdfs = [];
   for (const name of ["履歴書", "職務経歴書"]) {
     const bytes = await readFile(join(exportDirectory, `${name}.pdf`));
@@ -1078,7 +1072,9 @@ try {
       await task.destroy();
     }
   }
+  await browser.$("button=書き出し").click();
   await browser.$("button=書き出す").click();
+  await browser.$('[role="dialog"]').waitForExist({ reverse: true, timeout: 90000 });
   await browser.waitUntil(
     async () =>
       (await browser.$('[aria-label="書き出し結果"]').getText()).includes(
@@ -1089,6 +1085,8 @@ try {
   for (const [index, name] of ["履歴書", "職務経歴書"].entries()) {
     assert.deepEqual(await readFile(join(exportDirectory, `${name}.pdf`)), exportedPdfs[index]);
   }
+  await browser.$('[role="dialog"]').waitForExist({ reverse: true, timeout: 5000 });
+  await browser.$("button=書き出し").click();
   await browser.execute(() => {
     const select = Array.from(document.querySelectorAll("label"))
       .find((label) => label.textContent.startsWith("出力形式"))
@@ -1097,13 +1095,8 @@ try {
     select.dispatchEvent(new Event("change", { bubbles: true }));
   });
   await browser.$("button=書き出す").click();
-  await browser.waitUntil(
-    async () =>
-      (await browser.$('[aria-label="書き出し結果"]').getText()).includes(
-        "職務経歴書-tex：保存しました",
-      ),
-    { timeout: 10000 },
-  );
+  await browser.$('[role="dialog"]').waitForExist({ reverse: true, timeout: 10000 });
+  assert.equal(await browser.$('[aria-label="書き出し"] .lucide-check').isExisting(), true);
   for (const [name, style] of [
     ["履歴書", "resume.sty"],
     ["職務経歴書", "career.sty"],
@@ -1138,8 +1131,6 @@ try {
       (await readFile(join(directory, "main.pdf"))).subarray(0, 5).equals(Buffer.from("%PDF-")),
     );
   }
-  await browser.$("button=ダイアログを閉じる").click();
-  await browser.$('[role="dialog"]').waitForExist({ reverse: true, timeout: 5000 });
   await verifyAutoPdf();
   await browser.$(".draft-editor input").setValue("架空 終了確認");
   const closeRequest = await browser.executeAsync((done) => {

@@ -45,6 +45,8 @@ OS pickerと上書き選択はテストfeatureのadapterで置き換える。日
 
 ## CI
 
+書き出しボタン（T60）は`preview.test.tsx`でスピナー・全件保存成功のチェックマーク・3秒後の解除・ダイアログ自動閉鎖・フォーカス復帰・結果確認案内なしを確認する。部分失敗／スキップ／キャンセル／例外で成功表示にならないことと、書き出し中の編集通知・再実行を確認する。実WebView E2Eはダイアログを再度開いてPDF／TeXの保存と上書きスキップを検証する。
+
 [CI workflow](../.github/workflows/ci.yml)はfrontend-quality（Ubuntu）、rust-quality（macOS）、desktop-e2e（macOS）、required-checksで構成する。実TeX、通常bundleもdesktop-e2eに含む。required-checksは3品質ジョブの全成功を要求し、失敗・キャンセル・skipを拒否する。現行ゲート、固定版、導入・再現方法は[CI](CI.md)を参照する。
 
 CIの入力と診断ログには架空データだけを使用する。現行workflowは専用artifactをアップロードしない。紙面QAのPDF／画像は指定したローカル一時ディレクトリへ保存する。署名・公証・公開ReleaseのチェックはMVPには含めない。

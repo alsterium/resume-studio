@@ -30,6 +30,8 @@ import {
   Save,
   ChevronDown,
   Download,
+  Check,
+  LoaderCircle,
   Settings,
   RefreshCw,
   AlertTriangle,
@@ -137,6 +139,12 @@ export function DraftWorkspace({
   const [exportScope, setExportScope] = useState<"selected" | "both">("selected");
   const [exportResults, setExportResults] = useState<ExportResult[] | null>(null);
   const [exportMessage, setExportMessage] = useState<string | null>(null);
+  const [exportState, setExportState] = useState<"idle" | "exporting" | "succeeded">("idle");
+  useEffect(() => {
+    if (exportState !== "succeeded") return;
+    const timeout = window.setTimeout(() => setExportState("idle"), 3000);
+    return () => window.clearTimeout(timeout);
+  }, [exportState]);
   const [error, setError] = useState<string | null>(null);
   const [draftPdf, setDraftPdf] = useState<Preview | null>(null);
   const [documentPdfs, setDocumentPdfs] = useState<Partial<Record<DocumentKind, Preview>>>({});
@@ -255,6 +263,7 @@ export function DraftWorkspace({
         setDocumentPdfs({});
         setExportResults(null);
         setExportMessage(null);
+        setExportState("idle");
         setJob(null);
         setFileMessage("JSONを読み込みました。");
       }
@@ -344,6 +353,7 @@ export function DraftWorkspace({
     setDocumentPdfs({});
     setExportResults(null);
     setExportMessage(null);
+    setExportState("idle");
     setJob(null);
     setError(null);
     setFileMessage(null);
@@ -504,6 +514,7 @@ export function DraftWorkspace({
     setError(null);
     setExportResults(null);
     setExportMessage(null);
+    setExportState("exporting");
     setJob({ document: label, phase: "queued" });
     try {
       const results = await client.exportDocuments(
@@ -517,18 +528,25 @@ export function DraftWorkspace({
       );
       receivingProgress = false;
       if (mounted.current) {
-        setExportResults(results);
+        const succeeded =
+          results !== null &&
+          results.length > 0 &&
+          results.every((result) => result.status === "saved");
+        setExportResults(succeeded ? null : results);
+        setExportState(succeeded ? "succeeded" : "idle");
+        if (results !== null) setExportOpen(false);
         setExportMessage(
           results === null
             ? "書き出しをキャンセルしました。"
             : currentSession.current.revision !== snapshot.revision
               ? "書き出し中の編集は含まれていません。必要ならもう一度書き出してください。"
-              : "書き出し結果を確認してください。",
+              : null,
         );
         setJob(null);
       }
     } catch (failure) {
       if (mounted.current) {
+        setExportState("idle");
         setError(failure instanceof Error ? failure.message : String(failure));
         setJob({ document: label, phase: "failed" });
       }
@@ -634,10 +652,18 @@ export function DraftWorkspace({
           <Button
             ref={exportTrigger}
             variant="outline"
+            aria-label="書き出し"
+            aria-busy={exportState === "exporting"}
             disabled={pending !== null}
             onClick={() => setExportOpen(true)}
           >
-            <Download aria-hidden="true" />
+            {exportState === "exporting" ? (
+              <LoaderCircle aria-hidden="true" className="animate-spin" />
+            ) : exportState === "succeeded" ? (
+              <Check aria-hidden="true" />
+            ) : (
+              <Download aria-hidden="true" />
+            )}
             書き出し
           </Button>
           <Button
@@ -966,9 +992,14 @@ export function DraftWorkspace({
             </Button>
             <Button
               disabled={busy || fileBusy || editorDisabled}
+              aria-busy={exportState === "exporting"}
               onClick={() => void exportDocuments()}
             >
-              <Download aria-hidden="true" />
+              {exportState === "exporting" ? (
+                <LoaderCircle aria-hidden="true" className="animate-spin" />
+              ) : (
+                <Download aria-hidden="true" />
+              )}
               書き出す
             </Button>
           </DialogFooter>

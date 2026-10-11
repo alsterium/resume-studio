@@ -463,15 +463,21 @@ test("現在の書類・両書類をPDFとTeXで書き出し、部分成功と�
   if (!screen.queryByRole("dialog"))
     await user.click(screen.getByRole("button", { name: "書き出し" }));
   await user.click(screen.getByRole("button", { name: "書き出す" }));
-  expect(await screen.findByLabelText("書き出し結果")).toHaveTextContent("保存しました");
+  await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  expect(
+    screen.getByRole("button", { name: "書き出し" }).querySelector(".lucide-check"),
+  ).toBeInTheDocument();
+  expect(screen.queryByText("書き出し結果を確認してください。")).not.toBeInTheDocument();
+  expect(screen.queryByLabelText("書き出し結果")).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "書き出し" })).toHaveFocus();
   expect(requests.at(-1)).toEqual({ kinds: ["resume"], format: "pdf" });
-  await user.click(screen.getByRole("button", { name: "キャンセル" }));
+  await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
   rerender(<DraftWorkspace client={tauriClient} document="職務経歴書" />);
   if (!screen.queryByRole("dialog"))
     await user.click(screen.getByRole("button", { name: "書き出し" }));
   await user.click(screen.getByRole("button", { name: "書き出す" }));
   expect(requests.at(-1)).toEqual({ kinds: ["career"], format: "pdf" });
-  await user.click(screen.getByRole("button", { name: "キャンセル" }));
+  await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
   rerender(<DraftWorkspace client={tauriClient} document="履歴書" />);
   await user.click(screen.getByRole("button", { name: "書き出し" }));
   previousCanvas = await screen.findByLabelText("生成されたPDFページ");
@@ -486,12 +492,19 @@ test("現在の書類・両書類をPDFとTeXで書き出し、部分成功と�
   );
   expect(screen.getByLabelText("書き出し結果")).toHaveTextContent("career.tex：保存に失敗しました");
   expect(screen.getByLabelText("書き出し結果")).toHaveTextContent("職務経歴書の保存失敗");
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  expect(
+    screen.getByRole("button", { name: "書き出し" }).querySelector(".lucide-check"),
+  ).not.toBeInTheDocument();
   expect(requests.at(-1)).toEqual({ kinds: ["resume", "career"], format: "tex" });
   mode = "skipped";
   if (!screen.queryByRole("dialog"))
     await user.click(screen.getByRole("button", { name: "書き出し" }));
   await user.click(screen.getByRole("button", { name: "書き出す" }));
   expect(await screen.findByLabelText("書き出し結果")).toHaveTextContent("スキップしました");
+  expect(
+    screen.getByRole("button", { name: "書き出し" }).querySelector(".lucide-check"),
+  ).not.toBeInTheDocument();
   mode = "cancelled";
   if (!screen.queryByRole("dialog"))
     await user.click(screen.getByRole("button", { name: "書き出し" }));
@@ -509,15 +522,40 @@ test("現在の書類・両書類をPDFとTeXで書き出し、部分成功と�
     await user.click(screen.getByRole("button", { name: "書き出し" }));
   await user.click(screen.getByRole("button", { name: "書き出す" }));
   expect(screen.getByRole("button", { name: "書き出す" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "書き出す" })).toHaveAttribute("aria-busy", "true");
+  expect(
+    screen.getByRole("button", { name: "書き出す" }).querySelector(".animate-spin"),
+  ).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "新規", hidden: true })).toBeDisabled();
   await user.click(screen.getByRole("button", { name: "閉じる" }));
+  expect(screen.getByRole("button", { name: "書き出し" })).toHaveAttribute("aria-busy", "true");
+  expect(
+    screen.getByRole("button", { name: "書き出し" }).querySelector(".animate-spin"),
+  ).toBeInTheDocument();
   await user.type(screen.getByLabelText("氏名"), "追加編集");
+  vi.useFakeTimers();
   await act(async () => {
     complete?.([{ kind: "resume", status: "saved", displayName: "履歴書-tex", error: null }]);
   });
-  expect(await screen.findByLabelText("書き出し状態")).toHaveTextContent(
+  expect(screen.getByLabelText("書き出し状態")).toHaveTextContent(
     "書き出し中の編集は含まれていません",
   );
+  expect(
+    screen.getByRole("button", { name: "書き出し" }).querySelector(".lucide-check"),
+  ).toBeInTheDocument();
+  try {
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(3000);
+    });
+  } finally {
+    vi.useRealTimers();
+  }
+  expect(
+    screen.getByRole("button", { name: "書き出し" }).querySelector(".lucide-check"),
+  ).not.toBeInTheDocument();
+  expect(
+    screen.getByRole("button", { name: "書き出し" }).querySelector(".lucide-download"),
+  ).toBeInTheDocument();
   await user.click(screen.getByRole("button", { name: "書き出し" }));
   expect(screen.getByRole("button", { name: "書き出す" })).toBeEnabled();
 });
