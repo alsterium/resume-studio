@@ -37,6 +37,12 @@ pub fn bundled_templates() -> Vec<Template> {
             include_str!("../../templates/resume-standard-v1.2/resume.sty"),
         ),
         (
+            include_str!("../../templates/career-standard-v1.2/manifest.json"),
+            include_str!("../../templates/career-standard-v1.2/main.tex"),
+            "career.sty",
+            include_str!("../../templates/career-standard-v1.2/career.sty"),
+        ),
+        (
             include_str!("../../templates/career-standard-v1.1/manifest.json"),
             include_str!("../../templates/career-standard-v1.1/main.tex"),
             "career.sty",

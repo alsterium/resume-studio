@@ -1,0 +1,88 @@
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{career}[2026/10/11 Resume Studio reference career]
+\RequirePackage[margin=18mm]{geometry}
+\RequirePackage[hidelinks,unicode]{hyperref}
+\RequirePackage{color}
+\pagestyle{empty}
+\renewcommand{\familydefault}{\sfdefault}
+\renewcommand{\kanjifamilydefault}{\gtdefault}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0pt}
+\AtBeginDocument{\fontsize{10.5pt}{17pt}\selectfont\emergencystretch=2em}
+\newcommand{\cr@reserve}[1]{\par
+  \ifdim\pagegoal<\maxdimen
+    \ifdim\dimexpr\pagegoal-\pagetotal\relax<#1\relax\newpage\fi
+  \fi}
+\newcommand{\cr@dottedRule}{\begingroup\color[gray]{.65}\noindent\hbox to\linewidth{%
+  \leaders\hbox{\rule{.8pt}{.3pt}\hskip1.5pt}\hfill}\par\endgroup}
+\newcommand{\CareerHeader}[2]{%
+  {\fontsize{18pt}{24pt}\selectfont\bfseries 職務経歴書}\par\nobreak
+  \vspace{1.5mm}\hrule height.7pt\kern1.2pt\hrule height.3pt\nobreak\vspace{2mm}
+  \hfill #1\par\nobreak\hfill #2\par\vspace{2mm}}
+\newcommand{\cr@sectionGap}{7mm}
+\newcommand{\CareerSection}[2][3mm]{%
+  \cr@reserve{8\baselineskip}\addvspace{\cr@sectionGap}
+  {\fontsize{13.5pt}{19pt}\selectfont\bfseries #2}\par\nobreak
+  \vspace{1.5mm}\hrule height.5pt\nobreak\vspace{#1}}
+\newcommand{\CareerSummarySection}[1]{\begingroup
+  \renewcommand{\cr@sectionGap}{5mm}\CareerSection{#1}\endgroup}
+\newcommand{\CareerSkillsSection}[1]{\CareerSection[0pt]{#1}}
+\newcommand{\CareerCompany}[2]{%
+  \cr@reserve{4\baselineskip}\addvspace{5mm}
+  \noindent\colorbox[gray]{.92}{\parbox{\dimexpr\linewidth-2\fboxsep\relax}{%
+    {\fontsize{12pt}{17pt}\selectfont\textbf{#1}}\hfill {\small #2}}}\par\nobreak}
+\newcommand{\CareerProjects}{\cr@reserve{4\baselineskip}\textbf{主な実績}\par\nobreak}
+\newcommand{\CareerProject}[2]{%
+  \cr@reserve{4\baselineskip}\addvspace{3mm}
+  \noindent\ensuremath{\diamond}\,\textbf{#1}\quad
+  {\fontsize{9pt}{12pt}\selectfont\color[gray]{.25}#2}\par\nobreak}
+\newcommand{\CareerField}[2]{%
+  \cr@reserve{2\baselineskip}\noindent 【#1】\, #2\par}
+\newcommand{\CareerBody}[2]{%
+  \cr@reserve{3\baselineskip}\noindent 【#1】\par\nobreak #2}
+\newbox\cr@left
+\newbox\cr@right
+\newbox\cr@leftSlice
+\newbox\cr@rightSlice
+\newbox\cr@rightCentered
+\newdimen\cr@rowHeight
+\newdimen\cr@cellPadding
+\cr@cellPadding=2mm
+\newcommand{\cr@prepareRow}{%
+  \advance\cr@rowHeight by2\cr@cellPadding
+  \ifdim\cr@rowHeight<14mm\cr@rowHeight=14mm\fi}
+\newcommand{\cr@rowStart}{\nointerlineskip}
+\newcommand{\cr@leftCell}{\vtop{\vskip0pt
+  \vbox to\cr@rowHeight{\vskip\cr@cellPadding
+    \unvbox\cr@leftSlice\vfil\vskip\cr@cellPadding}}}
+\newcommand{\cr@rowRule}{\nointerlineskip\cr@dottedRule\nointerlineskip}
+\newcommand{\cr@split}[2]{%
+  \splittopskip=\topskip\splitmaxdepth=0pt
+  \ifdim\dimexpr\ht#1+\dp#1\relax>35mm
+    \setbox#2=\vsplit#1 to35mm
+  \else\setbox#2=\box#1\fi}
+\newcommand{\CareerSkill}[2]{\par\begingroup
+  \setbox\cr@left=\vbox{\hsize=.48\linewidth\linewidth=\hsize
+    \raggedright\textbf{#1}\par}
+  \setbox\cr@right=\vbox{\hsize=.48\linewidth\linewidth=\hsize
+    \raggedright #2\par}
+  % Bound each row fragment so a long skill cell can cross pages too.
+  \loop
+    \cr@split{\cr@left}{\cr@leftSlice}\cr@split{\cr@right}{\cr@rightSlice}
+    \cr@rowHeight=\dimexpr\ht\cr@leftSlice+\dp\cr@leftSlice\relax
+    \ifdim\dimexpr\ht\cr@rightSlice+\dp\cr@rightSlice\relax>\cr@rowHeight
+      \cr@rowHeight=\dimexpr\ht\cr@rightSlice+\dp\cr@rightSlice\relax
+    \fi
+    \cr@prepareRow
+    \setbox\cr@rightCentered=\vbox to\cr@rowHeight{%
+      \vskip\cr@cellPadding\vfil\unvbox\cr@rightSlice\vfil\vskip\cr@cellPadding}
+    % Let the page builder break between bounded fragments. Forcing newpage
+    % here can observe the preceding page while its output is still pending.
+    \cr@rowStart\noindent\hbox to\linewidth{%
+      \cr@leftCell\hfil
+      {\color[gray]{.25}\vtop{\vskip0pt\box\cr@rightCentered}}}\par\penalty0
+  \ifdim\dimexpr\ht\cr@left+\dp\cr@left+\ht\cr@right+\dp\cr@right\relax>0pt
+  \repeat
+  \cr@rowRule\endgroup}
+\newcommand{\CareerQualification}[2]{\CareerSkill{#1}{#2}}
+\newcommand{\CareerURL}[2]{\noindent URL: \quad\href{#1}{#2}\par}

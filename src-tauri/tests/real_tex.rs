@@ -16,7 +16,7 @@ fn formal_documents_compile_from_exported_bundles_with_and_without_photos() {
     ] {
         let mut project = parse_project(fixture).unwrap();
         project.templates.resume.version = "1.2.0".into();
-        project.templates.career.version = "1.1.0".into();
+        project.templates.career.version = "1.2.0".into();
         for kind in [DocumentKind::Resume, DocumentKind::Career] {
             let bundle = generate_project(&project, kind).unwrap();
             let artifact =
@@ -106,16 +106,238 @@ fn formal_documents_compile_from_exported_bundles_with_and_without_photos() {
                         assert!(text.contains(value), "missing {value}: {text}");
                     }
                     if kind == DocumentKind::Career {
+                        let compact = text.split_whitespace().collect::<String>();
                         assert!(
                             text.contains("https://example.com/project?a=1&b=2"),
                             "{text}"
                         );
                         assert!(text.contains("架空の実務経験"), "{text}");
+                        assert!(compact.contains("Rust（3年）"), "{text}");
+                        assert!(compact.contains("2012年4月～在籍中"), "{text}");
+                        assert!(compact.contains("2020年1月～2022年3月"), "{text}");
                     }
                 }
             }
         }
     }
+}
+
+#[test]
+#[cfg(target_os = "macos")]
+fn career_skill_experience_renders_digits_and_free_text() {
+    use resume_studio_lib::{
+        domain::validation::parse_project,
+        generator::{documents::generate_project, templates::DocumentKind},
+    };
+    let mut value: serde_json::Value =
+        serde_json::from_str(include_str!("../../tests/fixtures/project-empty.json")).unwrap();
+    let cases = [
+        ("数字", "3", "3年以上"),
+        ("全角数字", "３", "３年以上"),
+        ("年単位", "3年", "3年"),
+        ("概算", "約3年", "約3年"),
+        ("月単位", "半年", "半年"),
+        ("複合期間", "3年6か月", "3年6か月"),
+        ("下限指定", "3年以上", "3年以上"),
+    ];
+    value["career"]["skills"] = serde_json::json!(cases
+        .iter()
+        .enumerate()
+        .map(|(index, (name, input, _))| serde_json::json!({
+            "id": format!("experience-{index}"),
+            "name": name,
+            "experienceLabel": input,
+            "description": "経験期間の表示確認"
+        }))
+        .collect::<Vec<_>>());
+    let mut project = parse_project(&serde_json::to_vec(&value).unwrap()).unwrap();
+    project.templates.career.version = "1.2.0".into();
+    let bundle = generate_project(&project, DocumentKind::Career).unwrap();
+    let artifact = compile(&TexRuntime::discover(), &bundle).unwrap();
+    save_layout_qa("career-experience-t61", &bundle, &artifact.bytes);
+    assert!(!artifact.log.contains("Overfull"), "{}", artifact.log);
+    assert!(
+        !artifact.log.contains("Missing character:"),
+        "{}",
+        artifact.log
+    );
+    let pages = inspected_pdf_pages(&artifact.bytes);
+    assert_eq!(pages.len(), 1, "{pages:?}");
+    assert_a4(&pages);
+    let text = pages[0]["text"].as_str().unwrap();
+    let compact = text.split_whitespace().collect::<String>();
+    for (name, _, expected) in cases {
+        assert!(compact.contains(&format!("{name}（{expected}）")), "{text}");
+    }
+}
+
+#[test]
+#[cfg(target_os = "macos")]
+fn career_v1_2_uses_common_skill_and_qualification_row_layout() {
+    use resume_studio_lib::{
+        domain::validation::parse_project,
+        generator::{documents::generate_project, templates::DocumentKind},
+    };
+    let mut value: serde_json::Value =
+        serde_json::from_str(include_str!("../../tests/fixtures/project-full.json")).unwrap();
+    value["career"]["skills"][0]["name"] = serde_json::json!(
+        "長いスキル名を複数行にして説明文の垂直中央配置を目視確認するためのサンプル項目"
+    );
+    value["career"]["skills"][0]["experienceLabel"] = serde_json::json!("3");
+    value["career"]["skills"][0]["description"] = serde_json::json!("短い説明");
+    let mut single = value["career"]["skills"][0].clone();
+    single["id"] = serde_json::json!("single-line-skill");
+    single["name"] = serde_json::json!("一行スキル");
+    single["description"] = serde_json::json!("一行説明");
+    let mut multiline = single.clone();
+    multiline["id"] = serde_json::json!("multiline-description-skill");
+    multiline["name"] = serde_json::json!("複数行説明スキル");
+    multiline["description"] = serde_json::json!(format!(
+        "説明開始{} DESCEND",
+        "複数行になる説明文です。".repeat(5)
+    ));
+    let mut empty = single.clone();
+    empty["id"] = serde_json::json!("empty-description-skill");
+    empty["name"] = serde_json::json!("説明空欄スキル");
+    empty["description"] = serde_json::json!("");
+    let skills = value["career"]["skills"].as_array_mut().unwrap();
+    skills.push(single);
+    skills.push(empty);
+    skills.push(multiline);
+    let mut qualification = value["career"]["qualifications"][0].clone();
+    qualification["id"] = serde_json::json!("empty-date-qualification");
+    qualification["text"] = serde_json::json!("取得年月空欄資格");
+    qualification["yearMonth"] = serde_json::json!("");
+    value["career"]["qualifications"]
+        .as_array_mut()
+        .unwrap()
+        .push(qualification);
+    value["career"]["positions"] = serde_json::json!([]);
+    let mut project = parse_project(&serde_json::to_vec(&value).unwrap()).unwrap();
+    project.templates.career.version = "1.2.0".into();
+    let bundle = generate_project(&project, DocumentKind::Career).unwrap();
+    let artifact = compile(&TexRuntime::discover(), &bundle).unwrap();
+    save_layout_qa("career-layout-t58", &bundle, &artifact.bytes);
+    assert!(!artifact.log.contains("Overfull"), "{}", artifact.log);
+    assert!(
+        !artifact.log.contains("Missing character:"),
+        "{}",
+        artifact.log
+    );
+    let pages = inspected_pdf_pages(&artifact.bytes);
+    assert_eq!(pages.len(), 1, "{pages:?}");
+    assert_a4(&pages);
+    let text = pages[0]["text"].as_str().unwrap();
+    let compact = text.split_whitespace().collect::<String>();
+    assert!(compact.contains("活かせるスキル・経験"), "{text}");
+    assert!(compact.contains("長いスキル名"), "{text}");
+    assert!(compact.contains("3年以上"), "{text}");
+    assert!(compact.contains("短い説明"), "{text}");
+    let bounds = pdf_text_vertical_bounds(
+        &artifact.bytes,
+        &[
+            "長いスキル名",
+            "サンプル項目",
+            "短い説明",
+            "一行スキル",
+            "一行説明",
+            "説明空欄スキル",
+            "複数行説明スキル",
+            "説明開始",
+            "DESCEND",
+            "架空資格",
+            "取得年月空欄資格",
+            "2013",
+        ],
+    );
+    let rect = |label: &str| {
+        let value = bounds[label].as_array().unwrap();
+        (value[0].as_f64().unwrap(), value[1].as_f64().unwrap())
+    };
+    let padding = 2.0 * 72.0 / 25.4;
+    let minimum_height = 14.0 * 72.0 / 25.4;
+    let rule_gap = |name: &str| {
+        bounds["_rules"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|rule| rule["page"].as_u64() == Some(1))
+            .map(|rule| rule["y"].as_f64().unwrap() - rule["width"].as_f64().unwrap() / 2.0)
+            .filter(|y| *y > rect(name).1)
+            .map(|y| y - rect(name).1)
+            .min_by(f64::total_cmp)
+            .unwrap()
+    };
+    assert!(
+        (rule_gap("長いスキル名") - rule_gap("一行スキル")).abs() < 0.3,
+        "first skill has additional margin: {bounds}"
+    );
+    // Consecutive short, two-line and empty-description rows have the same pitch.
+    for (first, next) in [
+        ("長いスキル名", "一行スキル"),
+        ("一行スキル", "説明空欄スキル"),
+        ("説明空欄スキル", "複数行説明スキル"),
+        ("架空資格", "取得年月空欄資格"),
+    ] {
+        let pitch = rect(first).1 - rect(next).1;
+        assert!(
+            (pitch - minimum_height - 0.3 * 72.0 / 72.27).abs() < 0.2,
+            "{first}: inconsistent row height {pitch}, bounds={bounds}"
+        );
+    }
+    for (name_first, name_last, description_first, description_last) in [
+        ("長いスキル名", "サンプル項目", "短い説明", "短い説明"),
+        ("一行スキル", "一行スキル", "一行説明", "一行説明"),
+        ("架空資格", "架空資格", "2013", "2013"),
+        (
+            "複数行説明スキル",
+            "複数行説明スキル",
+            "説明開始",
+            "DESCEND",
+        ),
+    ] {
+        let first = rect(name_first);
+        let last = rect(name_last);
+        let description_top = rect(description_first).1;
+        let description_bottom = rect(description_last).0;
+        let row_height = ((first.1 - last.0).max(description_top - description_bottom)
+            + 2.0 * padding)
+            .max(minimum_height);
+        let row_top = first.1 + padding;
+        let expected_center = row_top - row_height / 2.0;
+        assert!(
+            row_top - description_top >= padding - 0.2,
+            "top padding: {bounds}"
+        );
+        assert!(
+            description_bottom - (row_top - row_height) >= padding - 0.2,
+            "bottom padding: {bounds}"
+        );
+        let actual_center = (description_top + description_bottom) / 2.0;
+        assert!((actual_center - expected_center).abs() < 1.5,
+            "{name_first}: description center={actual_center}, row center={expected_center}, bounds={bounds}");
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn pdf_text_vertical_bounds(bytes: &[u8], labels: &[&str]) -> serde_json::Value {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("main.pdf");
+    fs::write(&path, bytes).unwrap();
+    let output = std::process::Command::new("node")
+        .arg(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../tools/pdf-text-geometry.mjs"),
+        )
+        .arg(&path)
+        .args(labels)
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    serde_json::from_slice(&output.stdout).unwrap()
 }
 
 #[test]
@@ -615,7 +837,7 @@ fn maximum_fixed_fields_wrap_and_resume_moves_oversized_contacts_to_continuation
     career_fields.push(url);
     let mut project = parse_project(&serde_json::to_vec(&value).unwrap()).unwrap();
     project.templates.resume.version = "1.2.0".into();
-    project.templates.career.version = "1.1.0".into();
+    project.templates.career.version = "1.2.0".into();
     for (kind, fields) in [
         (DocumentKind::Resume, resume_fields),
         (DocumentKind::Career, career_fields),
@@ -980,7 +1202,7 @@ fn career_flow_preserves_long_cases_skill_cells_and_breakable_url_links() {
     value["career"]["selfPromotion"] = paragraph(promotion.clone());
     value["career"]["skills"][0]["description"] = serde_json::json!(skill);
     let mut project = parse_project(&serde_json::to_vec(&value).unwrap()).unwrap();
-    project.templates.career.version = "1.1.0".into();
+    project.templates.career.version = "1.2.0".into();
     let bundle = generate_project(&project, DocumentKind::Career).unwrap();
     let artifact = compile(&TexRuntime::discover(), &bundle).unwrap();
     assert!(!artifact.log.contains("Overfull"), "{}", artifact.log);

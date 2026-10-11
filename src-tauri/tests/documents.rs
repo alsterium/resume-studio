@@ -113,10 +113,88 @@ fn formal_documents_preserve_fields_and_export_owned_resources() {
 }
 
 #[test]
+fn career_v1_2_formats_experience_and_employment_periods_without_changing_v1_1() {
+    let mut value: serde_json::Value =
+        serde_json::from_slice(include_bytes!("../../tests/fixtures/project-full.json")).unwrap();
+    value["career"]["skills"][0]["experienceLabel"] = serde_json::json!("3");
+    value["career"]["positions"][0]["startYearMonth"] = serde_json::json!("2020-02");
+    value["career"]["positions"][0]["endYearMonth"] = serde_json::json!("2021-10");
+    value["career"]["positions"][0]["projects"][0]["startYearMonth"] = serde_json::json!("2021-04");
+    value["career"]["positions"][0]["projects"][0]["endYearMonth"] = serde_json::json!("2022-06");
+    let mut project = parse_project(&serde_json::to_vec(&value).unwrap()).unwrap();
+
+    project.templates.career.version = "1.2.0".into();
+    let current = generate_project(&project, DocumentKind::Career)
+        .unwrap()
+        .content_tex
+        .replace("\\allowbreak{}", "");
+    assert!(current.contains("Rust（3年以上）"), "{current}");
+    assert!(current.contains("\\CareerSummarySection{経歴要約}"));
+    assert!(
+        current.contains("\\CareerSkillsSection{活かせるスキル・経験}"),
+        "{current}"
+    );
+    assert!(current.contains("2020年2月 ～ 2021年10月"), "{current}");
+    assert!(current.contains("2021年4月 ～ 2022年6月"), "{current}");
+    assert!(
+        current.contains("\\CareerQualification{架空資格}"),
+        "{current}"
+    );
+
+    project.templates.career.version = "1.1.0".into();
+    let previous = generate_project(&project, DocumentKind::Career)
+        .unwrap()
+        .content_tex
+        .replace("\\allowbreak{}", "");
+    assert!(previous.contains("Rust（3）"), "{previous}");
+    assert!(
+        previous.contains("\\CareerSection{活かせるスキル・経験}"),
+        "{previous}"
+    );
+    assert!(previous.contains("2020-02 ～ 2021-10"), "{previous}");
+    assert!(previous.contains("2021-04 ～ 2022-06"), "{previous}");
+    assert!(previous.contains("\\CareerSkill{架空資格}"), "{previous}");
+}
+
+#[test]
+fn career_skill_experience_preserves_free_text_and_only_formats_digits() {
+    for (input, expected) in [
+        ("3", "3年以上"),
+        ("３", "３年以上"),
+        ("3年", "3年"),
+        ("約3年", "約3年"),
+        ("半年", "半年"),
+        ("3年6か月", "3年6か月"),
+        ("3年以上", "3年以上"),
+        ("3.5", "3.5"),
+        ("", ""),
+    ] {
+        let mut value: serde_json::Value =
+            serde_json::from_slice(include_bytes!("../../tests/fixtures/project-full.json"))
+                .unwrap();
+        value["career"]["skills"][0]["experienceLabel"] = serde_json::json!(input);
+        let mut project = parse_project(&serde_json::to_vec(&value).unwrap()).unwrap();
+        for (version, label) in [("1.2.0", expected), ("1.1.0", input), ("1.0.0", input)] {
+            project.templates.career.version = version.into();
+            let content = generate_project(&project, DocumentKind::Career)
+                .unwrap()
+                .content_tex
+                .replace("\\allowbreak{}", "");
+            let name = if label.is_empty() {
+                "{Rust}".to_owned()
+            } else {
+                format!("{{Rust（{label}）}}")
+            };
+            assert!(content.contains(&name), "{version}/{input:?}: {content}");
+        }
+    }
+}
+
+#[test]
 fn exact_template_kind_version_and_schema_are_required() {
     let mut project =
         parse_project(include_bytes!("../../tests/fixtures/project-empty.json")).unwrap();
-    assert_eq!(bundled_templates().len(), 5);
+    assert_eq!(bundled_templates().len(), 6);
     for template in bundled_templates() {
         assert_eq!(template.manifest.engine, "lualatex");
         assert_eq!(template.manifest.schema_versions, [1]);

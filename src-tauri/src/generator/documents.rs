@@ -18,6 +18,7 @@ enum DocumentContent<'a> {
 }
 struct DocumentModel<'a> {
     date: &'a str,
+    template_version: &'a str,
     profile: &'a Profile,
     content: DocumentContent<'a>,
     photo: Option<String>,
@@ -84,8 +85,36 @@ fn contact(output: &mut String, title: &str, contact: &Contact) {
         ],
     );
 }
-fn period(start: &str, end: Option<&str>, ongoing: &str) -> String {
-    format!("{} ～ {}", start, end.unwrap_or(ongoing))
+fn career_year_month(value: &str, localized: bool) -> String {
+    if !localized {
+        return value.to_owned();
+    }
+    let Some((year, month)) = value.split_once('-') else {
+        return value.to_owned();
+    };
+    match month.parse::<u8>() {
+        Ok(month) => format!("{year}年{month}月"),
+        Err(_) => value.to_owned(),
+    }
+}
+fn period(start: &str, end: Option<&str>, ongoing: &str, localized: bool) -> String {
+    let start = career_year_month(start, localized);
+    let end = end
+        .map(|value| career_year_month(value, localized))
+        .unwrap_or_else(|| ongoing.to_owned());
+    format!("{start} ～ {end}")
+}
+fn skill_experience(value: &str) -> String {
+    let trimmed = value.trim();
+    if !trimmed.is_empty()
+        && trimmed
+            .chars()
+            .all(|character| character.is_ascii_digit() || ('０'..='９').contains(&character))
+    {
+        format!("{trimmed}年以上")
+    } else {
+        value.to_owned()
+    }
 }
 fn document_date(value: &str) -> String {
     let parts: Vec<_> = value.split('-').collect();
@@ -196,18 +225,35 @@ fn render(model: &DocumentModel<'_>) -> Result<String, String> {
                     display_text(&model.profile.name),
                 ],
             );
-            command(&mut output, "CareerSection", &["経歴要約".into()]);
+            command(
+                &mut output,
+                if model.template_version == "1.2.0" {
+                    "CareerSummarySection"
+                } else {
+                    "CareerSection"
+                },
+                &["経歴要約".into()],
+            );
             output.push_str(&render_body(&career.summary)?);
             command(
                 &mut output,
-                "CareerSection",
+                if model.template_version == "1.2.0" {
+                    "CareerSkillsSection"
+                } else {
+                    "CareerSection"
+                },
                 &["活かせるスキル・経験".into()],
             );
             for skill in &career.skills {
-                let label = if skill.experience_label.is_empty() {
+                let experience = if model.template_version == "1.2.0" {
+                    skill_experience(&skill.experience_label)
+                } else {
+                    skill.experience_label.clone()
+                };
+                let label = if experience.is_empty() {
                     skill.name.clone()
                 } else {
-                    format!("{}（{}）", skill.name, skill.experience_label)
+                    format!("{}（{}）", skill.name, experience)
                 };
                 command(
                     &mut output,
@@ -218,7 +264,11 @@ fn render(model: &DocumentModel<'_>) -> Result<String, String> {
             for qualification in &career.qualifications {
                 command(
                     &mut output,
-                    "CareerSkill",
+                    if model.template_version == "1.2.0" {
+                        "CareerQualification"
+                    } else {
+                        "CareerSkill"
+                    },
                     &[
                         display_text(&qualification.text),
                         display_text(&qualification_date(&qualification.year_month)),
@@ -236,6 +286,7 @@ fn render(model: &DocumentModel<'_>) -> Result<String, String> {
                             &position.start_year_month,
                             position.end_year_month.as_deref(),
                             "在籍中",
+                            model.template_version == "1.2.0",
                         )),
                     ],
                 );
@@ -262,6 +313,7 @@ fn render(model: &DocumentModel<'_>) -> Result<String, String> {
                                 &item.start_year_month,
                                 item.end_year_month.as_deref(),
                                 "進行中",
+                                model.template_version == "1.2.0",
                             )),
                         ],
                     );
@@ -344,6 +396,7 @@ pub fn generate_project(project: &Project, kind: DocumentKind) -> Result<Generat
         project.effective_document_date(&chrono::Local::now().format("%Y-%m-%d").to_string());
     let model = DocumentModel {
         date: &date,
+        template_version: &template.manifest.version,
         profile: &project.profile,
         photo,
         content: match kind {
@@ -364,7 +417,7 @@ pub fn generate_project(project: &Project, kind: DocumentKind) -> Result<Generat
 
 #[cfg(test)]
 mod tests {
-    use super::{document_date, render_url};
+    use super::{career_year_month, document_date, period, render_url, skill_experience};
 
     #[test]
     fn document_dates_keep_the_year_and_allow_an_empty_birth_date() {
@@ -402,6 +455,39 @@ mod tests {
             "https://",
         ] {
             assert!(render_url(value).is_err(), "accepted {value}");
+        }
+    }
+
+    #[test]
+    fn career_v1_2_formats_year_month_and_numeric_skill_experience() {
+        assert_eq!(career_year_month("2020-02", true), "2020年2月");
+        assert_eq!(career_year_month("2020-10", true), "2020年10月");
+        assert_eq!(career_year_month("2020-02", false), "2020-02");
+        assert_eq!(
+            period("2020-02", Some("2021-10"), "在籍中", true),
+            "2020年2月 ～ 2021年10月"
+        );
+        assert_eq!(
+            period("2020-02", None, "在籍中", true),
+            "2020年2月 ～ 在籍中"
+        );
+        for (input, expected) in [
+            ("3", "3年以上"),
+            ("12", "12年以上"),
+            ("０", "０年以上"),
+            ("３", "３年以上"),
+            (" 3 ", "3年以上"),
+            ("3年", "3年"),
+            ("3年以上", "3年以上"),
+            ("半年", "半年"),
+            ("約3年", "約3年"),
+            ("3年6か月", "3年6か月"),
+            ("3.5", "3.5"),
+            (" 3年 ", " 3年 "),
+            ("", ""),
+            (" ", " "),
+        ] {
+            assert_eq!(skill_experience(input), expected, "{input:?}");
         }
     }
 }
