@@ -55,3 +55,7 @@ pnpm exec wrangler whoami
 ## 公開確認（2026-10-13）
 
 Worker `resume-studio-web`をCustom Domainへ公開済み。独自ドメインのHTTPS、HTML/CSS/JSの200応答とビルド一致、CSP等のヘッダーを確認した。実Safariで起動・架空入力の反映・JSONダウンロードと390pxの編集／プレビュー切替を確認した。UI／単体73件は順次実行で成功。`pnpm check`の並列UI実行では既存career全項目テストの15秒timeoutが再発したため、同じ全件を`pnpm exec vitest run --no-file-parallelism tests/integration tests/unit`で検証した。Rust検証は既存キャンセルテストの記録書込競合を修正して成功。
+
+## QRでMacと受け渡す
+
+「QR転送」で、送る端末は「送信モード」→「ループ送信を開始」、受け取る端末は「受信モード」→「カメラを開始」を選ぶ。開始→データ→終了のQRが0.5秒ごとに循環し、受信は途中からでも読み続けられる。「受信完了」後に内容を確認して取り込み、JSONを保存する。読み取りづらい場合は送信間隔を1秒/2秒へ変更できる。写真も含むため容量によって時間がかかる。詳細は[QR_TRANSFER](QR_TRANSFER.md)。

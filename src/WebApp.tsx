@@ -26,6 +26,8 @@ import {
 import { importBrowserPhoto } from "./infrastructure/browser-photos";
 import type { Project } from "./domain/project";
 import type { TemplateManifest } from "./infrastructure/app-client";
+import { QrTransferButton } from "./features/transfer/QrTransferButton";
+import "./features/transfer/transfer.css";
 
 const manifests = import.meta.glob<TemplateManifest>("../src-tauri/templates/*/manifest.json", {
   eager: true,
@@ -101,6 +103,7 @@ export function WebWorkspace({
   const [view, setView] = useState("edit");
   const [editorKey, setEditorKey] = useState(0);
   const [busy, setBusy] = useState(false);
+  const [transferActive, setTransferActive] = useState(false);
   const [error, setError] = useState<string | null>(startupError);
   const [fileMessage, setFileMessage] = useState<string | null>(
     restored ? "このブラウザの下書きを復元しました。" : null,
@@ -147,7 +150,7 @@ export function WebWorkspace({
   useEffect(() => {
     latest.current = { dirty, busy, pending, saveOpen };
     shortcut.current = (rename) => {
-      if (busy || pending || saveOpen) return;
+      if (busy || pending || saveOpen || transferActive) return;
       if (rename) showSaveDialog();
       else save();
     };
@@ -309,9 +312,25 @@ export function WebWorkspace({
             </output>
           </div>
           <div className="project-actions" aria-label="プロジェクト操作">
+            <QrTransferButton
+              project={project}
+              dirty={dirty}
+              disabled={busy || pending !== null || saveOpen}
+              onActiveChange={setTransferActive}
+              onReceive={(received) => {
+                setDraft({
+                  session: editSession(beginSession(received), received),
+                  filename: "resume-studio.json",
+                });
+                setEditorKey((key) => key + 1);
+                setPersist(true);
+                setError(null);
+                setFileMessage("QRで受信した内容を取り込みました。JSONは未保存です。");
+              }}
+            />
             <Button
               variant="outline"
-              disabled={busy || pending !== null}
+              disabled={busy || pending !== null || transferActive}
               onClick={() => requestAction("new")}
             >
               <FilePlus2 aria-hidden="true" />
@@ -368,7 +387,7 @@ export function WebWorkspace({
               project={project}
               document={documentKind}
               onDocumentChange={setDocumentKind}
-              disabled={busy || pending !== null}
+              disabled={busy || pending !== null || transferActive}
               photoBusy={busy}
               editorKey={editorKey}
               onChange={updateProject}

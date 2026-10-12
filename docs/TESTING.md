@@ -105,3 +105,7 @@ UI結合で追加・自由入力・本文書式・並べ替え・削除・保存
 ## 軽量Web版（T65/T66）
 
 `tests/integration/web.test.tsx`で実Tiptapとfake-indexeddbを使い、共通全項目JSONの読込→編集→ダウンロード→再読込、下書き復元、保存順序、古い保存完了、読込/保存失敗時の保持、未保存確認、表示切替とIMEキーを検証する。写真正規化は`tests/unit/browser-photos.test.ts`、5MiB base64と不正文字/paddingは共通Project単体で検証する。Mac UI回帰、両ビルド、Lint/型/書式を通す。公開物にTauri/PDF/TeX/fixtureを含めず、公開HTTPSとCSPを確認する。実Safariと390pxの表示を目視し、実iPhoneのキーボード/ダウンロードは未検証境界として報告する。詳細は[WEB](WEB.md)。
+
+## QR転送（T67）
+
+Project全項目を圧縮→Version40/Mの実QR画像→実jsQR復号→終了QR→展開/検証まで往復させる。途中開始/順不同/重複/別transfer/矛盾/CRC/hash/容量/展開失敗を単体検証する。UI結合では500msループ、終了待ち、未保存の置換確認、Mac fileId分離、Webの未保存取込を確認する。カメラは拒否・異常・閉じた後の遅い許可・再生待ちabort・track停止をadapterとUIで確認する。実PC↔iPhoneのカメラ/光学条件は別途実機検証の境界とする。

@@ -87,3 +87,7 @@ WebDriverサーバーとpicker adapterはdesktop-e2e featureだけに含める�
 ## 軽量Web版（M7）
 
 Mac/Webで`ProjectEditor`を共用する。Web専用entryと静的配信を使い、JSONをFile APIで開いてBlobとしてダウンロードする。単一の下書きをIndexedDBへ順に書込み、復元後に自動保存を始める。セッションのrevision／保存済みrevisionとファイル名は下書きの外枠へ保持し、Project JSONへWeb属性を追加しない。PDF生成・終了IPC・TeX診断はWebへ含めず、`CssPreview`で参考紙面を描画する。詳細は[WEB](WEB.md)。
+
+## QR転送（M8）
+
+Mac/Webから共通の転送UIとRSQR1を遅延読込する。JSONをgzip（DEFLATE）圧縮し1500byte分割、Version40/Mで開始・データ・終了を循環表示する。カメラ画像は端末内jsQRで読み取り、全体SHA/展開容量/Project検証後に確認付きで未保存プロジェクトとして取り込む。詳細は[QR転送設計](QR_TRANSFER.md)。

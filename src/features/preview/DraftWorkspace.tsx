@@ -20,6 +20,8 @@ import {
   ResizableHandle,
 } from "../../components/ui/resizable";
 import { ProjectEditor } from "../../components/ProjectEditor";
+import { QrTransferButton } from "../transfer/QrTransferButton";
+import "../transfer/transfer.css";
 import { TexDiagnosticsPanel } from "../diagnostics/TexDiagnosticsPanel";
 import {
   FileText,
@@ -101,6 +103,7 @@ export function DraftWorkspace({
   }, []);
   const [exportOpen, setExportOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [transferActive, setTransferActive] = useState(false);
   const [autoPdf, setAutoPdf] = useState(readAutoPdfPreference);
   const [preferenceMessage, setPreferenceMessage] = useState<string | null>(null);
   const [composing, setComposing] = useState(false);
@@ -183,7 +186,7 @@ export function DraftWorkspace({
     currentSession.current = session;
     closeHandler.current = () => void requestAction("close");
     saveShortcut.current = (saveAs) => {
-      if (!fileBusy && !opening && pending === null) void saveProject(saveAs);
+      if (!fileBusy && !opening && pending === null && !transferActive) void saveProject(saveAs);
     };
   });
   useEffect(() => {
@@ -571,7 +574,7 @@ export function DraftWorkspace({
     setSession((current) => editSession(current, updated));
     setFileMessage(null);
   };
-  const editorDisabled = opening || pending !== null;
+  const editorDisabled = opening || pending !== null || transferActive;
   return (
     <section aria-label="応募書類の編集" className="studio-shell">
       <header className="studio-toolbar">
@@ -589,6 +592,25 @@ export function DraftWorkspace({
           </Badge>
         </div>
         <div aria-label="プロジェクト操作" className="project-actions">
+          <QrTransferButton
+            project={project}
+            dirty={dirty}
+            disabled={fileBusy || busy || pending !== null}
+            onActiveChange={setTransferActive}
+            onReceive={(received) => {
+              setSession(editSession(beginSession(received), received));
+              setFile(null);
+              setEditorKey((key) => key + 1);
+              setDraftPdf(null);
+              setDocumentPdfs({});
+              setExportResults(null);
+              setExportMessage(null);
+              setExportState("idle");
+              setJob(null);
+              setError(null);
+              setFileMessage("QRで受信した内容を取り込みました。JSONは未保存です。");
+            }}
+          />
           <Button
             variant="outline"
             disabled={fileBusy || busy || pending !== null}

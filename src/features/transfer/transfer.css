@@ -1,0 +1,95 @@
+.qr-transfer-dialog {
+  width: calc(100% - 20px);
+  max-width: 760px !important;
+  max-height: calc(100dvh - 20px);
+  overflow: auto;
+  padding: 20px;
+  gap: 12px;
+}
+.qr-transfer-panel section {
+  display: grid;
+  gap: 10px;
+  font-size: 13px;
+  min-width: 0;
+}
+.qr-transfer-panel p {
+  overflow-wrap: anywhere;
+}
+.qr-mode-buttons,
+.qr-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: end;
+}
+.qr-mode-buttons {
+  margin-bottom: 12px;
+}
+.qr-symbol {
+  width: min(100%, 555px, max(185px, calc(100dvh - 360px)));
+  margin: auto;
+  aspect-ratio: 1;
+  background: white;
+}
+.qr-symbol svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.qr-phase {
+  text-align: center;
+  font-weight: 600;
+}
+.qr-controls label {
+  display: grid;
+  gap: 4px;
+}
+.qr-controls select,
+.qr-controls input {
+  font: inherit;
+  border: 1px solid #d4d4d8;
+  border-radius: 6px;
+  padding: 8px;
+  background: white;
+  max-width: 220px;
+}
+.qr-controls input {
+  width: 110px;
+}
+.qr-help {
+  color: #52525b;
+  font-size: 12px;
+}
+.qr-camera {
+  width: 100%;
+  max-height: 38dvh;
+  object-fit: contain;
+  background: #18181b;
+  min-height: 140px;
+  border-radius: 8px;
+}
+.qr-received {
+  display: grid;
+  gap: 10px;
+  border: 1px solid #d4d4d8;
+  padding: 12px;
+  border-radius: 8px;
+}
+.qr-received label {
+  display: flex;
+  gap: 8px;
+  align-items: start;
+}
+.qr-transfer-panel progress {
+  width: 100%;
+  accent-color: #18181b;
+}
+@media (max-width: 760px) {
+  .qr-transfer-dialog {
+    padding: 12px;
+  }
+  .qr-transfer-panel select,
+  .qr-transfer-panel input {
+    font-size: 16px;
+  }
+}
