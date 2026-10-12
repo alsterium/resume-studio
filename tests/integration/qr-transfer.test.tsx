@@ -81,12 +81,19 @@ test("終了QR不足では現在の内容を変更せず、確認後だけ取り
     for (let i = 0; i < transfer.count; i++) deliver(frameText(transfer, "D", i));
   });
   expect(receive).not.toHaveBeenCalled();
+  expect(screen.getByText(/終了QRを読み取るまでカメラを向けたまま/)).toBeInTheDocument();
   expect(screen.queryByText("この内容を取り込む")).not.toBeInTheDocument();
   await act(async () => {
     deliver(frameText(transfer, "E"));
   });
   await screen.findByText("受信完了。内容を確認して取り込んでください。");
   expect(stop).toHaveBeenCalled();
+  expect(
+    screen.getByRole("heading", { name: "受信完了。内容を確認して取り込んでください。" }),
+  ).toHaveFocus();
+  expect(screen.queryByLabelText("QR読み取りカメラ")).not.toBeInTheDocument();
+  expect(screen.queryByLabelText("QR受信進捗")).not.toBeInTheDocument();
+  expect(screen.getByText(/まだ編集画面には反映していません/)).toBeInTheDocument();
   expect(screen.getByText("この内容を取り込む")).toBeDisabled();
   fireEvent.click(screen.getByLabelText("現在の未保存変更を置き換えることを確認しました"));
   fireEvent.click(screen.getByText("この内容を取り込む"));

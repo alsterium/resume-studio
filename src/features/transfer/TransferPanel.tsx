@@ -102,8 +102,8 @@ export function Sender({ project }: { project: Project }) {
         秒。開始→データ→終了を繰り返します。
       </p>
       <div className="qr-symbol">
-        <svg aria-hidden="true" viewBox="0 0 185 185" shapeRendering="crispEdges">
-          <rect width="185" height="185" fill="white" />
+        <svg aria-hidden="true" viewBox="0 0 145 145" shapeRendering="crispEdges">
+          <rect width="145" height="145" fill="white" />
           <path d={path} fill="black" />
         </svg>
       </div>
@@ -198,6 +198,13 @@ export function Receiver({
   const [progress, setProgress] = useState({ received: 0, total: 0, missing: [] as number[] });
   const [received, setReceived] = useState<Project | null>(null);
   const [confirmed, setConfirmed] = useState(false);
+  const completion = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    if (received) {
+      completion.current?.scrollIntoView?.({ block: "start" });
+      completion.current?.focus({ preventScroll: true });
+    }
+  }, [received]);
   const stopResources = useCallback(() => {
     epoch.current++;
     abort.current?.abort();
@@ -245,6 +252,8 @@ export function Receiver({
         setStatus("開始QRを読み取りました。受信済みデータを保持して続けます。");
       else if (result === "end") setStatus("終了QRを読み取りました。不足分は次の周回で補います。");
       else setStatus("データ受信中。途中からの読み取りも、そのまま続けられます。");
+      if (target.received === target.info!.count && !target.ready)
+        setStatus("全データを受信しました。終了QRを読み取るまでカメラを向けたままお待ちください。");
       if (target.ready) {
         verifying.current = true;
         setChecking(true);
@@ -329,6 +338,40 @@ export function Receiver({
     setError(null);
     setStatus("受信をリセットしました。カメラを開始してください。");
   }
+  if (received)
+    return (
+      <section aria-label="受信完了の確認">
+        <h3 ref={completion} tabIndex={-1}>
+          受信完了。内容を確認して取り込んでください。
+        </h3>
+        <p>
+          まだ編集画面には反映していません。下の「この内容を取り込む」で編集を再開できます。送信側のループは停止してください。
+        </p>
+
+        <div className="qr-received">
+          <p>プロジェクト：{received.title || "名称なし"}</p>
+          <p>氏名：{received.profile.name || "未入力"}</p>
+          {dirty && (
+            <label>
+              <input
+                type="checkbox"
+                checked={confirmed}
+                onChange={(e) => setConfirmed(e.target.checked)}
+              />
+              現在の未保存変更を置き換えることを確認しました
+            </label>
+          )}
+          <Button disabled={dirty && !confirmed} onClick={() => onReceive(received)}>
+            この内容を取り込む
+          </Button>
+          <p>取り込んだ内容は未保存です。JSONへの保存を行ってください。</p>
+        </div>
+
+        <Button variant="outline" onClick={reset}>
+          受信をリセット
+        </Button>
+      </section>
+    );
   return (
     <section aria-label="QR受信">
       {!received && (
@@ -392,26 +435,6 @@ export function Receiver({
         </>
       )}
       {error && <p role="alert">{error}</p>}
-      {received && (
-        <div className="qr-received">
-          <p>プロジェクト：{received.title || "名称なし"}</p>
-          <p>氏名：{received.profile.name || "未入力"}</p>
-          {dirty && (
-            <label>
-              <input
-                type="checkbox"
-                checked={confirmed}
-                onChange={(e) => setConfirmed(e.target.checked)}
-              />
-              現在の未保存変更を置き換えることを確認しました
-            </label>
-          )}
-          <Button disabled={dirty && !confirmed} onClick={() => onReceive(received)}>
-            この内容を取り込む
-          </Button>
-          <p>取り込んだ内容は未保存です。JSONへの保存を行ってください。</p>
-        </div>
-      )}
       <Button variant="outline" onClick={reset}>
         受信をリセット
       </Button>

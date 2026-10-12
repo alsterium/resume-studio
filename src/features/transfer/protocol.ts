@@ -2,9 +2,9 @@ import { gzipSync, Gunzip } from "fflate";
 import type { Project } from "../../domain/project";
 import { MAX_PROJECT_BYTES, validateProject } from "../../domain/validate-project";
 
-export const CHUNK_BYTES = 1500;
+export const CHUNK_BYTES = 900;
 export const MAX_COMPRESSED_BYTES = 21 * 1024 * 1024;
-export const FRAME_BYTES = 2331;
+export const FRAME_BYTES = 1370;
 export type FrameKind = "B" | "D" | "E";
 export interface TransferInfo {
   id: string;
@@ -12,6 +12,7 @@ export interface TransferInfo {
   compressedBytes: number;
   jsonBytes: number;
   count: number;
+  chunkBytes: number;
 }
 export interface Frame extends TransferInfo {
   kind: FrameKind;
@@ -58,6 +59,7 @@ export async function prepareTransfer(project: Project): Promise<PreparedTransfe
     compressedBytes: compressed.length,
     jsonBytes: json.length,
     count: Math.ceil(compressed.length / CHUNK_BYTES),
+    chunkBytes: CHUNK_BYTES,
     compressed,
   };
 }
@@ -66,10 +68,10 @@ export function frameText(transfer: PreparedTransfer, kind: FrameKind, index = 0
     fail("QR番号が範囲外です。");
   const data =
     kind === "D"
-      ? transfer.compressed.subarray(index * CHUNK_BYTES, (index + 1) * CHUNK_BYTES)
+      ? transfer.compressed.subarray(index * transfer.chunkBytes, (index + 1) * transfer.chunkBytes)
       : new Uint8Array();
   return [
-    "RSQR1",
+    "RSQR2",
     kind,
     transfer.id,
     transfer.hash,
@@ -79,6 +81,7 @@ export function frameText(transfer: PreparedTransfer, kind: FrameKind, index = 0
     kind === "D" ? index : 0,
     checksum(data),
     encode64(data),
+    transfer.chunkBytes,
   ].join("|");
 }
 function integer(text: string, max: number, min = 0) {
@@ -90,9 +93,13 @@ function integer(text: string, max: number, min = 0) {
 }
 export function parseFrame(text: string): Frame | null {
   if (!text.startsWith("RSQR")) return null;
-  if (text.length > FRAME_BYTES) fail("QRの容量が上限を超えています。");
+  if (text.length > 2331) fail("QRの容量が上限を超えています。");
   const parts = text.split("|");
-  if (parts.length !== 10 || parts[0] !== "RSQR1") fail("対応していないQR転送形式です。");
+  const legacy = parts[0] === "RSQR1";
+  if (parts.length !== (legacy ? 10 : 11) || (!legacy && parts[0] !== "RSQR2"))
+    fail("対応していないQR転送形式です。");
+  const chunkBytes = legacy ? 1500 : integer(parts[10], CHUNK_BYTES, CHUNK_BYTES);
+  if (!legacy && text.length > FRAME_BYTES) fail("QRの容量が上限を超えています。");
   const [, kind, id, hash, packed, raw, total, number, crc, payload] = parts;
   if (
     !["B", "D", "E"].includes(kind) ||
@@ -103,14 +110,24 @@ export function parseFrame(text: string): Frame | null {
     fail("QRのヘッダーが不正です。");
   const compressedBytes = integer(packed, MAX_COMPRESSED_BYTES, 1),
     jsonBytes = integer(raw, MAX_PROJECT_BYTES, 1);
-  const count = integer(total, Math.ceil(MAX_COMPRESSED_BYTES / CHUNK_BYTES), 1),
+  const count = integer(total, Math.ceil(MAX_COMPRESSED_BYTES / chunkBytes), 1),
     index = integer(number, count - 1);
-  if (count !== Math.ceil(compressedBytes / CHUNK_BYTES)) fail("QRの分割数が不正です。");
+  if (count !== Math.ceil(compressedBytes / chunkBytes)) fail("QRの分割数が不正です。");
   const data = decode64(payload);
-  const expected = kind === "D" ? Math.min(CHUNK_BYTES, compressedBytes - index * CHUNK_BYTES) : 0;
+  const expected = kind === "D" ? Math.min(chunkBytes, compressedBytes - index * chunkBytes) : 0;
   if (data.length !== expected || checksum(data) !== crc || (kind !== "D" && index !== 0))
     fail("QRデータが破損しています。次の周回で読み直してください。");
-  return { kind: kind as FrameKind, id, hash, compressedBytes, jsonBytes, count, index, data };
+  return {
+    kind: kind as FrameKind,
+    id,
+    hash,
+    compressedBytes,
+    jsonBytes,
+    count,
+    chunkBytes,
+    index,
+    data,
+  };
 }
 export function inflateProject(bytes: Uint8Array, jsonBytes: number): Project {
   if (bytes.length < 18 || bytes[0] !== 31 || bytes[1] !== 139 || bytes[2] !== 8)
@@ -161,6 +178,7 @@ export class TransferReceiver {
       this.info &&
       (frame.hash !== this.info.hash ||
         frame.count !== this.info.count ||
+        frame.chunkBytes !== this.info.chunkBytes ||
         frame.compressedBytes !== this.info.compressedBytes ||
         frame.jsonBytes !== this.info.jsonBytes)
     )
@@ -169,6 +187,7 @@ export class TransferReceiver {
       id: frame.id,
       hash: frame.hash,
       count: frame.count,
+      chunkBytes: frame.chunkBytes,
       compressedBytes: frame.compressedBytes,
       jsonBytes: frame.jsonBytes,
     };
@@ -194,7 +213,7 @@ export class TransferReceiver {
     if (!this.ready || !this.info) fail("データと終了QRがまだ揃っていません。");
     const info = this.info!;
     const bytes = new Uint8Array(info.compressedBytes);
-    for (const [index, chunk] of this.chunks) bytes.set(chunk, index * CHUNK_BYTES);
+    for (const [index, chunk] of this.chunks) bytes.set(chunk, index * info.chunkBytes);
     if ((await sha(bytes)) !== info.hash)
       fail("データ全体の検査値が一致しません。送信をやり直してください。");
     return inflateProject(bytes, info.jsonBytes);

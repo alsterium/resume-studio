@@ -370,4 +370,4 @@ M7で同期なしのスマホ対応Web編集を追加。共通ProjectEditorで�
 
 ## QR転送（T67）
 
-M8で共通RSQR1の送受信を追加。500msの開始/分割データ/終了QR循環、gzip（DEFLATE）、欠落補完、確認後取込をMac/Webで共有する。MacはInfo.plistのカメラ用途とcamera entitlementを追加し、音声やネットワーク中継は使わない。設計・操作・検証境界は[QR_TRANSFER](QR_TRANSFER.md)。
+M8で共通RSQR2の送受信を追加。500msの開始/分割データ/終了QR循環、gzip（DEFLATE）、欠落補完、確認後取込をMac/Webで共有する。MacはInfo.plistのカメラ用途とcamera entitlementを追加し、音声やネットワーク中継は使わない。設計・操作・検証境界は[QR_TRANSFER](QR_TRANSFER.md)。

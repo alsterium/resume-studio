@@ -3,7 +3,7 @@ import jsQR from "jsqr";
 
 export function qrMatrix(text: string) {
   return QRCode.create([{ data: new TextEncoder().encode(text), mode: "byte" }], {
-    version: 40,
+    version: 30,
     errorCorrectionLevel: "M",
   }).modules;
 }

@@ -79,7 +79,7 @@ test("版・容量・数値・長さ・CRC・base64の異常フレームは状�
   const data = frameText(t, "D", 0),
     begin = frameText(t, "B");
   for (const text of [
-    data.replace("RSQR1", "RSQR2"),
+    data.replace("RSQR2", "RSQR3"),
     changed(begin, 4, "22020097"),
     changed(begin, 5, "20971521"),
     changed(begin, 6, "0"),
@@ -128,7 +128,7 @@ test("全体SHA・gzip CRC・展開上限・UTF8/JSON/Project検証を通らな�
   expect(() => inflateProject(new Uint8Array(10), 1)).toThrow();
 });
 
-test("Version40/Mの実QR画像をjsQRで読み取り、全項目プロジェクトを再組立する", async () => {
+test("Version30/Mの実QR画像をjsQRで読み取り、全項目プロジェクトを再組立する", async () => {
   const t = await prepareTransfer(full),
     r = new TransferReceiver();
   for (let i = 0; i < t.count + 2; i++) {
@@ -139,11 +139,11 @@ test("Version40/Mの実QR画像をjsQRで読み取り、全項目プロジェク
     );
     expect(text.length).toBeLessThanOrEqual(FRAME_BYTES);
     const matrix = qrMatrix(text);
-    expect(matrix.size).toBe(177);
-    const width = 185 * 4,
+    expect(matrix.size).toBe(137);
+    const width = 145 * 4,
       pixels = new Uint8ClampedArray(width * width * 4).fill(255);
-    for (let y = 0; y < 177; y++)
-      for (let x = 0; x < 177; x++)
+    for (let y = 0; y < 137; y++)
+      for (let x = 0; x < 137; x++)
         if (matrix.get(y, x))
           for (let yy = 0; yy < 4; yy++)
             for (let xx = 0; xx < 4; xx++) {
@@ -157,12 +157,30 @@ test("Version40/Mの実QR画像をjsQRで読み取り、全項目プロジェク
   expect(await r.finish()).toEqual(full);
 });
 
-test("最大チャンクのフレームもVersion40/Mに収まり、JSONの圧縮効果を維持する", async () => {
+test("最大チャンクのフレームもVersion30/Mに収まり、JSONの圧縮効果を維持する", async () => {
   const t = await prepareTransfer(largeProject());
   const text = frameText(t, "D", 0);
   expect(parseFrame(text)!.data.length).toBe(CHUNK_BYTES);
   expect(text.length).toBeLessThanOrEqual(FRAME_BYTES);
-  expect(qrMatrix(text).size).toBe(177);
+  expect(qrMatrix(text).size).toBe(137);
   const empty = await prepareTransfer(newProject());
   expect(empty.compressedBytes).toBeLessThan(empty.jsonBytes);
+});
+
+test("旧RSQR1の1500byte分割送信も混ぜずに復元できる", async () => {
+  const project = largeProject();
+  const t = await prepareTransfer(project);
+  const legacy = { ...t, chunkBytes: 1500, count: Math.ceil(t.compressedBytes / 1500) };
+  const r = new TransferReceiver();
+  const old = (kind: "B" | "D" | "E", index = 0) => {
+    const parts = frameText(legacy, kind, index).split("|");
+    parts[0] = "RSQR1";
+    parts.pop();
+    return parts.join("|");
+  };
+  r.accept(old("B"));
+  for (let i = 0; i < legacy.count; i++) r.accept(old("D", i));
+  r.accept(old("E"));
+  expect(await r.finish()).toEqual(project);
+  expect(() => parseFrame(changed(frameText(t, "B"), 10, "1500"))).toThrow();
 });
