@@ -29,6 +29,20 @@ test("会社→案件・スキルの全項目を編集し、並べ替え・職�
   const user = userEvent.setup();
   render(<App client={tauriClient} />);
   await user.click(screen.getByRole("tab", { name: "職務経歴書" }));
+  expect(
+    screen
+      .getAllByRole("button")
+      .filter((button) => button.dataset.slot === "accordion-trigger")
+      .map((button) => button.textContent),
+  ).toEqual([
+    "基本情報",
+    "職務要約",
+    "スキル",
+    "免許・資格",
+    "職務経歴",
+    "学生時代の研究",
+    "自己PR",
+  ]);
   await expandSections(user);
   expect(screen.getByLabelText("職務経歴書の編集")).toBeVisible();
   expect(screen.getByLabelText("履歴書の編集")).not.toBeVisible();
@@ -98,12 +112,29 @@ test("会社→案件・スキルの全項目を編集し、並べ替え・職�
   await user.click(screen.getByRole("button", { name: "免許・資格を追加" }));
   await user.type(screen.getByLabelText("免許・資格 1 内容"), "職務経歴書資格");
   await user.click(screen.getByRole("tab", { name: "履歴書" }));
+  expect(
+    screen
+      .getAllByRole("button")
+      .filter((button) => button.dataset.slot === "accordion-trigger")
+      .map((button) => button.textContent),
+  ).toEqual(["基本情報", "学歴・職歴", "免許・資格", "志望動機", "本人希望"]);
   await expandSections(user);
   expect(screen.queryByLabelText("免許・資格 1 内容")).not.toBeInTheDocument();
   await user.click(screen.getByRole("button", { name: "免許・資格を追加" }));
   await user.type(screen.getByLabelText("免許・資格 1 内容"), "履歴書資格");
+  await user.click(screen.getByRole("button", { name: "免許・資格を編集" }));
   await user.click(screen.getByRole("tab", { name: "職務経歴書" }));
   await expandSections(user);
+  expect(screen.getByRole("button", { name: "免許・資格を編集" })).toHaveAttribute(
+    "aria-expanded",
+    "true",
+  );
+  await user.click(screen.getByRole("tab", { name: "履歴書" }));
+  expect(screen.getByRole("button", { name: "免許・資格を編集" })).toHaveAttribute(
+    "aria-expanded",
+    "false",
+  );
+  await user.click(screen.getByRole("tab", { name: "職務経歴書" }));
   await user.click(screen.getByRole("button", { name: "保存" }));
   expect(saved?.career.positions.map((value) => value.companyName)).toEqual([
     "架空会社A",

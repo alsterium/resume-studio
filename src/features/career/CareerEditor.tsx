@@ -2,7 +2,7 @@ import { EditorSection } from "../../components/EditorSection";
 import { Input } from "../../components/ui/input";
 import { Button } from "../../components/ui/button";
 import { ArrowUp, ArrowDown, Trash2, Plus } from "lucide-react";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import type {
   BodyDoc,
   CareerProject,
@@ -304,12 +304,14 @@ function ProjectEditor({
 }
 
 export function CareerEditor({
+  qualificationsSection,
   project,
   disabled,
   editorKey,
   onChange,
 }: {
   project: Project;
+  qualificationsSection?: ReactNode;
   disabled: boolean;
   editorKey: number;
   onChange: (project: Project) => void;
@@ -341,6 +343,81 @@ export function CareerEditor({
   return (
     <section aria-label="職務経歴書の編集" className="career-editor">
       <h3>職務経歴書の項目</h3>
+      <EditorSection value="skills" title="スキル">
+        <fieldset disabled={disabled}>
+          <legend>活かせるスキル・経験</legend>
+          {career.skills.map((skill, index) => (
+            <div key={skill.id} className="history-row">
+              {(
+                [
+                  ["name", "スキル名"],
+                  ["experienceLabel", "経験期間"],
+                  ["description", "説明"],
+                ] as const
+              ).map(([key, title]) => (
+                <TextField
+                  key={key}
+                  label={`スキル ${index + 1} ${title}`}
+                  value={skill[key]}
+                  onChange={(value) =>
+                    onChange({
+                      ...project,
+                      career: {
+                        ...career,
+                        skills: career.skills.map((current) =>
+                          current.id === skill.id ? { ...current, [key]: value } : current,
+                        ),
+                      },
+                    })
+                  }
+                />
+              ))}
+              <OrderActions
+                label={`スキル ${index + 1}`}
+                index={index}
+                count={career.skills.length}
+                onMove={(direction) =>
+                  onChange({
+                    ...project,
+                    career: { ...career, skills: moved(career.skills, index, direction) },
+                  })
+                }
+                onDelete={() =>
+                  onChange({
+                    ...project,
+                    career: {
+                      ...career,
+                      skills: career.skills.filter((value) => value.id !== skill.id),
+                    },
+                  })
+                }
+              />
+            </div>
+          ))}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={career.skills.length >= 200}
+            onClick={() =>
+              onChange({
+                ...project,
+                career: {
+                  ...career,
+                  skills: [
+                    ...career.skills,
+                    { id: createId("skill"), name: "", experienceLabel: "", description: "" },
+                  ],
+                },
+              })
+            }
+          >
+            <Plus aria-hidden="true" />
+            スキルを追加
+          </Button>
+        </fieldset>
+      </EditorSection>
+      {qualificationsSection}
       <EditorSection value="positions" title="職務経歴">
         <fieldset disabled={disabled}>
           <legend>職務経歴</legend>
@@ -587,80 +664,6 @@ export function CareerEditor({
               ))}
             </div>
           )}
-        </fieldset>
-      </EditorSection>
-      <EditorSection value="skills" title="スキル">
-        <fieldset disabled={disabled}>
-          <legend>活かせるスキル・経験</legend>
-          {career.skills.map((skill, index) => (
-            <div key={skill.id} className="history-row">
-              {(
-                [
-                  ["name", "スキル名"],
-                  ["experienceLabel", "経験期間"],
-                  ["description", "説明"],
-                ] as const
-              ).map(([key, title]) => (
-                <TextField
-                  key={key}
-                  label={`スキル ${index + 1} ${title}`}
-                  value={skill[key]}
-                  onChange={(value) =>
-                    onChange({
-                      ...project,
-                      career: {
-                        ...career,
-                        skills: career.skills.map((current) =>
-                          current.id === skill.id ? { ...current, [key]: value } : current,
-                        ),
-                      },
-                    })
-                  }
-                />
-              ))}
-              <OrderActions
-                label={`スキル ${index + 1}`}
-                index={index}
-                count={career.skills.length}
-                onMove={(direction) =>
-                  onChange({
-                    ...project,
-                    career: { ...career, skills: moved(career.skills, index, direction) },
-                  })
-                }
-                onDelete={() =>
-                  onChange({
-                    ...project,
-                    career: {
-                      ...career,
-                      skills: career.skills.filter((value) => value.id !== skill.id),
-                    },
-                  })
-                }
-              />
-            </div>
-          ))}
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            disabled={career.skills.length >= 200}
-            onClick={() =>
-              onChange({
-                ...project,
-                career: {
-                  ...career,
-                  skills: [
-                    ...career.skills,
-                    { id: createId("skill"), name: "", experienceLabel: "", description: "" },
-                  ],
-                },
-              })
-            }
-          >
-            <Plus aria-hidden="true" />
-            スキルを追加
-          </Button>
         </fieldset>
       </EditorSection>
       <EditorSection value="selfPromotion" title="自己PR">

@@ -187,6 +187,7 @@ export function ResumeEditor({
   includeQualifications = true,
   includeProfile = true,
   profileExtras,
+  qualificationsSection,
   onChange,
 }: {
   project: Project;
@@ -195,6 +196,7 @@ export function ResumeEditor({
   includeQualifications?: boolean;
   includeProfile?: boolean;
   profileExtras?: ReactNode;
+  qualificationsSection?: ReactNode;
   onChange: (project: Project) => void;
 }) {
   return (
@@ -202,11 +204,7 @@ export function ResumeEditor({
       <h3>履歴書の項目</h3>
       {includeProfile && (
         <EditorSection value="profile" title="基本情報">
-          <ProfileEditor
-            project={project}
-            disabled={disabled}
-            onChange={onChange}
-          >
+          <ProfileEditor project={project} disabled={disabled} onChange={onChange}>
             {profileExtras}
           </ProfileEditor>
         </EditorSection>
@@ -216,36 +214,42 @@ export function ResumeEditor({
           [
             ["education", "学歴"],
             ["employment", "職歴"],
-            ["qualifications", "免許・資格"],
           ] as const
-        )
-          .filter(([key]) => includeQualifications || key !== "qualifications")
-          .map(([key, title]) => (
+        ).map(([key, title]) => (
+          <HistoryEditor
+            key={key}
+            title={title}
+            rows={project.resume[key]}
+            disabled={disabled}
+            onChange={(rows) =>
+              onChange({
+                ...project,
+                resume: { ...project.resume, [key]: rows },
+              })
+            }
+          />
+        ))}
+      </EditorSection>
+      {qualificationsSection ??
+        (includeQualifications && (
+          <EditorSection value="qualifications" title="免許・資格">
             <HistoryEditor
-              key={key}
-              title={title}
-              rows={project.resume[key]}
+              title="免許・資格"
+              rows={project.resume.qualifications}
               disabled={disabled}
-              onChange={(rows) =>
-                onChange({
-                  ...project,
-                  resume: { ...project.resume, [key]: rows },
-                })
+              onChange={(qualifications) =>
+                onChange({ ...project, resume: { ...project.resume, qualifications } })
               }
             />
-          ))}
-      </EditorSection>
+          </EditorSection>
+        ))}
       {(
         [
           ["motivation", "志望動機・特技・アピールポイント"],
           ["preferences", "本人希望欄"],
         ] as const
       ).map(([key, label]) => (
-        <EditorSection
-          key={key}
-          value={key}
-          title={key === "motivation" ? "志望動機" : "本人希望"}
-        >
+        <EditorSection key={key} value={key} title={key === "motivation" ? "志望動機" : "本人希望"}>
           <section aria-label={`${label}の編集`}>
             <h4>{label}</h4>
             <BodyEditor

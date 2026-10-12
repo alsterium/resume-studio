@@ -583,6 +583,22 @@ export function DraftWorkspace({
     setFileMessage(null);
   };
   const editorDisabled = opening || pending !== null;
+  const qualificationsSection = (
+    <EditorSection value="qualifications" title="免許・資格">
+      <HistoryEditor
+        title="免許・資格"
+        rows={project[selectedKind].qualifications}
+        disabled={editorDisabled}
+        onChange={(qualifications) =>
+          updateProject({
+            ...project,
+            [selectedKind]: { ...project[selectedKind], qualifications },
+          })
+        }
+      />
+      <p className="field-hint">{document}に掲載する免許・資格を入力します。</p>
+    </EditorSection>
+  );
   return (
     <section aria-label="応募書類の編集" className="studio-shell">
       <header className="studio-toolbar">
@@ -801,6 +817,9 @@ export function DraftWorkspace({
                       project={project}
                       includeProfile={false}
                       includeQualifications={false}
+                      qualificationsSection={
+                        document === "履歴書" ? qualificationsSection : undefined
+                      }
                       disabled={editorDisabled}
                       editorKey={editorKey}
                       onChange={updateProject}
@@ -821,6 +840,9 @@ export function DraftWorkspace({
                       />
                     </EditorSection>
                     <CareerEditor
+                      qualificationsSection={
+                        document === "職務経歴書" ? qualificationsSection : undefined
+                      }
                       key={editorKey}
                       project={project}
                       disabled={editorDisabled}
@@ -828,20 +850,6 @@ export function DraftWorkspace({
                       onChange={updateProject}
                     />
                   </div>
-                  <EditorSection value="qualifications" title="免許・資格">
-                    <HistoryEditor
-                      title="免許・資格"
-                      rows={project[selectedKind].qualifications}
-                      disabled={editorDisabled}
-                      onChange={(qualifications) =>
-                        updateProject({
-                          ...project,
-                          [selectedKind]: { ...project[selectedKind], qualifications },
-                        })
-                      }
-                    />
-                    <p className="field-hint">{document}に掲載する免許・資格を入力します。</p>
-                  </EditorSection>
                 </Accordion>
               </EditorNavigationContext>
             </div>
