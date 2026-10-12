@@ -37,6 +37,7 @@ export function newProject(): Project {
     career: {
       summary: body(),
       positions: [],
+      researches: [],
       skills: [],
       qualifications: [],
       selfPromotion: body(),

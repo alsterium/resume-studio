@@ -350,6 +350,60 @@ fn render(model: &DocumentModel<'_>) -> Result<String, String> {
                     }
                 }
             }
+            let researches: Vec<_> = career
+                .researches
+                .iter()
+                .filter(|research| {
+                    !research.name.trim().is_empty()
+                        || research.overview.has_content()
+                        || research.contents.has_content()
+                        || research.achievements.has_content()
+                        || research
+                            .languages
+                            .iter()
+                            .any(|value| !value.trim().is_empty())
+                        || research
+                            .technologies
+                            .iter()
+                            .any(|value| !value.trim().is_empty())
+                })
+                .collect();
+            if !researches.is_empty() {
+                command(&mut output, "CareerSection", &["学生時代の研究".into()]);
+                for research in researches {
+                    if !research.name.trim().is_empty() {
+                        command(
+                            &mut output,
+                            "CareerProject",
+                            &[display_text(&research.name), String::new()],
+                        );
+                    }
+                    for (label, body) in [
+                        ("研究概要", &research.overview),
+                        ("研究内容", &research.contents),
+                        ("実績", &research.achievements),
+                    ] {
+                        if body.has_content() {
+                            command(
+                                &mut output,
+                                "CareerBody",
+                                &[display_text(label), render_body(body)?],
+                            );
+                        }
+                    }
+                    for (label, items) in [
+                        ("使用言語", &research.languages),
+                        ("使用技術", &research.technologies),
+                    ] {
+                        let values: Vec<_> = items
+                            .iter()
+                            .filter(|value| !value.trim().is_empty())
+                            .cloned()
+                            .collect();
+                        field(&mut output, label, &values.join("、"));
+                    }
+                }
+            }
             if career.self_promotion.has_content() {
                 command(&mut output, "CareerSection", &["自己PR".into()]);
                 output.push_str(&render_body(&career.self_promotion)?);

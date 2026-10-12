@@ -437,3 +437,66 @@ fn today_mode_resolves_the_local_date_and_age_for_both_documents() {
     }
     assert_eq!(project.document_date, "2000-01-01");
 }
+
+#[test]
+fn optional_student_research_preserves_order_omits_empty_and_validates() {
+    let mut value: serde_json::Value =
+        serde_json::from_slice(include_bytes!("../../tests/fixtures/project-full.json")).unwrap();
+    let body = |text: &str| serde_json::json!({"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":text,"marks":[{"type":"bold"}]}]}]});
+    let empty = serde_json::json!({"id":"research-empty","name":"","overview":{"type":"doc"},"contents":{"type":"doc"},"achievements":{"type":"doc"},"languages":[" "],"technologies":[]});
+    value["career"]["researches"] = serde_json::json!([empty]);
+    let project = parse_project(&serde_json::to_vec(&value).unwrap()).unwrap();
+    assert!(!generate_project(&project, DocumentKind::Career)
+        .unwrap()
+        .content_tex
+        .contains("学生時代の研究"));
+    let research = serde_json::json!({"id":"research-1","name":"画像認識研究","overview":body("研究概要本文"),"contents":body("研究内容本文"),"achievements":body("研究実績本文"),"languages":["Python"],"technologies":["PyTorch"]});
+    value["career"]["researches"] = serde_json::json!([research]);
+    for version in ["1.0.0", "1.1.0", "1.2.0"] {
+        value["templates"]["career"]["version"] = serde_json::json!(version);
+        let project = parse_project(&serde_json::to_vec(&value).unwrap()).unwrap();
+        let tex = generate_project(&project, DocumentKind::Career)
+            .unwrap()
+            .content_tex
+            .replace("\\allowbreak{}", "");
+        assert!(tex.find("学生時代の研究").unwrap() > tex.find("架空の実務経験").unwrap());
+        for text in [
+            "画像認識研究",
+            "研究概要本文",
+            "研究内容本文",
+            "研究実績本文",
+            "Python",
+            "PyTorch",
+        ] {
+            assert!(tex.contains(text), "{tex}");
+        }
+        assert!(tex.contains("\\CareerBody{研究内容}{"));
+        assert!(tex.contains("\\textbf{研究内容本文}"));
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("研究.json");
+        resume_studio_lib::storage::write_project(&path, &project).unwrap();
+        let restored = resume_studio_lib::storage::read_project(&path).unwrap();
+        assert_eq!(
+            generate_project(&restored, DocumentKind::Career)
+                .unwrap()
+                .content_tex,
+            generate_project(&project, DocumentKind::Career)
+                .unwrap()
+                .content_tex
+        );
+        assert!(!generate_project(&project, DocumentKind::Resume)
+            .unwrap()
+            .content_tex
+            .contains("研究概要本文"));
+    }
+    let valid = value.clone();
+    value["career"]["researches"][0]["id"] = value["career"]["positions"][0]["id"].clone();
+    assert!(parse_project(&serde_json::to_vec(&value).unwrap()).is_err());
+    value = valid.clone();
+    value["career"]["researches"][0]["contents"] = body(&"日".repeat(22000));
+    assert!(parse_project(&serde_json::to_vec(&value).unwrap()).is_err());
+    value = valid.clone();
+    value["career"]["researches"] =
+        serde_json::json!(vec![valid["career"]["researches"][0].clone(); 201]);
+    assert!(parse_project(&serde_json::to_vec(&value).unwrap()).is_err());
+}

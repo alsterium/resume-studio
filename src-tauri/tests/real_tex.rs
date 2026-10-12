@@ -1505,3 +1505,64 @@ fn dynamic_today_dates_and_age_render_in_both_pdfs() {
     }
     assert_eq!(project.document_date, "1999-12-31");
 }
+
+#[test]
+#[cfg(target_os = "macos")]
+fn student_research_compiles_and_flows_across_pages() {
+    use resume_studio_lib::{
+        domain::validation::parse_project,
+        generator::{documents::generate_project, templates::DocumentKind},
+    };
+    let mut value: serde_json::Value =
+        serde_json::from_slice(include_bytes!("../../tests/fixtures/project-full.json")).unwrap();
+    let body = |text: &str| serde_json::json!({"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":text}]}]});
+    value["templates"]["career"]["version"] = serde_json::json!("1.2.0");
+    value["career"]["researches"] = serde_json::json!([{"id":"student-research","name":"画像認識の研究","overview":body("架空大学での画像分類手法の比較研究。"),"contents":body("学習データを整理し複数のモデルの精度を比較した。"),"achievements":body("架空学会で研究成果を発表した。"),"languages":["Python"],"technologies":["PyTorch"]}]);
+    for long in [false, true] {
+        if long {
+            value["career"]["researches"][0]["contents"] = body(&format!(
+                "{}研究内容末尾",
+                "学習データを整理し分類精度を比較した。".repeat(150)
+            ));
+        }
+        let project = parse_project(&serde_json::to_vec(&value).unwrap()).unwrap();
+        let bundle = generate_project(&project, DocumentKind::Career).unwrap();
+        let artifact = compile(&TexRuntime::discover(), &bundle).unwrap();
+        save_layout_qa(
+            if long {
+                "research-long-t62"
+            } else {
+                "research-normal-t62"
+            },
+            &bundle,
+            &artifact.bytes,
+        );
+        assert!(!artifact.log.contains("Overfull"), "{}", artifact.log);
+        assert!(
+            !artifact.log.contains("Missing character:"),
+            "{}",
+            artifact.log
+        );
+        let pages = inspected_pdf_pages(&artifact.bytes);
+        assert_a4(&pages);
+        let text = extracted_pdf_text(&artifact.bytes)
+            .split_whitespace()
+            .collect::<String>();
+        for expected in [
+            "学生時代の研究",
+            "画像認識の研究",
+            "研究概要",
+            "研究内容",
+            "架空学会で研究成果を発表した。",
+            "Python",
+            "PyTorch",
+        ] {
+            assert!(text.contains(expected), "{text}");
+        }
+        assert!(text.find("学生時代の研究").unwrap() > text.find("架空の実務経験").unwrap());
+        if long {
+            assert!(pages.len() > 1);
+            assert!(text.contains("研究内容末尾"));
+        }
+    }
+}

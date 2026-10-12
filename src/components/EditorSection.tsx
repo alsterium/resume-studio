@@ -26,7 +26,7 @@ export function EditorSection({
   const Icon =
     value === "profile"
       ? UserRound
-      : value === "history"
+      : value === "history" || value === "researches"
         ? GraduationCap
         : value === "qualifications"
           ? Award

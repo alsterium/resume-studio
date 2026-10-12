@@ -3,7 +3,13 @@ import { Input } from "../../components/ui/input";
 import { Button } from "../../components/ui/button";
 import { ArrowUp, ArrowDown, Trash2, Plus } from "lucide-react";
 import { useState } from "react";
-import type { BodyDoc, CareerProject, Position, Project } from "../../domain/project";
+import type {
+  BodyDoc,
+  CareerProject,
+  Position,
+  Project,
+  StudentResearch,
+} from "../../domain/project";
 import { createId } from "../../domain/new-project";
 import { isYearMonth } from "../../domain/dates";
 import { BodyEditor } from "../../editor/BodyEditor";
@@ -310,11 +316,18 @@ export function CareerEditor({
 }) {
   const career = project.career;
   const [companyId, setCompanyId] = useState<string | null>(null);
+  const [researchId, setResearchId] = useState<string | null>(null);
   const [caseId, setCaseId] = useState<string | null>(null);
   const company = career.positions.find((item) => item.id === companyId) ?? career.positions[0];
   const companyIndex = company ? career.positions.indexOf(company) : -1;
   const item = company?.projects.find((item) => item.id === caseId) ?? company?.projects[0];
   const caseIndex = item && company ? company.projects.indexOf(item) : -1;
+  const researches = career.researches ?? [];
+  const research = researches.find((value) => value.id === researchId) ?? researches[0];
+  const updateResearches = (researches: StudentResearch[]) =>
+    onChange({ ...project, career: { ...career, researches } });
+  const updateResearch = (updated: StudentResearch) =>
+    updateResearches(researches.map((value) => (value.id === updated.id ? updated : value)));
   const updateCompany = (updated: Position) =>
     onChange({
       ...project,
@@ -482,6 +495,96 @@ export function CareerEditor({
                   </div>
                 )}
               </fieldset>
+            </div>
+          )}
+        </fieldset>
+      </EditorSection>
+      <EditorSection value="researches" title="学生時代の研究">
+        <fieldset disabled={disabled}>
+          <legend>学生時代の研究（任意）</legend>
+          <p>必要に応じて追加できます。未入力の項目は書類に表示しません。</p>
+          {research && (
+            <label>
+              編集する研究
+              <select value={research.id} onChange={(event) => setResearchId(event.target.value)}>
+                {researches.map((value, index) => (
+                  <option key={value.id} value={value.id}>
+                    {index + 1}. {value.name || "研究名未入力"}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={researches.length >= 200}
+            onClick={() => {
+              const next: StudentResearch = {
+                id: createId("research"),
+                name: "",
+                overview: emptyBody(),
+                contents: emptyBody(),
+                achievements: emptyBody(),
+                languages: [],
+                technologies: [],
+              };
+              updateResearches([...researches, next]);
+              setResearchId(next.id);
+            }}
+          >
+            <Plus aria-hidden="true" />
+            研究を追加
+          </Button>
+          {research && (
+            <div key={research.id}>
+              <OrderActions
+                label="研究"
+                index={researches.indexOf(research)}
+                count={researches.length}
+                onMove={(direction) =>
+                  updateResearches(moved(researches, researches.indexOf(research), direction))
+                }
+                onDelete={() =>
+                  updateResearches(researches.filter((value) => value.id !== research.id))
+                }
+              />
+              <TextField
+                label="研究名（任意）"
+                value={research.name}
+                onChange={(name) => updateResearch({ ...research, name })}
+              />
+              {(
+                [
+                  ["overview", "研究概要"],
+                  ["contents", "研究内容"],
+                  ["achievements", "実績"],
+                ] as const
+              ).map(([key, label]) => (
+                <section key={key}>
+                  <h4>{label}</h4>
+                  <BodyEditor
+                    label={label}
+                    editable={!disabled}
+                    initialContent={research[key]}
+                    onChange={(body) => updateResearch({ ...research, [key]: body as BodyDoc })}
+                  />
+                </section>
+              ))}
+              {(
+                [
+                  ["languages", "研究の使用言語"],
+                  ["technologies", "研究の使用技術"],
+                ] as const
+              ).map(([key, title]) => (
+                <ListField
+                  key={key}
+                  title={title}
+                  items={research[key]}
+                  onChange={(items) => updateResearch({ ...research, [key]: items })}
+                />
+              ))}
             </div>
           )}
         </fieldset>

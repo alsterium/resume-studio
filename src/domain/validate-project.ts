@@ -95,6 +95,10 @@ export function validateProject(value: unknown): Project {
       }
     }
   }
+  for (const research of project.career.researches ?? []) {
+    id(research.id);
+    bodies.push(research.overview, research.contents, research.achievements);
+  }
   for (const skill of project.career.skills) id(skill.id);
   for (const asset of project.assets) {
     id(asset.id);

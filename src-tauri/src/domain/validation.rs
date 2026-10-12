@@ -135,6 +135,14 @@ fn validate_semantics(project: &Project) -> Result<(), String> {
             }
         }
     }
+    for research in &project.career.researches {
+        insert_id(&mut ids, &research.id)?;
+        bodies.extend([
+            &research.overview,
+            &research.contents,
+            &research.achievements,
+        ]);
+    }
     for skill in &project.career.skills {
         insert_id(&mut ids, &skill.id)?;
     }

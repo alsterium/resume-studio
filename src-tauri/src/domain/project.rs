@@ -75,10 +75,24 @@ pub struct Resume {
 pub struct Career {
     pub summary: BodyNode,
     pub positions: Vec<Position>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub researches: Vec<StudentResearch>,
     pub skills: Vec<Skill>,
     #[serde(default)]
     pub qualifications: Vec<HistoryRow>,
     pub self_promotion: BodyNode,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct StudentResearch {
+    pub id: String,
+    pub name: String,
+    pub overview: BodyNode,
+    pub contents: BodyNode,
+    pub achievements: BodyNode,
+    pub languages: Vec<String>,
+    pub technologies: Vec<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]

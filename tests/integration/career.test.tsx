@@ -247,3 +247,55 @@ test("会社100・案件200・スキル200・一覧50の上限で追加を止め
   await user.click(screen.getByRole("button", { name: "会社 削除" }));
   expect(screen.getByRole("button", { name: "会社を追加" })).toBeEnabled();
 }, 15_000);
+
+test("任意の研究を入力・並べ替え・削除して保存再読込で本文と値を保持する", async () => {
+  let saved: Project = validateProject(structuredClone(fixture));
+  mockIPC((command, args) => {
+    if (command === "open_project")
+      return { project: saved, fileId: "1", displayName: "研究.json" };
+    if (command === "save_project") {
+      saved = savedArgs(args);
+      return { fileId: "1", displayName: "研究.json" };
+    }
+  });
+  const user = userEvent.setup();
+  render(<DraftWorkspace client={tauriClient} document="職務経歴書" />);
+  await expandSections(user);
+  await user.click(screen.getByRole("button", { name: "開く" }));
+  expect(screen.queryByLabelText("研究概要")).not.toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "研究を追加" }));
+  await user.type(screen.getByLabelText("研究名（任意）"), "画像認識の研究");
+  for (const [label, text] of [
+    ["研究概要", "架空の研究概要"],
+    ["研究内容", "分類手法を比較"],
+    ["実績", "学会で発表"],
+  ]) {
+    await user.type(screen.getByLabelText(label), text);
+  }
+  for (const [title, text] of [
+    ["研究の使用言語", "Python"],
+    ["研究の使用技術", "PyTorch"],
+  ]) {
+    await user.click(screen.getByRole("button", { name: title + "を追加" }));
+    await user.type(screen.getByLabelText(title + " 1"), text);
+  }
+  await user.click(screen.getByRole("button", { name: "研究を追加" }));
+  await user.type(screen.getByLabelText("研究名（任意）"), "第二の研究");
+  await user.click(screen.getByRole("button", { name: "研究 上へ" }));
+  await user.click(screen.getByRole("button", { name: "保存" }));
+  expect(saved.career.researches?.map((value) => value.name)).toEqual([
+    "第二の研究",
+    "画像認識の研究",
+  ]);
+  await user.click(screen.getByRole("button", { name: "開く" }));
+  await user.selectOptions(screen.getByLabelText("編集する研究"), saved.career.researches![1].id);
+  expect(screen.getByLabelText("研究概要")).toHaveTextContent("架空の研究概要");
+  expect(screen.getByLabelText("研究内容")).toHaveTextContent("分類手法を比較");
+  expect(screen.getByLabelText("実績")).toHaveTextContent("学会で発表");
+  expect(screen.getByLabelText("研究の使用言語 1")).toHaveValue("Python");
+  expect(screen.getByLabelText("研究の使用技術 1")).toHaveValue("PyTorch");
+  await user.click(screen.getByRole("button", { name: "研究 削除" }));
+  await user.click(screen.getByRole("button", { name: "研究 削除" }));
+  await user.click(screen.getByRole("button", { name: "保存" }));
+  expect(saved.career.researches).toEqual([]);
+});

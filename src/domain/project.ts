@@ -41,6 +41,15 @@ export interface CareerProject {
   technologies: string[];
   url?: string;
 }
+export interface StudentResearch {
+  id: string;
+  name: string;
+  overview: BodyDoc;
+  contents: BodyDoc;
+  achievements: BodyDoc;
+  languages: string[];
+  technologies: string[];
+}
 export interface Position {
   id: string;
   companyName: string;
@@ -82,6 +91,7 @@ export interface Project {
   career: {
     summary: BodyDoc;
     positions: Position[];
+    researches?: StudentResearch[];
     skills: Skill[];
     qualifications: HistoryRow[];
     selfPromotion: BodyDoc;

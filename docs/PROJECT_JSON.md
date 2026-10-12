@@ -60,3 +60,7 @@ Schemaは構造を表し、日付の実在性、期間の順序、参照先、UT
 ## 書類日付のモード（T45）
 
 任意のdocumentDateModeはfixed（指定日）/today（今日）。省略はfixedで旧JSONの日付を維持する。documentDateには元の指定日を引き続き保持し、どちらのモードでも実在ISO日付として検証する。todayの当日は生成/書き出し時に端末のローカルタイムゾーンで解決し、保存値を上書きしない。モードは両書類共通で、年齢もその時点の日付で算出する。
+
+## 学生時代の研究（T62）
+
+career.researchesは省略可能な配列（最大200件）。省略と空配列は研究なし。各研究はid、name（任意の研究名、空文字可）、overview（研究概要）、contents（研究内容）、achievements（実績）、languages、technologiesを持つ。本文は既存の限定AST、言語・技術は各50件の自由入力。ID重複・本文容量は既存と同じ検証を適用する。旧JSONへ研究を補わず読み込める。

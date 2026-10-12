@@ -96,3 +96,36 @@ test("旧JSONの資格を独立データへ移し、明示的な空欄と書類�
     expect(() => validateProject(invalid)).toThrow();
   }
 });
+
+test("任意の研究の旧JSON互換・ID重複・件数・本文容量を検証する", () => {
+  const project = validateProject(structuredClone(empty));
+  expect(project.career.researches).toBeUndefined();
+  const research = {
+    id: "research-1",
+    name: "",
+    overview: { type: "doc" as const },
+    contents: { type: "doc" as const },
+    achievements: { type: "doc" as const },
+    languages: [],
+    technologies: [],
+  };
+  project.career.researches = [research];
+  expect(validateProject(project).career.researches).toEqual([research]);
+  project.career.researches = [research, research];
+  expect(() => validateProject(project)).toThrow(/ID/);
+  project.career.researches = Array.from({ length: 201 }, (_, index) => ({
+    ...research,
+    id: `research-${index}`,
+  }));
+  expect(() => validateProject(project)).toThrow();
+  project.career.researches = [
+    {
+      ...research,
+      contents: {
+        type: "doc",
+        content: [{ type: "paragraph", content: [{ type: "text", text: "日".repeat(22000) }] }],
+      },
+    },
+  ];
+  expect(() => validateProject(project)).toThrow(/64KiB/);
+});
