@@ -46,15 +46,21 @@ fn cancellation_and_timeout_stop_real_descendants_and_delete_working_resources()
             )
         });
         let before = Instant::now();
-        while !record.exists() {
+        // Creating the file precedes writing its contents. Wait for the whole
+        // trace so cancellation cannot race the shell's redirected printf.
+        let trace = loop {
+            if let Ok(trace) = fs::read_to_string(&record) {
+                if trace.lines().count() == 3 {
+                    break trace;
+                }
+            }
             if worker.is_finished() {
                 let failure = worker.join().unwrap().err();
                 panic!("compiler exited before recording children: {failure:?}");
             }
             assert!(before.elapsed() < Duration::from_secs(3));
             std::thread::sleep(Duration::from_millis(5));
-        }
-        let trace = fs::read_to_string(&record).unwrap();
+        };
         let lines: Vec<_> = trace.lines().collect();
         if cancel {
             token.cancel();
