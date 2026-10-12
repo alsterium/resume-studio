@@ -1,0 +1,357 @@
+.web-workspace,
+.web-workspace .studio-shell {
+  min-height: 0;
+}
+.web-loading {
+  display: grid;
+  place-content: center;
+  height: 100dvh;
+  color: #71717a;
+}
+.web-workspace .project-identity > strong {
+  display: inline;
+}
+.web-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  padding: 8px 18px;
+  background: #fafafa;
+  border-bottom: 1px solid #e4e4e7;
+  font-size: 11px;
+  color: #52525b;
+}
+.web-error {
+  padding: 10px 18px;
+  background: #fff1f2;
+  color: #9f1239;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+  max-height: 20dvh;
+  overflow: auto;
+}
+.web-panels {
+  display: grid;
+  grid-template-columns: minmax(320px, 410px) minmax(0, 1fr);
+  flex: 1;
+  min-height: 0;
+}
+.web-editor {
+  min-height: 0;
+  min-width: 0;
+  border-right: 1px solid #d4d4d8;
+}
+.web-preview-panel {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: #e9e9ed;
+}
+.web-preview-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: white;
+  padding: 12px 18px;
+  border-bottom: 1px solid #e4e4e7;
+}
+.web-preview-heading h2 {
+  font-size: 17px;
+  font-weight: 600;
+}
+.web-preview-heading .template-picker {
+  max-width: 310px;
+}
+.web-preview-note {
+  margin: 0;
+  padding: 8px 16px;
+  color: #52525b;
+  font-size: 11px;
+}
+.web-view-switch,
+.web-preview-kind {
+  display: none;
+}
+.web-filename-input {
+  width: 100%;
+  border: 1px solid #d4d4d8;
+  border-radius: 6px;
+  padding: 10px;
+  margin-top: 8px;
+}
+.css-preview {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 16px;
+}
+.css-paper-frame {
+  position: relative;
+  margin: 0 auto 20px;
+  box-shadow: 0 2px 12px #18181b1a;
+}
+.css-paper {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-origin: top left;
+  box-sizing: border-box;
+  width: 794px;
+  min-height: 1123px;
+  padding: 58px 56px;
+  background: white;
+  color: #171717;
+  font-family: "Hiragino Mincho ProN", "Yu Mincho", serif;
+  font-size: 14px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+.css-paper h2,
+.css-paper h3,
+.css-paper h4,
+.css-paper h5,
+.css-paper h6,
+.css-paper th {
+  font-weight: 600;
+}
+.css-paper p {
+  white-space: pre-wrap;
+}
+.css-paper small {
+  font-size: 11px;
+}
+.paper-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin: 0 0 24px;
+}
+.paper-title h2 {
+  font-size: 28px;
+  letter-spacing: 8px;
+}
+.career-paper-title {
+  justify-content: center;
+  margin-bottom: 8px;
+}
+.paper-career-meta {
+  text-align: right;
+  margin-bottom: 24px;
+}
+.paper-profile {
+  display: grid;
+  grid-template-columns: 1fr 114px;
+  border: 2px solid #171717;
+}
+.paper-name {
+  padding: 8px 12px;
+}
+.paper-name p {
+  font-size: 24px;
+  margin: 8px 0;
+}
+.paper-photo {
+  display: grid;
+  place-content: center;
+  padding: 4px;
+  border-left: 1px solid #171717;
+  color: #737373;
+}
+.paper-photo img {
+  width: 104px;
+  height: 142px;
+  object-fit: contain;
+}
+.paper-birth {
+  grid-column: 1 / -1;
+  border-top: 1px solid #171717;
+  padding: 8px 12px;
+  text-align: right;
+}
+.paper-birth span {
+  padding-left: 16px;
+}
+.paper-contact {
+  border: 2px solid #171717;
+  border-top: 0;
+}
+.paper-contact > div {
+  padding: 6px 12px;
+}
+.paper-contact > div + div {
+  border-top: 1px solid #171717;
+}
+.paper-contact p {
+  margin: 4px 0;
+}
+.paper-history {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 24px 0;
+  table-layout: fixed;
+  border: 2px solid #171717;
+}
+.paper-history th,
+.paper-history td {
+  padding: 7px 10px;
+  border: 1px solid #171717;
+}
+.paper-history th:nth-child(1) {
+  width: 64px;
+}
+.paper-history th:nth-child(2) {
+  width: 46px;
+}
+.paper-history td:nth-child(-n + 2) {
+  text-align: center;
+}
+.paper-resume-box {
+  border: 2px solid #171717;
+  margin-top: 24px;
+  min-height: 240px;
+}
+.paper-resume-box h3 {
+  border-bottom: 1px solid #171717;
+  padding: 6px 12px;
+}
+.paper-resume-box .paper-body {
+  padding: 12px;
+}
+.paper-section {
+  margin-top: 24px;
+}
+.paper-section > h3 {
+  font-size: 18px;
+  border-bottom: 1px solid #171717;
+  padding-bottom: 6px;
+  margin-bottom: 12px;
+}
+.paper-body p + p {
+  margin-top: 8px;
+}
+.paper-body ul,
+.paper-body ol {
+  padding-left: 24px;
+  margin: 8px 0;
+}
+.paper-body ul {
+  list-style: disc;
+}
+.paper-body ol {
+  list-style: decimal;
+}
+.paper-body strong {
+  font-weight: bold;
+}
+.paper-body em {
+  font-style: italic;
+}
+.paper-position {
+  margin-bottom: 24px;
+}
+.paper-position h4,
+.paper-project h4,
+.paper-project h5 {
+  font-size: 16px;
+}
+.paper-project {
+  border-top: 1px dotted #737373;
+  padding: 12px 0;
+  margin-top: 12px;
+}
+.paper-project h6 {
+  margin: 12px 0 4px;
+}
+.paper-skills {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+.paper-skills th,
+.paper-skills td {
+  border-bottom: 1px dotted #737373;
+  padding: 10px 0;
+  text-align: left;
+  white-space: pre-wrap;
+}
+.paper-skills th {
+  width: 35%;
+  padding-right: 16px;
+  vertical-align: top;
+}
+.paper-skills td {
+  vertical-align: middle;
+}
+.paper-skills small {
+  display: block;
+  font-weight: normal;
+}
+@media (max-width: 760px) {
+  .web-workspace .studio-toolbar {
+    gap: 8px;
+  }
+  .web-workspace .project-identity {
+    gap: 6px;
+  }
+  .web-workspace .project-filename {
+    max-width: none;
+    flex: 1;
+    font-size: 12px;
+  }
+  .web-workspace .project-actions {
+    justify-content: stretch;
+  }
+  .web-workspace .project-actions > button {
+    flex: 1;
+    padding-inline: 8px;
+  }
+  .web-status {
+    padding: 6px 10px;
+    gap: 2px 10px;
+  }
+  .web-view-switch {
+    display: flex;
+    padding: 8px 10px;
+    gap: 8px;
+    border-bottom: 1px solid #e4e4e7;
+    background: white;
+  }
+  .web-view-switch > button {
+    flex: 1;
+  }
+  .web-panels {
+    display: flex;
+  }
+  .web-editor,
+  .web-preview-panel {
+    flex: 1;
+    width: 100%;
+  }
+  .web-panels[data-view="edit"] .web-preview-panel,
+  .web-panels[data-view="preview"] .web-editor {
+    display: none;
+  }
+  .web-preview-kind {
+    display: block;
+    width: 140px;
+  }
+  .web-preview-heading {
+    padding: 8px 10px;
+  }
+  .web-preview-heading .template-picker {
+    display: none;
+  }
+  .web-workspace .draft-editor input,
+  .web-workspace .draft-editor textarea,
+  .web-workspace select,
+  .web-workspace .body-editor .tiptap {
+    font-size: 16px;
+  }
+  .web-workspace .inspector-footer {
+    padding-bottom: max(10px, env(safe-area-inset-bottom));
+  }
+}

@@ -102,6 +102,7 @@ export function validateProject(value: unknown): Project {
   for (const skill of project.career.skills) id(skill.id);
   for (const asset of project.assets) {
     id(asset.id);
+    if (asset.base64.length % 4 !== 0) invalid("写真のbase64形式が不正です。");
     const decodedLength =
       (asset.base64.length / 4) * 3 -
       (asset.base64.endsWith("==") ? 2 : asset.base64.endsWith("=") ? 1 : 0);

@@ -83,3 +83,7 @@ TSとRustが共通Schema／fixtureで構造を検証し、日付・期間・ID�
 独自コマンドはbuild.rsのAppManifest、permissions、main capabilityで宣言する。汎用fs／shell／dialog IPCは公開しない。通常画面はmainウィンドウだけ、リモートoriginを許可せず、CSPで同梱資源とPDF描画用blob/dataへ限定する。
 
 WebDriverサーバーとpicker adapterはdesktop-e2e featureだけに含める。通常依存にWebDriverがないことと通常.appをCIで確認する。詳細は[テスト](TESTING.md)と[ADR 0004](adr/0004-desktop-e2e.md)。
+
+## 軽量Web版（M7）
+
+Mac/Webで`ProjectEditor`を共用する。Web専用entryと静的配信を使い、JSONをFile APIで開いてBlobとしてダウンロードする。単一の下書きをIndexedDBへ順に書込み、復元後に自動保存を始める。セッションのrevision／保存済みrevisionとファイル名は下書きの外枠へ保持し、Project JSONへWeb属性を追加しない。PDF生成・終了IPC・TeX診断はWebへ含めず、`CssPreview`で参考紙面を描画する。詳細は[WEB](WEB.md)。

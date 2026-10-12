@@ -5,6 +5,13 @@ import standaloneCode from "ajv/dist/standalone/index.js";
 // Compile at development/build time. The desktop CSP never permits eval.
 const root = new URL("../", import.meta.url);
 const schema = JSON.parse(readFileSync(new URL("schemas/project-v1.schema.json", root), "utf8"));
+// JavaScript's repeated-group base64 regex can exhaust the stack for valid
+// multi-MiB photos. Check alphabet/padding with a linear regex here and check
+// length modulo four in validateProject; together they enforce the same schema.
+const base64Schema = schema.definitions.asset.properties.base64;
+if (base64Schema.pattern !== "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$")
+  throw new Error("Review the base64 validator when the schema pattern changes");
+base64Schema.pattern = "^[A-Za-z0-9+/]*={0,2}(?![\\s\\S])";
 const ajv = new Ajv({ strict: true, code: { source: true, esm: true }, inlineRefs: false });
 const validator = ajv.compile(schema);
 mkdirSync(new URL(".generated/", root), { recursive: true });

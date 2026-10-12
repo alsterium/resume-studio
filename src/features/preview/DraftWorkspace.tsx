@@ -1,7 +1,5 @@
 import { Button } from "../../components/ui/button";
 import { Badge } from "../../components/ui/badge";
-import { Tabs, TabsList, TabsTrigger } from "../../components/ui/tabs";
-import { Accordion } from "../../components/ui/accordion";
 import {
   Dialog,
   DialogContent,
@@ -21,7 +19,7 @@ import {
   ResizablePanel,
   ResizableHandle,
 } from "../../components/ui/resizable";
-import { EditorNavigationContext, EditorSection } from "../../components/EditorSection";
+import { ProjectEditor } from "../../components/ProjectEditor";
 import { TexDiagnosticsPanel } from "../diagnostics/TexDiagnosticsPanel";
 import {
   FileText,
@@ -48,14 +46,10 @@ import type {
   SavedProject,
 } from "../../infrastructure/app-client";
 import { PdfPreview } from "./PdfPreview";
-import { BodyEditor } from "../../editor/BodyEditor";
 import type { JSONContent } from "@tiptap/core";
 import { createId, newProject } from "../../domain/new-project";
-import type { BodyDoc } from "../../domain/project";
 import { beginSession, editSession, hasUnsavedChanges, recordSaved } from "../../domain/session";
 import { DiscardDialog } from "../files/DiscardDialog";
-import { HistoryEditor, ProfileEditor, ResumeEditor } from "../resume/ResumeEditor";
-import { CareerEditor } from "../career/CareerEditor";
 import { TemplatePicker } from "./TemplatePicker";
 import { readAutoPdfPreference, writeAutoPdfPreference, useAutoPdf } from "./useAutoPdf";
 import { useLocalDate } from "../../components/useLocalDate";
@@ -95,11 +89,6 @@ export function DraftWorkspace({
 }) {
   const [localDocument, setLocalDocument] = useState<"履歴書" | "職務経歴書">("履歴書");
   const document = controlledDocument ?? localDocument;
-  const [expandedByDocument, setExpandedByDocument] = useState<Record<string, string[]>>({
-    履歴書: ["profile"],
-    職務経歴書: ["profile"],
-  });
-  const expanded = expandedByDocument[document];
   const [compact, setCompact] = useState(
     () => window.matchMedia?.("(max-width: 760px)").matches ?? false,
   );
@@ -583,22 +572,6 @@ export function DraftWorkspace({
     setFileMessage(null);
   };
   const editorDisabled = opening || pending !== null;
-  const qualificationsSection = (
-    <EditorSection value="qualifications" title="免許・資格">
-      <HistoryEditor
-        title="免許・資格"
-        rows={project[selectedKind].qualifications}
-        disabled={editorDisabled}
-        onChange={(qualifications) =>
-          updateProject({
-            ...project,
-            [selectedKind]: { ...project[selectedKind], qualifications },
-          })
-        }
-      />
-      <p className="field-hint">{document}に掲載する免許・資格を入力します。</p>
-    </EditorSection>
-  );
   return (
     <section aria-label="応募書類の編集" className="studio-shell">
       <header className="studio-toolbar">
@@ -705,158 +678,20 @@ export function DraftWorkspace({
           maxSize={compact ? "70%" : "60%"}
           className="inspector-panel"
         >
-          <div className="inspector">
-            <Tabs
-              value={document}
-              onValueChange={(value) => {
-                const next = value as "履歴書" | "職務経歴書";
-                setLocalDocument(next);
-                onDocumentChange?.(next);
-              }}
-              className="document-tabs"
-            >
-              <TabsList aria-label="書類の選択">
-                <TabsTrigger value="履歴書">履歴書</TabsTrigger>
-                <TabsTrigger value="職務経歴書">職務経歴書</TabsTrigger>
-              </TabsList>
-            </Tabs>
-            <div className="draft-editor inspector-scroll" aria-label="編集パネル">
-              <EditorNavigationContext value={expanded}>
-                <Accordion
-                  type="multiple"
-                  value={expanded}
-                  onValueChange={(values) =>
-                    setExpandedByDocument((current) => ({ ...current, [document]: values }))
-                  }
-                >
-                  <EditorSection value="profile" title="基本情報">
-                    <ProfileEditor
-                      project={project}
-                      disabled={editorDisabled}
-                      onChange={updateProject}
-                    >
-                      <label>
-                        氏名
-                        <input
-                          disabled={opening || pending !== null}
-                          value={name}
-                          onChange={(event) => {
-                            const value = event.target.value;
-                            setSession((current) =>
-                              editSession(current, {
-                                ...current.project,
-                                profile: { ...current.project.profile, name: value },
-                              }),
-                            );
-                            setFileMessage(null);
-                          }}
-                        />
-                      </label>
-                      <div aria-label="証明写真" hidden={document !== "履歴書"}>
-                        {project.assets.length > 0 && (
-                          <label>
-                            保存済み写真
-                            <select
-                              disabled={fileBusy || pending !== null}
-                              value={project.profile.photoAssetId ?? ""}
-                              onChange={(event) => {
-                                const photoAssetId = event.target.value || null;
-                                setSession((current) =>
-                                  editSession(current, {
-                                    ...current.project,
-                                    profile: { ...current.project.profile, photoAssetId },
-                                  }),
-                                );
-                                setFileMessage(null);
-                              }}
-                            >
-                              <option value="">写真なし</option>
-                              {project.assets.map((asset, index) => (
-                                <option key={asset.id} value={asset.id}>
-                                  写真 {index + 1}
-                                </option>
-                              ))}
-                            </select>
-                          </label>
-                        )}
-                        {photo ? (
-                          <img
-                            src={`data:${photo.mediaType};base64,${photo.base64}`}
-                            alt="取り込んだ証明写真"
-                            width={90}
-                            height={120}
-                            style={{ objectFit: "contain" }}
-                          />
-                        ) : (
-                          <p>写真なし</p>
-                        )}
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          type="button"
-                          disabled={fileBusy || pending !== null}
-                          onClick={() => void importPhoto()}
-                        >
-                          写真を取り込む
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          type="button"
-                          disabled={!photo || fileBusy || pending !== null}
-                          onClick={removePhoto}
-                        >
-                          写真を削除
-                        </Button>
-                        <p>JPEG／PNG、5MiB以内。縦横比を保ち最大600×800pxへ調整します。</p>
-                      </div>
-                    </ProfileEditor>
-                  </EditorSection>
-                  <div hidden={document !== "履歴書"}>
-                    <ResumeEditor
-                      project={project}
-                      includeProfile={false}
-                      includeQualifications={false}
-                      qualificationsSection={
-                        document === "履歴書" ? qualificationsSection : undefined
-                      }
-                      disabled={editorDisabled}
-                      editorKey={editorKey}
-                      onChange={updateProject}
-                    />
-                  </div>
-                  <div hidden={document !== "職務経歴書"}>
-                    <EditorSection value="summary" title="職務要約">
-                      <BodyEditor
-                        key={editorKey}
-                        initialContent={body as JSONContent}
-                        editable={!editorDisabled}
-                        onChange={(content) =>
-                          updateProject({
-                            ...project,
-                            career: { ...project.career, summary: content as BodyDoc },
-                          })
-                        }
-                      />
-                    </EditorSection>
-                    <CareerEditor
-                      qualificationsSection={
-                        document === "職務経歴書" ? qualificationsSection : undefined
-                      }
-                      key={editorKey}
-                      project={project}
-                      disabled={editorDisabled}
-                      editorKey={editorKey}
-                      onChange={updateProject}
-                    />
-                  </div>
-                </Accordion>
-              </EditorNavigationContext>
-            </div>
-            <div className="inspector-footer">
-              保存：⌘/Ctrl+S<span>別名保存：⌘/Ctrl+Shift+S</span>
-            </div>
-          </div>
+          <ProjectEditor
+            project={project}
+            document={document}
+            onDocumentChange={(next) => {
+              setLocalDocument(next);
+              onDocumentChange?.(next);
+            }}
+            disabled={editorDisabled}
+            photoBusy={fileBusy}
+            editorKey={editorKey}
+            onChange={updateProject}
+            onImportPhoto={importPhoto}
+            onRemovePhoto={removePhoto}
+          />
         </ResizablePanel>
         <ResizableHandle withHandle aria-label="編集パネルの幅を変更" />
         <ResizablePanel id="preview" minSize={compact ? 180 : 360} className="preview-panel">

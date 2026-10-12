@@ -64,3 +64,7 @@ Schemaは構造を表し、日付の実在性、期間の順序、参照先、UT
 ## 学生時代の研究（T62）
 
 career.researchesは省略可能な配列（最大200件）。省略と空配列は研究なし。各研究はid、name（任意の研究名、空文字可）、overview（研究概要）、contents（研究内容）、achievements（実績）、languages、technologiesを持つ。本文は既存の限定AST、言語・技術は各50件の自由入力。ID重複・本文容量は既存と同じ検証を適用する。旧JSONへ研究を補わず読み込める。
+
+## Webとの共用（T65）
+
+Webも同じSchema／型／TS意味検証を用い、写真base64・本文AST・テンプレート参照を保持してJSONをダウンロードする。下書きの保存状態・ファイル名はIndexedDBの外枠へ置き、JSON本体へ追加しない。JSのbase64繰返しgroup正規表現は大きな正常写真でスタック上限に達するため、Schemaの正本は維持し、事前生成時に等価な文字/padding検査とTSの4桁単位検査へ分解する。RustのSchema／画像実体検証は継続する。

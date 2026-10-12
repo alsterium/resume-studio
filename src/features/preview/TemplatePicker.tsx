@@ -10,7 +10,7 @@ export function TemplatePicker({
   kind: selectedKind,
   onChange,
 }: {
-  client: AppClient;
+  client: Pick<AppClient, "listTemplates">;
   project: Project;
   disabled: boolean;
   kind?: "resume" | "career";

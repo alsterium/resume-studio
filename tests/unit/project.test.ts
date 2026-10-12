@@ -15,6 +15,26 @@ test("空・全項目・本文書式・写真の共通fixtureを検証し、順�
   }
 });
 
+test("5MiBの写真base64をスタック上限なしに検証し、桁数・文字・padding・容量を拒否する", () => {
+  const project = validateProject(structuredClone(empty));
+  const base64 = "AAAA".repeat(Math.floor(MAX_IMAGE_BYTES / 3)) + "AAA=";
+  project.assets = [{ id: "large-photo", mediaType: "image/png", base64 }];
+  expect(validateProject(project).assets[0].base64).toBe(base64);
+  for (const value of [
+    "AAA",
+    "AA=A",
+    "A===",
+    "AAAA=",
+    "AA-_",
+    "AAA\n",
+    "AAAA\n",
+    base64 + "AAAA",
+  ]) {
+    project.assets[0].base64 = value;
+    expect(() => validateProject(project)).toThrow();
+  }
+});
+
 test("共通異常系fixtureを構造・日付・本文・参照・期間の境界で拒否する", () => {
   for (const row of mutations) {
     const value = structuredClone(full);
