@@ -3,18 +3,8 @@ import { EditorSection } from "../../components/EditorSection";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { ArrowUp, ArrowDown, Trash2, Plus } from "lucide-react";
-import type {
-  BodyDoc,
-  Contact,
-  HistoryRow,
-  Project,
-} from "../../domain/project";
-import {
-  ageOnDate,
-  isYearMonth,
-  effectiveDocumentDate,
-  parseDate,
-} from "../../domain/dates";
+import type { BodyDoc, Contact, HistoryRow, Project } from "../../domain/project";
+import { ageOnDate, isYearMonth, effectiveDocumentDate, parseDate } from "../../domain/dates";
 import { useLocalDate } from "../../components/useLocalDate";
 import { createId } from "../../domain/new-project";
 import { BodyEditor } from "../../editor/BodyEditor";
@@ -55,9 +45,7 @@ function ContactFields({
             disabled={disabled}
             maxLength={1024}
             value={contact[key]}
-            onChange={(event) =>
-              onChange({ ...contact, [key]: event.target.value })
-            }
+            onChange={(event) => onChange({ ...contact, [key]: event.target.value })}
           />
         </label>
       ))}
@@ -100,9 +88,7 @@ export function HistoryEditor({
               onChange={(event) =>
                 onChange(
                   rows.map((item) =>
-                    item.id === row.id
-                      ? { ...item, yearMonth: event.target.value }
-                      : item,
+                    item.id === row.id ? { ...item, yearMonth: event.target.value } : item,
                   ),
                 )
               }
@@ -119,9 +105,7 @@ export function HistoryEditor({
               onChange={(event) =>
                 onChange(
                   rows.map((item) =>
-                    item.id === row.id
-                      ? { ...item, text: event.target.value }
-                      : item,
+                    item.id === row.id ? { ...item, text: event.target.value } : item,
                   ),
                 )
               }
@@ -153,9 +137,7 @@ export function HistoryEditor({
               size="sm"
               type="button"
               aria-label={`${title} ${index + 1} 削除`}
-              onClick={() =>
-                onChange(rows.filter((item) => item.id !== row.id))
-              }
+              onClick={() => onChange(rows.filter((item) => item.id !== row.id))}
             >
               <Trash2 aria-hidden="true" />
             </Button>
@@ -167,12 +149,7 @@ export function HistoryEditor({
         size="sm"
         type="button"
         disabled={disabled || rows.length >= 200}
-        onClick={() =>
-          onChange([
-            ...rows,
-            { id: createId("history"), yearMonth: "", text: "" },
-          ])
-        }
+        onClick={() => onChange([...rows, { id: createId("history"), yearMonth: "", text: "" }])}
       >
         <Plus aria-hidden="true" /> {title}を追加
       </Button>
@@ -295,9 +272,7 @@ export function ProfileEditor({
         <Input
           maxLength={1024}
           value={project.title}
-          onChange={(event) =>
-            onChange({ ...project, title: event.target.value })
-          }
+          onChange={(event) => onChange({ ...project, title: event.target.value })}
         />
       </label>
       <label>
@@ -308,9 +283,7 @@ export function ProfileEditor({
           max="9999-12-31"
           disabled={project.documentDateMode === "today"}
           value={date}
-          onChange={(event) =>
-            onChange({ ...project, documentDate: event.target.value })
-          }
+          onChange={(event) => onChange({ ...project, documentDate: event.target.value })}
         />
       </label>
       <label className="checkbox-label">
@@ -331,9 +304,7 @@ export function ProfileEditor({
         今日の日付を使う
       </label>
       {project.documentDateMode === "today" && (
-        <p className="field-hint">
-          PDF生成・書き出し時の今日の日付を使います。
-        </p>
+        <p className="field-hint">PDF生成・書き出し時の今日の日付を使います。</p>
       )}
       <label>
         氏名ふりがな
@@ -380,9 +351,7 @@ export function ProfileEditor({
             const { genderLabel: _gender, ...rest } = profile;
             onChange({
               ...project,
-              profile: event.target.value
-                ? { ...rest, genderLabel: event.target.value }
-                : rest,
+              profile: event.target.value ? { ...rest, genderLabel: event.target.value } : rest,
             });
           }}
         />
@@ -391,9 +360,7 @@ export function ProfileEditor({
         prefix="現住所・"
         contact={profile}
         disabled={disabled}
-        onChange={(contact) =>
-          onChange({ ...project, profile: { ...profile, ...contact } })
-        }
+        onChange={(contact) => onChange({ ...project, profile: { ...profile, ...contact } })}
       />
       <label className="checkbox-label">
         <Input
@@ -403,17 +370,13 @@ export function ProfileEditor({
             const { alternateContact: _contact, ...rest } = profile;
             onChange({
               ...project,
-              profile: event.target.checked
-                ? { ...rest, alternateContact: emptyContact() }
-                : rest,
+              profile: event.target.checked ? { ...rest, alternateContact: emptyContact() } : rest,
             });
           }}
         />
         別連絡先を入力
       </label>
-      <p>
-        現住所と異なる連絡先がある場合に入力します。オフにすると別連絡先の入力を削除します。
-      </p>
+      <p>現住所と異なる連絡先がある場合に入力します。オフにすると別連絡先の入力を削除します。</p>
       {profile.alternateContact && (
         <ContactFields
           prefix="別連絡先・"
