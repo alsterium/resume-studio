@@ -51,3 +51,7 @@ pnpm exec wrangler whoami
 `tests/integration/web.test.tsx`は同じ全項目fixtureの読込→編集→ダウンロード→再読込、IndexedDBの復元／順序／古い完了抑止、失敗時保持、切替、IME／保存キーを検証する。IndexedDBはfake-indexeddb、UIは実Tiptap＋jsdom、ファイル選択はTesting Libraryで行う。写真の寸法・容量・向き指定・縮小は`tests/unit/browser-photos.test.ts`で検証する。共通JSON検証は5MiBのbase64と不正padding等も検証する。
 
 実Safariの表示と390px幅の切替／下書き復元を別に目視確認する。レスポンシブデザインモードは実iPhoneの仮想キーボード・共有シート・ダウンロード操作を代替しない。
+
+## 公開確認（2026-10-13）
+
+Worker `resume-studio-web`をCustom Domainへ公開済み。独自ドメインのHTTPS、HTML/CSS/JSの200応答とビルド一致、CSP等のヘッダーを確認した。実Safariで起動・架空入力の反映・JSONダウンロードと390pxの編集／プレビュー切替を確認した。UI／単体73件は順次実行で成功。`pnpm check`の並列UI実行では既存career全項目テストの15秒timeoutが再発したため、同じ全件を`pnpm exec vitest run --no-file-parallelism tests/integration tests/unit`で検証した。Rust検証は既存キャンセルテストの記録書込競合を修正して成功。
