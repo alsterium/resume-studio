@@ -99,7 +99,7 @@ export function Sender({ project }: { project: Project }) {
         {Math.ceil(transfer.compressedBytes / 1024)}KiB ／ データ{transfer.count}枚
       </p>
       <p>
-        最短1周：約{Math.ceil(((transfer.count + 2) * interval) / 1000)}
+        最短1周：約{(((transfer.count + 2) * interval) / 1000).toFixed(2)}
         秒。開始→データ→終了を繰り返します。
       </p>
       <div className="qr-symbol">
@@ -140,47 +140,47 @@ export function Sender({ project }: { project: Project }) {
           <input
             type="number"
             inputMode="decimal"
-            min={0.1}
-            step={0.1}
+            min={0.01}
+            step={0.01}
             value={intervalInput}
             onChange={(e) => {
               const value = e.target.value;
               setIntervalInput(value);
-              const units = Number(value) * 10;
+              const units = Number(value) * 100;
               if (
                 Number.isFinite(units) &&
                 units >= 1 &&
-                units <= 21474836 &&
+                units <= 214748364 &&
                 Math.abs(units - Math.round(units)) < 1e-6
               )
-                setIntervalMs(Math.round(units) * 100);
+                setIntervalMs(Math.round(units) * 10);
             }}
-            onBlur={() => setIntervalInput((interval / 1000).toFixed(1))}
+            onBlur={() => setIntervalInput((interval / 1000).toFixed(2))}
           />
         </label>
         <Button
           variant="outline"
-          aria-label="切替間隔を0.1秒短くする"
-          disabled={interval <= 100}
+          aria-label="切替間隔を0.01秒短くする"
+          disabled={interval <= 10}
           onClick={() => {
-            const next = interval - 100;
+            const next = interval - 10;
             setIntervalMs(next);
-            setIntervalInput((next / 1000).toFixed(1));
+            setIntervalInput((next / 1000).toFixed(2));
           }}
         >
-          −0.1秒
+          −0.01秒
         </Button>
         <Button
           variant="outline"
-          aria-label="切替間隔を0.1秒長くする"
-          disabled={interval >= 2147483600}
+          aria-label="切替間隔を0.01秒長くする"
+          disabled={interval >= 2147483640}
           onClick={() => {
-            const next = interval + 100;
+            const next = interval + 10;
             setIntervalMs(next);
-            setIntervalInput((next / 1000).toFixed(1));
+            setIntervalInput((next / 1000).toFixed(2));
           }}
         >
-          ＋0.1秒
+          ＋0.01秒
         </Button>
         <label>
           データ番号
