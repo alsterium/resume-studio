@@ -194,7 +194,7 @@ fn career_skill_experience_preserves_free_text_and_only_formats_digits() {
 fn exact_template_kind_version_and_schema_are_required() {
     let mut project =
         parse_project(include_bytes!("../../tests/fixtures/project-empty.json")).unwrap();
-    assert_eq!(bundled_templates().len(), 6);
+    assert_eq!(bundled_templates().len(), 7);
     for template in bundled_templates() {
         assert_eq!(template.manifest.engine, "lualatex");
         assert_eq!(template.manifest.schema_versions, [1]);
@@ -361,6 +361,7 @@ fn reference_revisions_export_both_documents_without_changing_their_content() {
         parse_project(include_bytes!("../../tests/fixtures/project-full.json")).unwrap();
     for (kind, version, style_name) in [
         (DocumentKind::Resume, "1.2.0", "resume.sty"),
+        (DocumentKind::Resume, "1.3.0", "resume.sty"),
         (DocumentKind::Career, "1.1.0", "career.sty"),
     ] {
         let original = generate_project(&project, kind).unwrap();

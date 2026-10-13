@@ -43,7 +43,7 @@ export function newProject(): Project {
       selfPromotion: body(),
     },
     templates: {
-      resume: { id: "resume-standard", version: "1.2.0" },
+      resume: { id: "resume-standard", version: "1.3.0" },
       career: { id: "career-standard", version: "1.2.0" },
     },
     assets: [],

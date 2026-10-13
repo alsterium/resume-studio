@@ -15,7 +15,7 @@ fn formal_documents_compile_from_exported_bundles_with_and_without_photos() {
         include_bytes!("../../tests/fixtures/project-empty.json").as_slice(),
     ] {
         let mut project = parse_project(fixture).unwrap();
-        project.templates.resume.version = "1.2.0".into();
+        project.templates.resume.version = "1.3.0".into();
         project.templates.career.version = "1.2.0".into();
         for kind in [DocumentKind::Resume, DocumentKind::Career] {
             let bundle = generate_project(&project, kind).unwrap();
@@ -550,6 +550,141 @@ fn resume_form_keeps_two_base_pages_and_preserves_overflow_in_section_order() {
 
 #[test]
 #[cfg(target_os = "macos")]
+fn resume_adaptive_body_uses_only_unused_history_rows() {
+    use resume_studio_lib::{
+        domain::validation::parse_project,
+        generator::{documents::generate_project, templates::DocumentKind},
+    };
+    // The old template is the physical baseline. A hard break makes each body
+    // line deterministic; history entries and its closing label must stay put.
+    for (name, lines, entries, transferred_rows) in [
+        ("empty", 0, 0, 0),
+        ("short", 7, 0, 0),
+        ("just-over", 8, 0, 1),
+        ("expanded", 12, 0, 3),
+        ("partial-history", 12, 16, 2),
+        ("full-history", 12, 22, 0),
+        ("overflow", 30, 0, 5),
+    ] {
+        let mut value: serde_json::Value =
+            serde_json::from_str(include_str!("../../tests/fixtures/project-empty.json")).unwrap();
+        value["resume"]["education"] = serde_json::json!((0..entries)
+            .map(|index| serde_json::json!({"id":format!("school-{index}"),"yearMonth":"2020-04","text":format!("学校確認{index:02}")}))
+            .collect::<Vec<_>>());
+        let mut content = Vec::new();
+        for index in 0..lines {
+            if index > 0 {
+                content.push(serde_json::json!({"type":"hardBreak"}));
+            }
+            content
+                .push(serde_json::json!({"type":"text","text":format!("アピール確認{index:02}")}));
+        }
+        value["resume"]["motivation"] =
+            serde_json::json!({"type":"doc","content":[{"type":"paragraph","content":content}]});
+        value["resume"]["preferences"] = serde_json::json!({"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"本人希望確認"}]}]});
+        let mut project = parse_project(&serde_json::to_vec(&value).unwrap()).unwrap();
+        let mut baseline = None;
+        let mut baseline_history_pages = Vec::new();
+        for version in ["1.2.0", "1.3.0"] {
+            project.templates.resume.version = version.into();
+            let bundle = generate_project(&project, DocumentKind::Resume).unwrap();
+            let artifact = compile(&TexRuntime::discover(), &bundle).unwrap();
+            assert!(
+                !artifact.log.contains("Overfull"),
+                "{name}/{version}: {}",
+                artifact.log
+            );
+            assert!(
+                !artifact.log.contains("Missing character:"),
+                "{}",
+                artifact.log
+            );
+            save_layout_qa(
+                &format!("adaptive-{name}-{version}"),
+                &bundle,
+                &artifact.bytes,
+            );
+            let pages = inspected_pdf_pages(&artifact.bytes);
+            assert_a4(&pages);
+            let text: String = pages
+                .iter()
+                .map(|p| p["text"].as_str().unwrap())
+                .collect::<String>()
+                .split_whitespace()
+                .collect();
+            for index in 0..entries {
+                assert_eq!(
+                    text.matches(&format!("学校確認{index:02}")).count(),
+                    1,
+                    "{name}/{version}: {text}"
+                );
+            }
+            for index in 0..lines {
+                assert_eq!(
+                    text.matches(&format!("アピール確認{index:02}")).count(),
+                    1,
+                    "{name}/{version}: {text}"
+                );
+            }
+            assert!(pages[1]["text"].as_str().unwrap().contains("本人希望確認"));
+            let history_pages: Vec<_> = (0..entries)
+                .map(|index| {
+                    pages
+                        .iter()
+                        .position(|page| {
+                            page["text"]
+                                .as_str()
+                                .unwrap()
+                                .split_whitespace()
+                                .collect::<String>()
+                                .contains(&format!("学校確認{index:02}"))
+                        })
+                        .unwrap()
+                })
+                .collect();
+            let labels = [
+                "免許・資格",
+                "志望動機・特技・アピールポイントなど",
+                "本人希望欄",
+            ];
+            let bounds = pdf_text_vertical_bounds(&artifact.bytes, &labels);
+            if version == "1.2.0" {
+                baseline = Some(bounds);
+                baseline_history_pages = history_pages;
+                continue;
+            }
+            assert_eq!(
+                history_pages, baseline_history_pages,
+                "{name}: history moved to another page"
+            );
+            let baseline = baseline.as_ref().unwrap();
+            let expected_shift = f64::from(transferred_rows) * 9.5 * 72.0 / 25.4;
+            for label in &labels[..2] {
+                let shift =
+                    bounds[*label][0].as_f64().unwrap() - baseline[*label][0].as_f64().unwrap();
+                assert!(
+                    (shift - expected_shift).abs() < 0.2,
+                    "{name}: {label}, shift={shift}, expected={expected_shift}"
+                );
+            }
+            let preference_shift =
+                bounds[labels[2]][0].as_f64().unwrap() - baseline[labels[2]][0].as_f64().unwrap();
+            assert!(
+                preference_shift.abs() < 0.2,
+                "{name}: preference moved: {preference_shift}"
+            );
+            if name == "expanded" || lines <= 8 {
+                assert_eq!(pages.len(), 2, "{name}: {pages:?}");
+            }
+            if name == "overflow" || name == "full-history" || name == "partial-history" {
+                assert!(pages.len() > 2, "{name}: continuation missing");
+            }
+        }
+    }
+}
+
+#[test]
+#[cfg(target_os = "macos")]
 fn resume_fixed_rows_shrink_only_overflowing_text() {
     use resume_studio_lib::{
         domain::validation::parse_project,
@@ -836,7 +971,7 @@ fn maximum_fixed_fields_wrap_and_resume_moves_oversized_contacts_to_continuation
     value["career"]["positions"][0]["projects"][0]["url"] = serde_json::json!(url);
     career_fields.push(url);
     let mut project = parse_project(&serde_json::to_vec(&value).unwrap()).unwrap();
-    project.templates.resume.version = "1.2.0".into();
+    project.templates.resume.version = "1.3.0".into();
     project.templates.career.version = "1.2.0".into();
     for (kind, fields) in [
         (DocumentKind::Resume, resume_fields),
@@ -963,7 +1098,7 @@ fn maximum_body_bytes_preserve_the_complete_text_in_both_documents() {
         value["resume"]["motivation"] = body.clone();
         value["career"]["summary"] = body;
         let mut project = parse_project(&serde_json::to_vec(&value).unwrap()).unwrap();
-        project.templates.resume.version = "1.2.0".into();
+        project.templates.resume.version = "1.3.0".into();
         project.templates.career.version = "1.1.0".into();
         for kind in [DocumentKind::Resume, DocumentKind::Career] {
             let bundle = generate_project(&project, kind).unwrap();

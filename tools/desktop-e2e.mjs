@@ -643,7 +643,9 @@ try {
   );
   await selectDocument("職務経歴書");
   const restoredCareer = await browser.execute(() => ({
-    company: document.querySelector('[aria-label="職務経歴書の編集"] input').value,
+    company: Array.from(document.querySelectorAll('[aria-label="職務経歴書の編集"] label'))
+      .find((label) => label.textContent.trim() === "会社名")
+      .querySelector("input").value,
     caseText: document.querySelector('[role="textbox"][aria-label="業務内容"]').textContent,
     selfPromotion: document.querySelector('[role="textbox"][aria-label="自己PR"]').textContent,
     skill: Array.from(document.querySelectorAll("label"))
@@ -859,6 +861,21 @@ try {
       ),
     { timeout: 10000 },
   );
+  const resumeTemplate = await browser.execute(() => {
+    const select = Array.from(document.querySelectorAll("label"))
+      .find((label) => label.textContent.includes("履歴書テンプレート"))
+      .querySelector("select");
+    const versions = Array.from(select.options).map((option) => JSON.parse(option.value)[1]);
+    Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value").set.call(
+      select,
+      JSON.stringify(["resume-standard", "1.3.0"]),
+    );
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+    return { versions, value: select.value };
+  });
+  assert.ok(resumeTemplate.versions.includes("1.2.0"));
+  assert.ok(resumeTemplate.versions.includes("1.3.0"));
+  assert.equal(resumeTemplate.value, JSON.stringify(["resume-standard", "1.3.0"]));
   for (const [label, resultId, expected] of [
     ["履歴書", "2", ["架空大学卒業", "架空の志望動機末尾", "架空の希望末尾"]],
     ["職務経歴書", "3", ["架空会社", "架空案件", "架空の業務末尾", "架空の自己PR末尾"]],
@@ -1106,10 +1123,9 @@ try {
     assert.ok(main.includes("content"));
     assert.ok((await readFile(join(directory, "content.tex"), "utf8")).includes("架空 山田"));
     assert.ok((await readFile(join(directory, style))).length > 0);
-    assert.equal(
-      JSON.parse(await readFile(join(directory, "manifest.json"), "utf8")).engine,
-      "lualatex",
-    );
+    const manifest = JSON.parse(await readFile(join(directory, "manifest.json"), "utf8"));
+    assert.equal(manifest.engine, "lualatex");
+    if (name === "履歴書") assert.equal(manifest.version, "1.3.0");
     await runFile(
       "/Library/TeX/texbin/latexmk",
       [
