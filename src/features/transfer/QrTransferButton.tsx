@@ -28,8 +28,8 @@ export function QrTransferButton({
       </Button>
       <Dialog open={open} onOpenChange={change}>
         <DialogContent className="qr-transfer-dialog">
-          <DialogTitle>QRでプロジェクト転送</DialogTitle>
-          <DialogDescription>
+          <DialogTitle>QR転送</DialogTitle>
+          <DialogDescription className="sr-only">
             送る側でQRを表示し、受け取る側のカメラを向けます。データは端末間で読み取り、サーバーへ送りません。
           </DialogDescription>
           {open && (

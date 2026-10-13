@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Play, Pause, ChevronLeft, ChevronRight, Info } from "lucide-react";
 import type { Project } from "../../domain/project";
 import { Button } from "../../components/ui/button";
 import { prepareTransfer, frameText, TransferReceiver, type PreparedTransfer } from "./protocol";
 import { qrPath } from "./qr-image";
 import { startCamera, type CameraSession } from "./camera";
+const SEND_INTERVAL_MS = 80;
 const message = (failure: unknown) =>
   failure instanceof Error ? failure.message : String(failure);
 export default function TransferPanel({
@@ -15,25 +17,25 @@ export default function TransferPanel({
   dirty: boolean;
   onReceive: (project: Project) => void;
 }) {
-  const [mode, setMode] = useState<"choose" | "send" | "receive">("choose");
+  const [mode, setMode] = useState<"send" | "receive">("send");
   return (
     <div className="qr-transfer-panel">
       <div className="qr-mode-buttons">
-        <Button variant={mode === "send" ? "default" : "outline"} onClick={() => setMode("send")}>
+        <Button
+          aria-pressed={mode === "send"}
+          variant={mode === "send" ? "default" : "ghost"}
+          onClick={() => setMode("send")}
+        >
           送信モード
         </Button>
         <Button
-          variant={mode === "receive" ? "default" : "outline"}
+          aria-pressed={mode === "receive"}
+          variant={mode === "receive" ? "default" : "ghost"}
           onClick={() => setMode("receive")}
         >
           受信モード
         </Button>
       </div>
-      {mode === "choose" && (
-        <p>
-          受信が完了したら内容を確認して取り込みます。受信途中のデータは現在の編集内容に影響しません。
-        </p>
-      )}
       {mode === "send" && <Sender project={project} />}
       {mode === "receive" && <Receiver dirty={dirty} onReceive={onReceive} />}
     </div>
@@ -44,8 +46,6 @@ export function Sender({ project }: { project: Project }) {
   const [error, setError] = useState<string | null>(null);
   const [position, setPosition] = useState(0);
   const [playing, setPlaying] = useState(false);
-  const [interval, setIntervalMs] = useState(500);
-  const [intervalInput, setIntervalInput] = useState("0.5");
   const [number, setNumber] = useState("1");
   const [hidden, setHidden] = useState(document.hidden);
   useEffect(() => {
@@ -72,10 +72,10 @@ export function Sender({ project }: { project: Project }) {
     if (!playing || !transfer || hidden) return;
     const timer = window.setInterval(
       () => setPosition((current) => (current + 1) % (transfer.count + 2)),
-      interval,
+      SEND_INTERVAL_MS,
     );
     return () => window.clearInterval(timer);
-  }, [playing, transfer, hidden, interval]);
+  }, [playing, transfer, hidden]);
   const text = transfer
     ? frameText(
         transfer,
@@ -93,121 +93,112 @@ export function Sender({ project }: { project: Project }) {
         ? "終了QR"
         : `データQR ${position} / ${transfer.count}`;
   return (
-    <section aria-label="QR送信">
-      <p>
-        写真を含む {Math.ceil(transfer.jsonBytes / 1024)}KiB → 圧縮後{" "}
-        {Math.ceil(transfer.compressedBytes / 1024)}KiB ／ データ{transfer.count}枚
-      </p>
-      <p>
-        最短1周：約{(((transfer.count + 2) * interval) / 1000).toFixed(2)}
-        秒。開始→データ→終了を繰り返します。
-      </p>
+    <section className="qr-sender" aria-label="QR送信">
+      <div className="qr-send-intro">
+        <h2>QRで送信</h2>
+        <p>受信側のカメラをこのQRに向けてください。</p>
+      </div>
       <div className="qr-symbol">
-        <svg aria-hidden="true" viewBox="0 0 145 145" shapeRendering="crispEdges">
+        <svg
+          // Inline SVG keeps the real QR vector sharp; it is exposed as an accessible image.
+          // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role
+          role="img"
+          aria-label="プロジェクト転送用QRコード"
+          viewBox="0 0 145 145"
+          shapeRendering="crispEdges"
+        >
           <rect width="145" height="145" fill="white" />
           <path d={path} fill="black" />
         </svg>
       </div>
-      <p className="qr-phase" aria-live={playing ? "off" : "polite"}>
-        {phase} ／ {hidden ? "画面が非表示のため停止中" : playing ? "ループ送信中" : "一時停止中"}
-      </p>
-      <div className="qr-controls">
-        <Button onClick={() => setPlaying((value) => !value)}>
-          {playing ? "一時停止" : "ループ送信を開始"}
-        </Button>
-        <Button
-          variant="outline"
-          onClick={() => {
-            setPlaying(false);
-            setPosition((current) => (current + transfer.count + 1) % (transfer.count + 2));
-          }}
+      <aside className="qr-send-sidebar" aria-label="送信操作">
+        <dl className="qr-send-stats">
+          <div>
+            <dt>圧縮後</dt>
+            <dd>{Math.ceil(transfer.compressedBytes / 1024)} KiB</dd>
+          </div>
+          <div>
+            <dt>データ</dt>
+            <dd>{transfer.count}枚</dd>
+          </div>
+          <div>
+            <dt>最短1周</dt>
+            <dd>約{(((transfer.count + 2) * SEND_INTERVAL_MS) / 1000).toFixed(2)}秒</dd>
+          </div>
+        </dl>
+        <p
+          className="qr-phase"
+          data-playing={playing && !hidden}
+          aria-live={playing ? "off" : "polite"}
         >
-          前のQR
-        </Button>
-        <Button
-          variant="outline"
-          onClick={() => {
-            setPlaying(false);
-            setPosition((current) => (current + 1) % (transfer.count + 2));
-          }}
-        >
-          次のQR
-        </Button>
-      </div>
-      <div className="qr-controls">
-        <label>
-          切替間隔（秒）
-          <input
-            type="number"
-            inputMode="decimal"
-            min={0.01}
-            step={0.01}
-            value={intervalInput}
-            onChange={(e) => {
-              const value = e.target.value;
-              setIntervalInput(value);
-              const units = Number(value) * 100;
-              if (
-                Number.isFinite(units) &&
-                units >= 1 &&
-                units <= 214748364 &&
-                Math.abs(units - Math.round(units)) < 1e-6
-              )
-                setIntervalMs(Math.round(units) * 10);
-            }}
-            onBlur={() => setIntervalInput((interval / 1000).toFixed(2))}
-          />
-        </label>
-        <Button
-          variant="outline"
-          aria-label="切替間隔を0.01秒短くする"
-          disabled={interval <= 10}
-          onClick={() => {
-            const next = interval - 10;
-            setIntervalMs(next);
-            setIntervalInput((next / 1000).toFixed(2));
-          }}
-        >
-          −0.01秒
-        </Button>
-        <Button
-          variant="outline"
-          aria-label="切替間隔を0.01秒長くする"
-          disabled={interval >= 2147483640}
-          onClick={() => {
-            const next = interval + 10;
-            setIntervalMs(next);
-            setIntervalInput((next / 1000).toFixed(2));
-          }}
-        >
-          ＋0.01秒
-        </Button>
-        <label>
-          データ番号
-          <input
-            type="number"
-            min={1}
-            max={transfer.count}
-            value={number}
-            onChange={(e) => setNumber(e.target.value)}
-          />
-        </label>
-        <Button
-          variant="outline"
-          onClick={() => {
-            const value = Number(number);
-            if (Number.isInteger(value) && value >= 1 && value <= transfer.count) {
-              setPosition(value);
-              setPlaying(false);
-            }
-          }}
-        >
-          この番号を表示
-        </Button>
-      </div>
-      <p className="qr-help">
-        受信側が「受信完了」になったら送信を停止してください。読み取りにくい場合は画面を明るくし、距離・ピント・切替間隔を調整してください。QRを見られるとデータも読み取られます。
-      </p>
+          {phase} ／ {hidden ? "画面が非表示のため停止中" : playing ? "ループ送信中" : "一時停止中"}
+        </p>
+        <div className="qr-send-actions">
+          <Button className="qr-send-toggle" onClick={() => setPlaying((value) => !value)}>
+            {playing ? <Pause aria-hidden="true" /> : <Play aria-hidden="true" />}
+            {playing ? "一時停止" : "ループ送信を開始"}
+          </Button>
+          <p>0.08秒ごとに切替</p>
+        </div>
+        <details className="qr-manual">
+          <summary>手動操作</summary>
+          <div className="qr-controls qr-manual-step">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setPlaying(false);
+                setPosition((current) => (current + transfer.count + 1) % (transfer.count + 2));
+              }}
+            >
+              <ChevronLeft aria-hidden="true" />
+              前のQR
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setPlaying(false);
+                setPosition((current) => (current + 1) % (transfer.count + 2));
+              }}
+            >
+              次のQR
+              <ChevronRight aria-hidden="true" />
+            </Button>
+          </div>
+          <div className="qr-controls qr-manual-jump">
+            <label>
+              データ番号
+              <input
+                type="number"
+                min={1}
+                max={transfer.count}
+                value={number}
+                onChange={(e) => setNumber(e.target.value)}
+              />
+            </label>
+            <Button
+              variant="outline"
+              onClick={() => {
+                const value = Number(number);
+                if (Number.isInteger(value) && value >= 1 && value <= transfer.count) {
+                  setPosition(value);
+                  setPlaying(false);
+                }
+              }}
+            >
+              この番号を表示
+            </Button>
+          </div>
+        </details>
+        <div className="qr-send-help qr-help">
+          <Info aria-hidden="true" />
+          <div>
+            <p>受信側に「受信完了」が出たら停止してください。</p>
+            <p>
+              読み取りにくい場合は画面の明るさ・距離・ピントを調整してください。QRを見られるとデータも読み取られます。
+            </p>
+          </div>
+        </div>
+      </aside>
     </section>
   );
 }

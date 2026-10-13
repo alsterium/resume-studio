@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, test, vi, type Mock } from "vitest";
 import { mockIPC } from "@tauri-apps/api/mocks";
-import { Sender, Receiver } from "../../src/features/transfer/TransferPanel";
+import TransferPanel, { Sender, Receiver } from "../../src/features/transfer/TransferPanel";
 import { WebWorkspace } from "../../src/WebApp";
 import { DraftWorkspace } from "../../src/features/preview/DraftWorkspace";
 import { tauriClient } from "../../src/infrastructure/app-client";
@@ -39,14 +39,31 @@ async function deliverProject() {
   await screen.findByText("受信完了。内容を確認して取り込んでください。");
 }
 
-test("500msごとに開始→データ→終了→開始をループし、一時停止・番号指定ができる", async () => {
+test("転送画面は送信モードとQRを初期表示し、自動送信は開始しない", async () => {
+  render(<TransferPanel project={project} dirty={false} onReceive={vi.fn()} />);
+  await screen.findByText(/開始QR ／ 一時停止中/);
+  expect(screen.getByRole("button", { name: "送信モード" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  expect(screen.getByRole("button", { name: "受信モード" })).toHaveAttribute(
+    "aria-pressed",
+    "false",
+  );
+  expect(screen.getByRole("button", { name: "ループ送信を開始" })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "受信モード" }));
+  expect(screen.getByRole("button", { name: "カメラを開始" })).toBeInTheDocument();
+  expect(screen.queryByRole("img", { name: "プロジェクト転送用QRコード" })).not.toBeInTheDocument();
+});
+
+test("80msごとに開始→データ→終了→開始をループし、一時停止・番号指定ができる", async () => {
   render(<Sender project={project} />);
   await screen.findByText(/開始QR ／ 一時停止中/);
   const transfer = await prepareTransfer(project);
   vi.useFakeTimers();
   fireEvent.click(screen.getByText("ループ送信を開始"));
   act(() => {
-    vi.advanceTimersByTime(499);
+    vi.advanceTimersByTime(79);
   });
   expect(screen.getByText(/開始QR ／ ループ送信中/)).toBeInTheDocument();
   act(() => {
@@ -54,11 +71,11 @@ test("500msごとに開始→データ→終了→開始をループし、一時
   });
   expect(screen.getByText(/データQR 1/)).toBeInTheDocument();
   act(() => {
-    vi.advanceTimersByTime(500 * transfer.count);
+    vi.advanceTimersByTime(80 * transfer.count);
   });
   expect(screen.getByText(/終了QR ／ ループ送信中/)).toBeInTheDocument();
   act(() => {
-    vi.advanceTimersByTime(500);
+    vi.advanceTimersByTime(80);
   });
   expect(screen.getByText(/開始QR ／ ループ送信中/)).toBeInTheDocument();
   fireEvent.click(screen.getByText("一時停止"));
@@ -66,52 +83,35 @@ test("500msごとに開始→データ→終了→開始をループし、一時
     vi.advanceTimersByTime(2000);
   });
   expect(screen.getByText(/開始QR ／ 一時停止中/)).toBeInTheDocument();
+  fireEvent.click(screen.getByText("手動操作"));
   fireEvent.change(screen.getByLabelText("データ番号"), { target: { value: "1" } });
   fireEvent.click(screen.getByText("この番号を表示"));
   expect(screen.getByText(/データQR 1/)).toBeInTheDocument();
 });
 
-test("切替間隔を0.01〜0.09秒で表示し、0.01秒刻みの増減と不正値保護を確認する", async () => {
+test("送信は80ms固定で、主操作と折りたたみの手動操作を提供する", async () => {
   render(<Sender project={project} />);
   await screen.findByText(/開始QR ／ 一時停止中/);
-  const input = screen.getByLabelText("切替間隔（秒）");
-  expect(input).toHaveAttribute("min", "0.01");
-  expect(input).toHaveAttribute("step", "0.01");
+  expect(screen.getByText("0.08秒ごとに切替")).toBeInTheDocument();
+  expect(screen.queryByLabelText("切替間隔（秒）")).not.toBeInTheDocument();
+  expect(screen.getByRole("img", { name: "プロジェクト転送用QRコード" })).toBeInTheDocument();
+  const disclosure = screen.getByText("手動操作").closest("details");
+  expect(disclosure).not.toHaveAttribute("open");
+  fireEvent.click(screen.getByText("手動操作"));
+  expect(disclosure).toHaveAttribute("open");
   vi.useFakeTimers();
-  for (let units = 9; units >= 1; units--) {
-    fireEvent.change(input, { target: { value: (units / 100).toFixed(2) } });
-    expect(input).toHaveValue(units / 100);
-    fireEvent.click(screen.getByText("ループ送信を開始"));
-    act(() => {
-      vi.advanceTimersByTime(units * 10 - 1);
-    });
-    expect(screen.getByText(/開始QR ／ ループ送信中/)).toBeInTheDocument();
-    act(() => {
-      vi.advanceTimersByTime(1);
-    });
-    expect(screen.getByText(/データQR 1/)).toBeInTheDocument();
-    fireEvent.click(screen.getByText("一時停止"));
-    fireEvent.click(screen.getByText("前のQR"));
-  }
-  expect(screen.getByLabelText("切替間隔を0.01秒短くする")).toBeDisabled();
-  for (const value of ["", "0", "-0.01", "0.015", "9999999999"]) {
-    fireEvent.change(input, { target: { value } });
-    fireEvent.blur(input);
-    expect(input).toHaveValue(0.01);
-  }
-  fireEvent.click(screen.getByLabelText("切替間隔を0.01秒長くする"));
-  expect(input).toHaveValue(0.02);
   fireEvent.click(screen.getByText("ループ送信を開始"));
   act(() => {
-    vi.advanceTimersByTime(19);
-  });
-  expect(screen.getByText(/開始QR ／ ループ送信中/)).toBeInTheDocument();
-  act(() => {
-    vi.advanceTimersByTime(1);
+    vi.advanceTimersByTime(80);
   });
   expect(screen.getByText(/データQR 1/)).toBeInTheDocument();
-  fireEvent.click(screen.getByLabelText("切替間隔を0.01秒短くする"));
-  expect(input).toHaveValue(0.01);
+  fireEvent.click(screen.getByText("前のQR"));
+  act(() => {
+    vi.advanceTimersByTime(160);
+  });
+  expect(screen.getByText(/開始QR ／ 一時停止中/)).toBeInTheDocument();
+  fireEvent.click(screen.getByText("次のQR"));
+  expect(screen.getByText(/データQR 1.*一時停止中/)).toBeInTheDocument();
 });
 
 test("終了QR不足では現在の内容を変更せず、確認後だけ取り込み、カメラを解放する", async () => {
