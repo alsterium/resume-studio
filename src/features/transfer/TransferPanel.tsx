@@ -45,6 +45,7 @@ export function Sender({ project }: { project: Project }) {
   const [position, setPosition] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [interval, setIntervalMs] = useState(500);
+  const [intervalInput, setIntervalInput] = useState("0.5");
   const [number, setNumber] = useState("1");
   const [hidden, setHidden] = useState(document.hidden);
   useEffect(() => {
@@ -135,13 +136,52 @@ export function Sender({ project }: { project: Project }) {
       </div>
       <div className="qr-controls">
         <label>
-          切替間隔
-          <select value={interval} onChange={(e) => setIntervalMs(Number(e.target.value))}>
-            <option value={500}>0.5秒</option>
-            <option value={1000}>1秒（読み取りにくい場合）</option>
-            <option value={2000}>2秒</option>
-          </select>
+          切替間隔（秒）
+          <input
+            type="number"
+            inputMode="decimal"
+            min={0.1}
+            step={0.1}
+            value={intervalInput}
+            onChange={(e) => {
+              const value = e.target.value;
+              setIntervalInput(value);
+              const units = Number(value) * 10;
+              if (
+                Number.isFinite(units) &&
+                units >= 1 &&
+                units <= 21474836 &&
+                Math.abs(units - Math.round(units)) < 1e-6
+              )
+                setIntervalMs(Math.round(units) * 100);
+            }}
+            onBlur={() => setIntervalInput((interval / 1000).toFixed(1))}
+          />
         </label>
+        <Button
+          variant="outline"
+          aria-label="切替間隔を0.1秒短くする"
+          disabled={interval <= 100}
+          onClick={() => {
+            const next = interval - 100;
+            setIntervalMs(next);
+            setIntervalInput((next / 1000).toFixed(1));
+          }}
+        >
+          −0.1秒
+        </Button>
+        <Button
+          variant="outline"
+          aria-label="切替間隔を0.1秒長くする"
+          disabled={interval >= 2147483600}
+          onClick={() => {
+            const next = interval + 100;
+            setIntervalMs(next);
+            setIntervalInput((next / 1000).toFixed(1));
+          }}
+        >
+          ＋0.1秒
+        </Button>
         <label>
           データ番号
           <input
