@@ -1,4 +1,4 @@
-import { decodeQr } from "./qr-image";
+import { createQrDecoder, type QrDecoder } from "./qr-worker-client";
 export interface CameraSession {
   stop(): void;
   devices: MediaDeviceInfo[];
@@ -24,9 +24,14 @@ export async function startCamera(
   });
   let stopped = false;
   let timer: number | undefined;
+  let videoCallback: number | undefined;
+  let decoder: QrDecoder | null = null;
   const stop = () => {
+    if (stopped) return;
     stopped = true;
     window.clearTimeout(timer);
+    if (videoCallback !== undefined) video.cancelVideoFrameCallback(videoCallback);
+    decoder?.stop();
     stream.getTracks().forEach((track) => track.stop());
     if (video.srcObject === stream) video.srcObject = null;
     signal?.removeEventListener("abort", stop);
@@ -43,10 +48,24 @@ export async function startCamera(
       (device) => device.kind === "videoinput",
     );
     if (stopped) throw new Error("カメラの起動を中止しました。");
+    decoder = createQrDecoder();
+    await decoder.ready;
+    if (stopped) throw new Error("カメラの起動を中止しました。");
     const canvas = document.createElement("canvas");
     const context = canvas.getContext("2d", { willReadFrequently: true });
     if (!context) throw new Error("カメラ画像を読み取れませんでした。");
-    const scan = () => {
+    const schedule = () => {
+      if (stopped) return;
+      if (video.requestVideoFrameCallback)
+        videoCallback = video.requestVideoFrameCallback(() => {
+          void scan();
+        });
+      else
+        timer = window.setTimeout(() => {
+          void scan();
+        }, 16);
+    };
+    const scan = async () => {
       if (stopped) return;
       try {
         if (video.readyState >= 2 && video.videoWidth && !document.hidden) {
@@ -55,17 +74,19 @@ export async function startCamera(
           canvas.height = Math.round(video.videoHeight * scale);
           context.drawImage(video, 0, 0, canvas.width, canvas.height);
           const image = context.getImageData(0, 0, canvas.width, canvas.height);
-          const text = decodeQr(image.data, image.width, image.height);
+          const text = await decoder!.decode(image);
+          if (stopped) return;
           if (text) onFrame(text);
         }
       } catch (failure) {
+        if (stopped) return;
         stop();
         onError(failure);
         return;
       }
-      if (!stopped) timer = window.setTimeout(scan, 120);
+      schedule();
     };
-    timer = window.setTimeout(scan, 0);
+    schedule();
     return { stop, devices };
   } catch (failure) {
     stop();

@@ -1,5 +1,4 @@
 import QRCode from "qrcode";
-import jsQR from "jsqr";
 
 export function qrMatrix(text: string) {
   return QRCode.create([{ data: new TextEncoder().encode(text), mode: "byte" }], {
@@ -21,7 +20,4 @@ export function qrPath(text: string) {
       path += `M${start + 4} ${y + 4}h${x - start}v1h-${x - start}z`;
     }
   return path;
-}
-export function decodeQr(data: Uint8ClampedArray, width: number, height: number) {
-  return jsQR(data, width, height, { inversionAttempts: "dontInvert" })?.data ?? null;
 }

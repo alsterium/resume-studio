@@ -90,4 +90,4 @@ Mac/Webで`ProjectEditor`を共用する。Web専用entryと静的配信を使�
 
 ## QR転送（M8）
 
-Mac/Webから共通の転送UIとRSQR2を遅延読込する。JSONをgzip（DEFLATE）圧縮し900byte分割、Version30/Mで開始・データ・終了を循環表示する。カメラ画像は端末内jsQRで読み取り、全体SHA/展開容量/Project検証後に確認付きで未保存プロジェクトとして取り込む。詳細は[QR転送設計](QR_TRANSFER.md)。
+Mac/Webから共通の転送UIとRSQR2を遅延読込する。JSONをgzip（DEFLATE）圧縮し900byte分割、Version30/Mで開始・データ・終了を循環表示する。カメラ画像は端末内WorkerのZXing WASMで読み取り、全体SHA/展開容量/Project検証後に確認付きで未保存プロジェクトとして取り込む。詳細は[QR転送設計](QR_TRANSFER.md)。

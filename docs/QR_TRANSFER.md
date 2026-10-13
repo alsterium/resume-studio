@@ -30,6 +30,10 @@ MacアプリとHTTPS Web版で同じ形式を使用する。サーバー保存�
 
 ## 検証
 
-共通fixtureの圧縮/QR画像生成/実jsQR読取/再組立/JSON一致を確認。複数枚、途中開始、欠落と次周回、逆順、重複、開始終了、不正メタデータ/CRC/hash/gzip/容量を単体/結合で確認。UIで500msループ、受信確認/既存内容保持、カメラ拒否/停止/遅い許可後のcleanupを確認する。MacはInfo.plistの用途記述と署名用camera entitlementを設定する。今回のdebugビルドはリンカーのad-hoc署名でentitlementを埋め込まないが、現環境でカメラ起動・停止を確認した。配布署名時のentitlement適用と、実PC↔iPhoneの距離・画面輝度・ピント・最低対応OSは別途検証が必要。
+共通fixtureの圧縮/QR画像生成/実ZXing WASM読取/再組立/JSON一致を確認。複数枚、途中開始、欠落と次周回、逆順、重複、開始終了、不正メタデータ/CRC/hash/gzip/容量を単体/結合で確認。UIで500msループ、受信確認/既存内容保持、カメラ拒否/停止/遅い許可後のcleanupを確認する。MacはInfo.plistの用途記述と署名用camera entitlementを設定する。今回のdebugビルドはリンカーのad-hoc署名でentitlementを埋め込まないが、現環境でカメラ起動・停止を確認した。配布署名時のentitlement適用と、実PC↔iPhoneの距離・画面輝度・ピント・最低対応OSは別途検証が必要。
 
-参考: [DENSO QR容量と版](https://www.qrcode.com/en/about/version.html)、[node-qrcode](https://github.com/soldair/node-qrcode)、[jsQR](https://github.com/cozmo/jsQR)、[fflate](https://github.com/101arrowz/fflate)、[Tauri macOS設定](https://v2.tauri.app/distribute/macos-application-bundle/)。
+参考: [DENSO QR容量と版](https://www.qrcode.com/en/about/version.html)、[node-qrcode](https://github.com/soldair/node-qrcode)、[ZXing WASM](https://github.com/Sec-ant/zxing-wasm)、[fflate](https://github.com/101arrowz/fflate)、[Tauri macOS設定](https://v2.tauri.app/distribute/macos-application-bundle/)。
+
+## 受信デコーダ（T69）
+
+zxing-wasm 3.1.5のreaderとWASMを両ビルドへ同梱し、同一オリジンで配信する。Worker内でQR限定・1個限定、反転/縮小探索なし、tryHarderなしで読み取る。RGBA配列はtransferableとして渡し、前フレーム完了まで次の取得を行わない。requestVideoFrameCallbackで新しい映像を待ち、非対応時は16msタイマーで代替する。旧固定120ms待ちは廃止。停止/abortはWorkerと映像trackを解放し、遅い応答は適用しない。CSPはWASMコンパイルに必要なwasm-unsafe-evalと同一オリジンWorkerを許可する。実iPhoneの速度と認識率は実機で測定する必要がある。

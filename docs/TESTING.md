@@ -108,4 +108,4 @@ UI結合で追加・自由入力・本文書式・並べ替え・削除・保存
 
 ## QR転送（T67）
 
-Project全項目を圧縮→Version30/Mの実QR画像→実jsQR復号→終了QR→展開/検証まで往復させる。途中開始/順不同/重複/別transfer/矛盾/CRC/hash/容量/展開失敗を単体検証する。UI結合では500msループ、終了待ち、未保存の置換確認、Mac fileId分離、Webの未保存取込を確認する。カメラは拒否・異常・閉じた後の遅い許可・再生待ちabort・track停止をadapterとUIで確認する。実PC↔iPhoneのカメラ/光学条件は別途実機検証の境界とする。
+Project全項目を圧縮→Version30/Mの実QR画像→実ZXing WASM復号→終了QR→展開/検証まで往復させる。途中開始/順不同/重複/別transfer/矛盾/CRC/hash/容量/展開失敗を単体検証する。UI結合では500msループ、終了待ち、未保存の置換確認、Mac fileId分離、Webの未保存取込を確認する。カメラは拒否・異常・閉じた後の遅い許可・再生待ちabort・track停止をadapterとUIで確認する。実PC↔iPhoneのカメラ/光学条件は別途実機検証の境界とする。

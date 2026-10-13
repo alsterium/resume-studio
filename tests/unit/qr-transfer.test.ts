@@ -1,5 +1,5 @@
 import { installQrCrypto } from "../qr-crypto";
-import { expect, test } from "vitest";
+import { beforeAll, expect, test } from "vitest";
 import { gzipSync } from "fflate";
 import {
   prepareTransfer,
@@ -11,7 +11,20 @@ import {
   FRAME_BYTES,
   CHUNK_BYTES,
 } from "../../src/features/transfer/protocol";
-import { qrMatrix, decodeQr } from "../../src/features/transfer/qr-image";
+import { qrMatrix } from "../../src/features/transfer/qr-image";
+import { decodeQr } from "../../src/features/transfer/qr-decoder";
+import { prepareZXingModule } from "zxing-wasm/reader";
+import { readFileSync } from "node:fs";
+beforeAll(async () => {
+  await prepareZXingModule({
+    overrides: {
+      wasmBinary: new Uint8Array(
+        readFileSync(new URL(import.meta.resolve("zxing-wasm/reader/zxing_reader.wasm"))),
+      ).buffer,
+    },
+    fireImmediately: true,
+  });
+});
 import { newProject } from "../../src/domain/new-project";
 installQrCrypto();
 import fixture from "../fixtures/project-full.json";
@@ -128,7 +141,7 @@ test("全体SHA・gzip CRC・展開上限・UTF8/JSON/Project検証を通らな�
   expect(() => inflateProject(new Uint8Array(10), 1)).toThrow();
 });
 
-test("Version30/Mの実QR画像をjsQRで読み取り、全項目プロジェクトを再組立する", async () => {
+test("Version30/Mの実QR画像をZXing WASMで読み取り、全項目プロジェクトを再組立する", async () => {
   const t = await prepareTransfer(full),
     r = new TransferReceiver();
   for (let i = 0; i < t.count + 2; i++) {
@@ -150,7 +163,7 @@ test("Version30/Mの実QR画像をjsQRで読み取り、全項目プロジェク
               const index = (((y + 4) * 4 + yy) * width + (x + 4) * 4 + xx) * 4;
               pixels[index] = pixels[index + 1] = pixels[index + 2] = 0;
             }
-    const decoded = decodeQr(pixels, width, width);
+    const decoded = await decodeQr(pixels, width, width);
     expect(decoded).toBe(text);
     r.accept(decoded!);
   }
