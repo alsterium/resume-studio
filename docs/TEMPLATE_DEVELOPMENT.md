@@ -4,7 +4,7 @@ MVPはビルド時に同梱した開発者管理テンプレートだけを利�
 
 ## 構成と契約
 
-`src-tauri/templates/resume-standard`と`career-standard`にそれぞれ`manifest.json`、`main.tex`、`resume.sty`／`career.sty`がある。Rustの`generator/templates.rs`がinclude_str!で同梱するため、実行時のcwdやリポジトリの位置に依存しない。
+`src-tauri/templates/resume-standard-v1.2`／`resume-standard-v1.3`と`career-standard-v1.2`にそれぞれ`manifest.json`、`main.tex`、`resume.sty`／`career.sty`がある。Rustの`generator/templates.rs`がinclude_str!で同梱するため、実行時のcwdやリポジトリの位置に依存しない。
 
 manifestはID、version、displayName、documentKind（resume／career）、対応schemaVersions、engine（lualatex）、packages、fontsを定義する。解決にはID・版・書類種別・Schema・エンジンの一致が必要。同じIDの新版を追加しても旧JSONの指定版を勝手に置き換えない。
 

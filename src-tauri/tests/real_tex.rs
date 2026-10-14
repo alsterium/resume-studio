@@ -353,7 +353,7 @@ fn resume_form_keeps_two_base_pages_and_preserves_overflow_in_section_order() {
     ] {
         let mut project = parse_project(source).unwrap();
         project.templates.resume.version = "1.2.0".into();
-        project.templates.career.version = "1.1.0".into();
+        project.templates.career.version = "1.2.0".into();
         let artifact = compile(
             &TexRuntime::discover(),
             &generate_project(&project, DocumentKind::Resume).unwrap(),
@@ -427,7 +427,7 @@ fn resume_form_keeps_two_base_pages_and_preserves_overflow_in_section_order() {
         serde_json::json!(format!("{}住所末尾", "架空の長い住所".repeat(10)));
     let mut project = parse_project(&serde_json::to_vec(&value).unwrap()).unwrap();
     project.templates.resume.version = "1.2.0".into();
-    project.templates.career.version = "1.1.0".into();
+    project.templates.career.version = "1.2.0".into();
     let artifact = compile(
         &TexRuntime::discover(),
         &generate_project(&project, DocumentKind::Resume).unwrap(),
@@ -1099,7 +1099,7 @@ fn maximum_body_bytes_preserve_the_complete_text_in_both_documents() {
         value["career"]["summary"] = body;
         let mut project = parse_project(&serde_json::to_vec(&value).unwrap()).unwrap();
         project.templates.resume.version = "1.3.0".into();
-        project.templates.career.version = "1.1.0".into();
+        project.templates.career.version = "1.2.0".into();
         for kind in [DocumentKind::Resume, DocumentKind::Career] {
             let bundle = generate_project(&project, kind).unwrap();
             let artifact = compile(&TexRuntime::discover(), &bundle).unwrap();
@@ -1164,7 +1164,7 @@ fn real_photos_keep_their_aspect_ratio_inside_the_resume_frame() {
         let mut project =
             parse_project(include_bytes!("../../tests/fixtures/project-full.json")).unwrap();
         project.templates.resume.version = "1.2.0".into();
-        project.templates.career.version = "1.1.0".into();
+        project.templates.career.version = "1.2.0".into();
         project.assets.clear();
         project.profile.photo_asset_id = None;
         if width > 0 {
@@ -1570,7 +1570,7 @@ fn independent_career_qualification_dates_render_in_pdf() {
     };
     let mut project =
         parse_project(include_bytes!("../../tests/fixtures/project-full.json")).unwrap();
-    project.templates.career.version = "1.1.0".into();
+    project.templates.career.version = "1.2.0".into();
     project.career.qualifications[0].text = "職務経歴書専用資格".into();
     project.career.qualifications[0].year_month = "2020-04".into();
     project
@@ -1608,7 +1608,7 @@ fn dynamic_today_dates_and_age_render_in_both_pdfs() {
     let mut project =
         parse_project(include_bytes!("../../tests/fixtures/project-full.json")).unwrap();
     project.templates.resume.version = "1.2.0".into();
-    project.templates.career.version = "1.1.0".into();
+    project.templates.career.version = "1.2.0".into();
     project.document_date = "1999-12-31".into();
     project.document_date_mode = Some(DocumentDateMode::Today);
     let now = chrono::Local::now();

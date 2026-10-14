@@ -1,7 +1,7 @@
 {
   "id": "resume-standard",
   "version": "1.2.0",
-  "displayName": "標準履歴書（参考書式）",
+  "displayName": "履歴書(JIS形式)",
   "documentKind": "resume",
   "schemaVersions": [
     1

@@ -48,30 +48,6 @@ pub fn bundled_templates() -> Vec<Template> {
             "career.sty",
             include_str!("../../templates/career-standard-v1.2/career.sty"),
         ),
-        (
-            include_str!("../../templates/career-standard-v1.1/manifest.json"),
-            include_str!("../../templates/career-standard-v1.1/main.tex"),
-            "career.sty",
-            include_str!("../../templates/career-standard-v1.1/career.sty"),
-        ),
-        (
-            include_str!("../../templates/resume-standard-v1.1/manifest.json"),
-            include_str!("../../templates/resume-standard-v1.1/main.tex"),
-            "resume.sty",
-            include_str!("../../templates/resume-standard-v1.1/resume.sty"),
-        ),
-        (
-            include_str!("../../templates/resume-standard/manifest.json"),
-            include_str!("../../templates/resume-standard/main.tex"),
-            "resume.sty",
-            include_str!("../../templates/resume-standard/resume.sty"),
-        ),
-        (
-            include_str!("../../templates/career-standard/manifest.json"),
-            include_str!("../../templates/career-standard/main.tex"),
-            "career.sty",
-            include_str!("../../templates/career-standard/career.sty"),
-        ),
     ]
     .into_iter()
     .map(|(manifest_json, main_tex, style_name, style)| Template {

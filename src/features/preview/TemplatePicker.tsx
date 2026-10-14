@@ -1,3 +1,6 @@
+import resumeJis from "../../../src-tauri/templates/resume-standard-v1.2/manifest.json";
+import resumeDynamic from "../../../src-tauri/templates/resume-standard-v1.3/manifest.json";
+import career from "../../../src-tauri/templates/career-standard-v1.2/manifest.json";
 import { Button } from "../../components/ui/button";
 import { useState } from "react";
 import type { AppClient, TemplateManifest } from "../../infrastructure/app-client";
@@ -51,6 +54,13 @@ export function TemplatePicker({
               template.documentKind === kind &&
               template.schemaVersions.includes(project.schemaVersion),
           );
+          const displayName =
+            [resumeJis, resumeDynamic, career].find(
+              (template) =>
+                template.id === current.id &&
+                template.version === current.version &&
+                template.documentKind === kind,
+            )?.displayName ?? label;
           const value = JSON.stringify([current.id, current.version]);
           const available = options?.some(
             (template) => template.id === current.id && template.version === current.version,
@@ -82,8 +92,8 @@ export function TemplatePicker({
                   >
                     {!available && (
                       <option value={value} disabled>
-                        {templates ? "未対応：" : "標準"}
-                        {label} {current.version}
+                        {templates ? "未対応：" : ""}
+                        {displayName} {current.version}
                       </option>
                     )}
                     {options?.map((template) => (

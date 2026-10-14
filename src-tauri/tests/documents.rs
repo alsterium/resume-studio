@@ -113,7 +113,7 @@ fn formal_documents_preserve_fields_and_export_owned_resources() {
 }
 
 #[test]
-fn career_v1_2_formats_experience_and_employment_periods_without_changing_v1_1() {
+fn career_formats_experience_and_employment_periods() {
     let mut value: serde_json::Value =
         serde_json::from_slice(include_bytes!("../../tests/fixtures/project-full.json")).unwrap();
     value["career"]["skills"][0]["experienceLabel"] = serde_json::json!("3");
@@ -140,20 +140,6 @@ fn career_v1_2_formats_experience_and_employment_periods_without_changing_v1_1()
         current.contains("\\CareerQualification{架空資格}"),
         "{current}"
     );
-
-    project.templates.career.version = "1.1.0".into();
-    let previous = generate_project(&project, DocumentKind::Career)
-        .unwrap()
-        .content_tex
-        .replace("\\allowbreak{}", "");
-    assert!(previous.contains("Rust（3）"), "{previous}");
-    assert!(
-        previous.contains("\\CareerSection{活かせるスキル・経験}"),
-        "{previous}"
-    );
-    assert!(previous.contains("2020-02 ～ 2021-10"), "{previous}");
-    assert!(previous.contains("2021-04 ～ 2022-06"), "{previous}");
-    assert!(previous.contains("\\CareerSkill{架空資格}"), "{previous}");
 }
 
 #[test]
@@ -173,20 +159,17 @@ fn career_skill_experience_preserves_free_text_and_only_formats_digits() {
             serde_json::from_slice(include_bytes!("../../tests/fixtures/project-full.json"))
                 .unwrap();
         value["career"]["skills"][0]["experienceLabel"] = serde_json::json!(input);
-        let mut project = parse_project(&serde_json::to_vec(&value).unwrap()).unwrap();
-        for (version, label) in [("1.2.0", expected), ("1.1.0", input), ("1.0.0", input)] {
-            project.templates.career.version = version.into();
-            let content = generate_project(&project, DocumentKind::Career)
-                .unwrap()
-                .content_tex
-                .replace("\\allowbreak{}", "");
-            let name = if label.is_empty() {
-                "{Rust}".to_owned()
-            } else {
-                format!("{{Rust（{label}）}}")
-            };
-            assert!(content.contains(&name), "{version}/{input:?}: {content}");
-        }
+        let project = parse_project(&serde_json::to_vec(&value).unwrap()).unwrap();
+        let content = generate_project(&project, DocumentKind::Career)
+            .unwrap()
+            .content_tex
+            .replace("\\allowbreak{}", "");
+        let name = if expected.is_empty() {
+            "{Rust}".to_owned()
+        } else {
+            format!("{{Rust（{expected}）}}")
+        };
+        assert!(content.contains(&name), "{input:?}: {content}");
     }
 }
 
@@ -194,7 +177,23 @@ fn career_skill_experience_preserves_free_text_and_only_formats_digits() {
 fn exact_template_kind_version_and_schema_are_required() {
     let mut project =
         parse_project(include_bytes!("../../tests/fixtures/project-empty.json")).unwrap();
-    assert_eq!(bundled_templates().len(), 7);
+    let templates = bundled_templates();
+    assert_eq!(templates.len(), 3);
+    assert_eq!(
+        templates
+            .iter()
+            .map(|t| (
+                t.manifest.id.as_str(),
+                t.manifest.version.as_str(),
+                t.manifest.display_name.as_str()
+            ))
+            .collect::<Vec<_>>(),
+        [
+            ("resume-standard", "1.3.0", "履歴書(動的レイアウト)"),
+            ("resume-standard", "1.2.0", "履歴書(JIS形式)"),
+            ("career-standard", "1.2.0", "職務経歴書"),
+        ]
+    );
     for template in bundled_templates() {
         assert_eq!(template.manifest.engine, "lualatex");
         assert_eq!(template.manifest.schema_versions, [1]);
@@ -322,37 +321,29 @@ fn bundle_rejects_paths_duplicates_and_existing_symlinks_before_writing() {
 }
 
 #[test]
-fn resume_revision_preserves_saved_version_and_exports_jis_style() {
-    let mut project =
-        parse_project(include_bytes!("../../tests/fixtures/project-full.json")).unwrap();
-    let original = generate_project(&project, DocumentKind::Resume).unwrap();
-    assert_eq!(project.templates.resume.version, "1.0.0");
-    project.templates.resume.version = "1.1.0".into();
-    let revised = generate_project(&project, DocumentKind::Resume).unwrap();
-    assert_eq!(original.content_tex, revised.content_tex);
-    let style = |bundle: &resume_studio_lib::generator::GeneratedBundle| {
-        bundle
-            .resources
-            .iter()
-            .find(|resource| resource.name == "resume.sty")
-            .unwrap()
-            .bytes
-            .clone()
-    };
-    assert_eq!(
-        style(&original),
-        include_bytes!("../templates/resume-standard/resume.sty")
-    );
-    assert_eq!(
-        style(&revised),
-        include_bytes!("../templates/resume-standard-v1.1/resume.sty")
-    );
-    assert_ne!(style(&original), style(&revised));
-    let directory = tempfile::tempdir().unwrap();
-    write_bundle(directory.path(), &revised).unwrap();
-    let manifest: serde_json::Value =
-        serde_json::from_slice(&fs::read(directory.path().join("manifest.json")).unwrap()).unwrap();
-    assert_eq!(manifest["version"], "1.1.0");
+fn retired_versions_can_be_loaded_but_require_explicit_template_selection() {
+    for version in ["1.0.0", "1.1.0"] {
+        let mut value: serde_json::Value =
+            serde_json::from_slice(include_bytes!("../../tests/fixtures/project-full.json"))
+                .unwrap();
+        for kind in ["resume", "career"] {
+            value["templates"][kind]["version"] = version.into();
+        }
+        let mut project = parse_project(&serde_json::to_vec(&value).unwrap()).unwrap();
+        for kind in [DocumentKind::Resume, DocumentKind::Career] {
+            assert!(generate_project(&project, kind)
+                .unwrap_err()
+                .contains("TEMPLATE_NOT_FOUND"));
+        }
+        assert_eq!(project.templates.resume.version, version);
+        assert_eq!(project.templates.career.version, version);
+        assert_eq!(project.profile.name, "架空 山田");
+        project.templates.resume.version = "1.2.0".into();
+        project.templates.career.version = "1.2.0".into();
+        for kind in [DocumentKind::Resume, DocumentKind::Career] {
+            assert!(generate_project(&project, kind).is_ok());
+        }
+    }
 }
 
 #[test]
@@ -362,7 +353,7 @@ fn reference_revisions_export_both_documents_without_changing_their_content() {
     for (kind, version, style_name) in [
         (DocumentKind::Resume, "1.2.0", "resume.sty"),
         (DocumentKind::Resume, "1.3.0", "resume.sty"),
-        (DocumentKind::Career, "1.1.0", "career.sty"),
+        (DocumentKind::Career, "1.2.0", "career.sty"),
     ] {
         let original = generate_project(&project, kind).unwrap();
         match kind {
@@ -398,9 +389,9 @@ fn career_uses_independent_qualifications_and_formats_acquisition_months() {
         assert!(career.contains("職務経歴書専用資格"));
         assert!(!career.contains("架空資格"));
         assert!(career.contains(if date.is_empty() {
-            "\\CareerSkill{職務経歴書専用資格}{}"
+            "\\CareerQualification{職務経歴書専用資格}{}"
         } else {
-            "\\CareerSkill{職務経歴書専用資格}{2020年4月 取得}"
+            "\\CareerQualification{職務経歴書専用資格}{2020年4月 取得}"
         }));
         let resume = generate_project(&project, DocumentKind::Resume)
             .unwrap()
@@ -453,43 +444,40 @@ fn optional_student_research_preserves_order_omits_empty_and_validates() {
         .contains("学生時代の研究"));
     let research = serde_json::json!({"id":"research-1","name":"画像認識研究","overview":body("研究概要本文"),"contents":body("研究内容本文"),"achievements":body("研究実績本文"),"languages":["Python"],"technologies":["PyTorch"]});
     value["career"]["researches"] = serde_json::json!([research]);
-    for version in ["1.0.0", "1.1.0", "1.2.0"] {
-        value["templates"]["career"]["version"] = serde_json::json!(version);
-        let project = parse_project(&serde_json::to_vec(&value).unwrap()).unwrap();
-        let tex = generate_project(&project, DocumentKind::Career)
-            .unwrap()
-            .content_tex
-            .replace("\\allowbreak{}", "");
-        assert!(tex.find("学生時代の研究").unwrap() > tex.find("架空の実務経験").unwrap());
-        for text in [
-            "画像認識研究",
-            "研究概要本文",
-            "研究内容本文",
-            "研究実績本文",
-            "Python",
-            "PyTorch",
-        ] {
-            assert!(tex.contains(text), "{tex}");
-        }
-        assert!(tex.contains("\\CareerBody{研究内容}{"));
-        assert!(tex.contains("\\textbf{研究内容本文}"));
-        let directory = tempfile::tempdir().unwrap();
-        let path = directory.path().join("研究.json");
-        resume_studio_lib::storage::write_project(&path, &project).unwrap();
-        let restored = resume_studio_lib::storage::read_project(&path).unwrap();
-        assert_eq!(
-            generate_project(&restored, DocumentKind::Career)
-                .unwrap()
-                .content_tex,
-            generate_project(&project, DocumentKind::Career)
-                .unwrap()
-                .content_tex
-        );
-        assert!(!generate_project(&project, DocumentKind::Resume)
-            .unwrap()
-            .content_tex
-            .contains("研究概要本文"));
+    let project = parse_project(&serde_json::to_vec(&value).unwrap()).unwrap();
+    let tex = generate_project(&project, DocumentKind::Career)
+        .unwrap()
+        .content_tex
+        .replace("\\allowbreak{}", "");
+    assert!(tex.find("学生時代の研究").unwrap() > tex.find("架空の実務経験").unwrap());
+    for text in [
+        "画像認識研究",
+        "研究概要本文",
+        "研究内容本文",
+        "研究実績本文",
+        "Python",
+        "PyTorch",
+    ] {
+        assert!(tex.contains(text), "{tex}");
     }
+    assert!(tex.contains("\\CareerBody{研究内容}{"));
+    assert!(tex.contains("\\textbf{研究内容本文}"));
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("研究.json");
+    resume_studio_lib::storage::write_project(&path, &project).unwrap();
+    let restored = resume_studio_lib::storage::read_project(&path).unwrap();
+    assert_eq!(
+        generate_project(&restored, DocumentKind::Career)
+            .unwrap()
+            .content_tex,
+        generate_project(&project, DocumentKind::Career)
+            .unwrap()
+            .content_tex
+    );
+    assert!(!generate_project(&project, DocumentKind::Resume)
+        .unwrap()
+        .content_tex
+        .contains("研究概要本文"));
     let valid = value.clone();
     value["career"]["researches"][0]["id"] = value["career"]["positions"][0]["id"].clone();
     assert!(parse_project(&serde_json::to_vec(&value).unwrap()).is_err());

@@ -871,17 +871,30 @@ try {
       JSON.stringify(["resume-standard", "1.3.0"]),
     );
     select.dispatchEvent(new Event("change", { bubbles: true }));
-    return { versions, value: select.value };
+    return {
+      versions,
+      names: Array.from(select.options).map((option) => option.textContent),
+      value: select.value,
+    };
   });
-  assert.ok(resumeTemplate.versions.includes("1.2.0"));
-  assert.ok(resumeTemplate.versions.includes("1.3.0"));
+  assert.deepEqual(resumeTemplate.versions, ["1.3.0", "1.2.0"]);
+  assert.deepEqual(resumeTemplate.names, ["履歴書(動的レイアウト) 1.3.0", "履歴書(JIS形式) 1.2.0"]);
   assert.equal(resumeTemplate.value, JSON.stringify(["resume-standard", "1.3.0"]));
   for (const [label, resultId, expected] of [
     ["履歴書", "2", ["架空大学卒業", "架空の志望動機末尾", "架空の希望末尾"]],
     ["職務経歴書", "3", ["架空会社", "架空案件", "架空の業務末尾", "架空の自己PR末尾"]],
   ]) {
     await presentTestApp();
-    if (label === "職務経歴書") await selectDocument("職務経歴書");
+    if (label === "職務経歴書") {
+      await selectDocument("職務経歴書");
+      const careerNames = await browser.execute(() => {
+        const select = Array.from(document.querySelectorAll("label"))
+          .find((label) => label.textContent.includes("職務経歴書テンプレート"))
+          .querySelector("select");
+        return Array.from(select.options).map((option) => option.textContent);
+      });
+      assert.deepEqual(careerNames, ["職務経歴書 1.2.0"]);
+    }
     if (label === "職務経歴書") {
       await browser.execute(() => {
         const observer = new MutationObserver(() => {
