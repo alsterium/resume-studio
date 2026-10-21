@@ -747,8 +747,11 @@ try {
   assert.equal(beforeZoom.hint, false);
   // Exercise the visible shadcn buttons with real WebView clicks.
   while (
-    Number(await browser.execute(() => document.querySelector("canvas")?.dataset.renderedScale)) >
-    0.25
+    Number(
+      await browser.execute(() =>
+        document.querySelector('[aria-label="表示倍率"]').textContent.replace("%", ""),
+      ),
+    ) > 25
   ) {
     await browser.$('[aria-label="縮小"]').click();
   }
@@ -848,6 +851,70 @@ try {
   );
   console.log(
     "PREVIEW_ZOOM: PASS (buttons, WebKit events, real PDF rendering, fixed overlay, equal borders, hover rule/focus/idle/pinch opacity)",
+  );
+
+  // Exercise real WKWebView layout and PDF.js pixels while reading consecutive pages.
+  if ((await browser.$("button=見開き").getAttribute("aria-pressed")) === "true") {
+    await browser.$("button=見開き").click();
+  }
+  await browser.waitUntil(
+    async () =>
+      browser.execute(() => {
+        const pages = document.querySelectorAll(".pdf-page");
+        const first = pages[0]?.getBoundingClientRect();
+        const second = pages[1]?.getBoundingClientRect();
+        return !!second && Math.abs(first.left - second.left) < 1 && second.top > first.bottom + 18;
+      }),
+    { timeout: 10000 },
+  );
+  const continuousCount = await browser.execute(
+    () => document.querySelectorAll(".pdf-page").length,
+  );
+  assert.ok(continuousCount >= 2);
+  await browser.execute(() => {
+    const paper = document.querySelector(".pdf-paper");
+    const frames = paper.querySelectorAll(".pdf-page");
+    paper.scrollTop = frames[1].offsetTop - frames[0].offsetTop + 20;
+  });
+  await browser.waitUntil(
+    async () =>
+      browser.execute(
+        () =>
+          document.querySelector('[aria-label="ページ番号"]').textContent.startsWith("2 / ") &&
+          document.querySelector('[aria-label="生成されたPDFページ"]')?.dataset.renderedPage ===
+            "2",
+      ),
+    { timeout: 10000 },
+  );
+  const continuous = await browser.execute(() => {
+    const paper = document.querySelector(".pdf-paper");
+    const canvas = document.querySelector('[aria-label="生成されたPDFページ"]');
+    const pixels = canvas.getContext("2d").getImageData(0, 0, canvas.width, canvas.height).data;
+    let dark = 0;
+    for (let i = 0; i < pixels.length; i += 4) if (pixels[i] < 120 && pixels[i + 3] > 0) dark++;
+    const frame = canvas.getBoundingClientRect();
+    const viewport = paper.getBoundingClientRect();
+    return {
+      dark,
+      visible: frame.bottom > viewport.top && frame.top < viewport.bottom,
+      scroll: paper.scrollTop,
+    };
+  });
+  assert.ok(continuous.dark > 20 && continuous.visible && continuous.scroll > 100);
+  await captureLayout("continuous-page-2");
+  await browser.$('[aria-label="前のページ"]').click();
+  await browser.waitUntil(
+    async () =>
+      browser.execute(
+        () =>
+          document.querySelector('[aria-label="ページ番号"]').textContent.startsWith("1 / ") &&
+          document.querySelector(".pdf-paper").scrollTop < 1,
+      ),
+    { timeout: 5000 },
+  );
+  await browser.$("button=見開き").click();
+  console.log(
+    "CONTINUOUS_PREVIEW: PASS (vertical page frames, native scroll, page counter, page 2 pixels, previous-page navigation)",
   );
 
   await browser.$("button=テンプレート一覧を確認").click();

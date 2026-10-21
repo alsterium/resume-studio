@@ -17,3 +17,9 @@ WKWebView/Safariのgesturestart/change/end、Ctrl付きwheel、2指TouchEventを
 参照：[shadcn ButtonGroup](https://ui.shadcn.com/docs/components/radix/button-group)、[公式ソース](https://github.com/shadcn-ui/ui/blob/main/apps/v4/registry/new-york-v4/ui/button-group.tsx)、[MDN wheel](https://developer.mozilla.org/en-US/docs/Web/API/Element/wheel_event)、[MDN gesturechange](https://developer.mozilla.org/en-US/docs/Web/API/Element/gesturechange_event)。既存Radix系UIに合わせて公式ButtonGroup/Textを追加し、追加依存は不要。
 
 操作パネルは通常opacity 0.55、hover/focus-within時は1、ピンチ中は優先して0.55。Ctrl付きwheelの最終イベントから180msでピンチ状態を解除する。表示切替は150ms、reduced-motionではアニメーションなし。透明度を下げても操作可能。
+
+## 1ページ表示の縦連続スクロール（T75）
+
+見開きOFFでは全ページの軽量な枠を縦に並べる。生成PDFは共通A4サイズのため、先頭ページの実寸と倍率で枠の高さを確保し、ページ間隔20pxを維持する。画面内と前後のページだけcanvasへ描画し、画面外のピクセルバッファを解放する。描画中のページが範囲外へ出た場合や倍率/書類変更ではRenderTaskを中断し、破棄後の非同期結果を反映しない。
+
+スクロール位置から表示ページを算出して番号と書類別の保持状態を更新する。スクロール起点の番号変更ではページ先頭へジャンプしない。前/次ボタン・再生成・書類切替・見開きから戻る操作では対象ページの先頭へ移動する。見開きONは従来の横2ページ表示。ズームはページ内の基準点を保ち、ページ間隔を倍率に掛けない。幅合わせや領域幅の変更時は現在ページの先頭を保つ。PDFランタイムの遅延読込promiseを共有し、読込失敗時は再試行可能にする。

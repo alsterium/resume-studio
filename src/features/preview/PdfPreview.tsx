@@ -1,8 +1,93 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { PDFDocumentProxy, RenderTask } from "pdfjs-dist";
 import { Button } from "../../components/ui/button";
 import { ButtonGroup, ButtonGroupText } from "../../components/ui/button-group";
 import { ChevronLeft, ChevronRight, Columns2, FileText, Minus, Plus, Maximize } from "lucide-react";
+
+let runtimePromise: Promise<typeof import("../../infrastructure/pdf-runtime")> | undefined;
+function pdfRuntime() {
+  return (runtimePromise ??= import("../../infrastructure/pdf-runtime").catch(
+    (failure: unknown) => {
+      runtimePromise = undefined;
+      throw failure;
+    },
+  ));
+}
+
+// Generated documents use a common A4 page size. Keep lightweight page frames
+// in the flow, but release canvas pixel buffers outside the visible window.
+function PdfPage({
+  document,
+  number,
+  scale,
+  size,
+  active,
+  current,
+  onRendered,
+  onError,
+}: {
+  document: PDFDocumentProxy;
+  number: number;
+  scale: number;
+  size: { width: number; height: number };
+  active: boolean;
+  current: boolean;
+  onRendered: (page: number, scale: number) => void;
+  onError: (message: string) => void;
+}) {
+  const canvas = useRef<HTMLCanvasElement>(null);
+  const [ready, setReady] = useState<number | null>(null);
+  useEffect(() => {
+    const target = canvas.current;
+    if (!target) return;
+    let live = true;
+    let task: RenderTask | undefined;
+    setReady(null);
+    if (!active) {
+      target.width = 0;
+      target.height = 0;
+      return;
+    }
+    void document
+      .getPage(number)
+      .then(async (pdfPage) => {
+        if (!live) return;
+        const viewport = pdfPage.getViewport({ scale });
+        target.width = Math.ceil(viewport.width);
+        target.height = Math.ceil(viewport.height);
+        task = pdfPage.render({ canvas: target, viewport });
+        await task.promise;
+        if (live) {
+          setReady(scale);
+          onRendered(number, scale);
+        }
+      })
+      .catch((failure: unknown) => {
+        if (live) {
+          console.error("PDF page render failed", failure);
+          onError("PDFのページを表示できませんでした。");
+        }
+      });
+    return () => {
+      live = false;
+      task?.cancel();
+    };
+  }, [document, number, scale, active, onRendered, onError]);
+  return (
+    <div
+      className="pdf-page"
+      data-page-number={number}
+      style={{ width: size.width * scale, height: size.height * scale }}
+    >
+      <canvas
+        ref={canvas}
+        aria-label={current ? "生成されたPDFページ" : `生成されたPDFページ ${number}`}
+        data-rendered-page={ready === scale ? number : undefined}
+        data-rendered-scale={ready === scale ? ready : undefined}
+      />
+    </div>
+  );
+}
 
 export function PdfPreview({
   bytes,
@@ -25,8 +110,9 @@ export function PdfPreview({
   page?: number;
   onPageChange?: (page: number) => void;
 }) {
-  const canvas = useRef<HTMLCanvasElement>(null);
-  const secondCanvas = useRef<HTMLCanvasElement>(null);
+  const [pageSize, setPageSize] = useState({ width: 595.276, height: 841.89 });
+  const [visible, setVisible] = useState({ first: 1, last: 3 });
+  const scrolledPage = useRef<number | null>(null);
   const paper = useRef<HTMLDivElement>(null);
   const [localSpread, setLocalSpread] = useState(fitToWidth);
   const spread = controlledSpread ?? localSpread;
@@ -42,18 +128,19 @@ export function PdfPreview({
   const [error, setError] = useState<string | null>(null);
   const [pinching, setPinching] = useState(false);
   const pageSelection = useRef({ page: requestedPage, onPageChange });
-  const zoomState = useRef({ scale, onZoomChange });
+  const zoomState = useRef({ scale, onZoomChange, spread, height: pageSize.height });
   const zoomAnchor = useRef<{
     x: number;
     y: number;
     left: number;
     top: number;
     scale: number;
+    height: number | null;
   } | null>(null);
 
   useEffect(() => {
-    zoomState.current = { scale, onZoomChange };
-  }, [scale, onZoomChange]);
+    zoomState.current = { scale, onZoomChange, spread, height: pageSize.height };
+  }, [scale, onZoomChange, spread, pageSize.height]);
 
   function changeZoom(next: "fit" | number, point?: { x: number; y: number }) {
     if (typeof next === "number") {
@@ -71,6 +158,7 @@ export function PdfPreview({
           left: container.scrollLeft,
           top: container.scrollTop,
           scale: zoomState.current.scale,
+          height: zoomState.current.spread ? null : zoomState.current.height,
         };
       }
       zoomState.current.scale = next;
@@ -88,7 +176,19 @@ export function PdfPreview({
     if (!container || !anchor || !rendered || rendered.scale !== scale) return;
     const ratio = scale / anchor.scale;
     container.scrollLeft = (anchor.left + anchor.x) * ratio - anchor.x;
-    container.scrollTop = (anchor.top + anchor.y) * ratio - anchor.y;
+    if (anchor.height !== null) {
+      const oldHeight = anchor.height * anchor.scale;
+      const index = Math.max(0, Math.floor((anchor.top + anchor.y - 24) / (oldHeight + 20)));
+      const offset = anchor.top + anchor.y - 24 - index * (oldHeight + 20);
+      const resizedOffset =
+        offset <= oldHeight ? offset * ratio : oldHeight * ratio + offset - oldHeight;
+      container.scrollTop = Math.max(
+        0,
+        24 + index * (anchor.height * scale + 20) + resizedOffset - anchor.y,
+      );
+    } else {
+      container.scrollTop = (anchor.top + anchor.y) * ratio - anchor.y;
+    }
     zoomAnchor.current = null;
   }, [rendered, scale]);
 
@@ -179,9 +279,89 @@ export function PdfPreview({
   }, [requestedPage, onPageChange]);
 
   const changePage = (next: number) => {
+    scrolledPage.current = null;
     setLocalPage(next);
     onPageChange?.(next);
   };
+
+  const updateVisiblePages = useCallback(
+    (selectPage = false) => {
+      const container = paper.current;
+      if (!container || !document || spread) return;
+      const height = pageSize.height * scale;
+      const stride = height + 20;
+      const top = Math.max(0, container.scrollTop - 24);
+      const first = Math.max(1, Math.floor(top / stride));
+      const last = Math.min(
+        document.numPages,
+        Math.ceil((top + container.clientHeight) / stride) + 2,
+      );
+      setVisible((previous) =>
+        previous.first === first && previous.last === last ? previous : { first, last },
+      );
+      if (!selectPage || zoomAnchor.current) return;
+      const next = Math.max(
+        1,
+        Math.min(
+          document.numPages,
+          Math.floor((top + Math.min(container.clientHeight / 3, height / 2)) / stride) + 1,
+        ),
+      );
+      if (next !== pageSelection.current.page) {
+        scrolledPage.current = next;
+        pageSelection.current.page = next;
+        setLocalPage(next);
+        pageSelection.current.onPageChange?.(next);
+      }
+    },
+    [document, spread, scale, pageSize.height],
+  );
+
+  const fitLayout = useRef({ document, scale, fit, spread });
+  useLayoutEffect(() => {
+    const previous = fitLayout.current;
+    fitLayout.current = { document, scale, fit, spread };
+    // Width fitting changes the height of every frame. Stay on the selected
+    // page rather than retaining an absolute offset into a different page.
+    if (
+      fit &&
+      !spread &&
+      document &&
+      paper.current &&
+      (previous.document !== document ||
+        previous.scale !== scale ||
+        previous.fit !== fit ||
+        previous.spread !== spread)
+    ) {
+      paper.current.scrollTop = (page - 1) * (pageSize.height * scale + 20);
+    }
+  }, [document, scale, fit, spread, page, pageSize.height]);
+
+  useEffect(() => {
+    const container = paper.current;
+    if (!container || !document) return;
+    if (spread) {
+      container.scrollTop = 0;
+    } else if (scrolledPage.current !== page) {
+      container.scrollTop = (page - 1) * (pageSize.height * zoomState.current.scale + 20);
+    }
+    scrolledPage.current = null;
+    // Scale is deliberately not a dependency: zoom preserves its own anchor.
+  }, [document, spread, page, pageSize.height]);
+
+  useEffect(() => {
+    const container = paper.current;
+    if (!container) return;
+    const observer = new ResizeObserver(() => updateVisiblePages());
+    observer.observe(container);
+    updateVisiblePages();
+    return () => observer.disconnect();
+  }, [updateVisiblePages]);
+
+  const pageRendered = useCallback(
+    (page: number, scale: number) => setRendered({ page, scale }),
+    [],
+  );
 
   useEffect(() => {
     const container = paper.current;
@@ -211,14 +391,17 @@ export function PdfPreview({
   useEffect(() => {
     let active = true;
     let task: ReturnType<typeof import("../../infrastructure/pdf-runtime").loadPdf> | undefined;
-    void import("../../infrastructure/pdf-runtime")
+    void pdfRuntime()
       .then(async ({ loadPdf }) => {
         if (!active) return;
         task = loadPdf(bytes);
         const pdf = await task.promise;
+        const firstPage = await pdf.getPage(1);
+        const size = firstPage.getViewport({ scale: 1 });
         if (active) {
           const selection = pageSelection.current;
           const nextPage = Math.max(1, Math.min(pdf.numPages, selection.page));
+          setPageSize({ width: size.width, height: size.height });
           setDocument(pdf);
           setLocalPage(nextPage);
           if (nextPage !== selection.page) selection.onPageChange?.(nextPage);
@@ -235,46 +418,6 @@ export function PdfPreview({
       void task?.destroy();
     };
   }, [bytes]);
-
-  useEffect(() => {
-    if (!document) return;
-    let active = true;
-    let task: RenderTask | undefined;
-    let secondTask: RenderTask | undefined;
-    void document
-      .getPage(page)
-      .then(async (pdfPage) => {
-        if (!active || !canvas.current) return;
-        const target = canvas.current;
-        const viewport = pdfPage.getViewport({ scale });
-        target.width = Math.ceil(viewport.width);
-        target.height = Math.ceil(viewport.height);
-        task = pdfPage.render({ canvas: target, viewport });
-        await task.promise;
-        if (active && spread && page < document.numPages && secondCanvas.current) {
-          const following = await document.getPage(page + 1);
-          if (!active || !secondCanvas.current) return;
-          const secondViewport = following.getViewport({ scale });
-          const target = secondCanvas.current;
-          target.width = Math.ceil(secondViewport.width);
-          target.height = Math.ceil(secondViewport.height);
-          secondTask = following.render({ canvas: target, viewport: secondViewport });
-          await secondTask.promise;
-        }
-        if (active) setRendered({ page, scale });
-      })
-      .catch((failure: unknown) => {
-        if (active) {
-          console.error("PDF page render failed", failure);
-          setError("PDFのページを表示できませんでした。");
-        }
-      });
-    return () => {
-      active = false;
-      task?.cancel();
-      secondTask?.cancel();
-    };
-  }, [document, page, scale, spread]);
 
   return (
     <section aria-label="PDFプレビュー" className="pdf-preview">
@@ -308,6 +451,7 @@ export function PdfPreview({
           aria-pressed={spread}
           disabled={!document}
           onClick={() => {
+            zoomAnchor.current = null;
             setLocalSpread(!spread);
             onSpreadChange?.(!spread);
           }}
@@ -323,22 +467,27 @@ export function PdfPreview({
       )}
       {error && <p role="alert">{error}</p>}
       <div className="preview-viewport">
-        <div className="pdf-paper" ref={paper}>
-          <div className="pdf-pages">
-            <canvas
-              ref={canvas}
-              aria-label="生成されたPDFページ"
-              data-rendered-page={rendered?.page}
-              data-rendered-scale={rendered?.scale}
-            />
-            {spread && document && page < document.numPages && (
-              <canvas
-                ref={secondCanvas}
-                aria-label={`生成されたPDFページ ${page + 1}`}
-                data-rendered-page={rendered ? page + 1 : undefined}
-                data-rendered-scale={rendered?.scale}
-              />
-            )}
+        <div className="pdf-paper" ref={paper} onScroll={() => updateVisiblePages(true)}>
+          <div className={spread ? "pdf-pages" : "pdf-pages pdf-pages-continuous"}>
+            {document &&
+              (spread
+                ? [page, ...(page < document.numPages ? [page + 1] : [])]
+                : Array.from({ length: document.numPages }, (_, index) => index + 1)
+              ).map((number) => (
+                <PdfPage
+                  key={number}
+                  document={document}
+                  number={number}
+                  scale={scale}
+                  size={pageSize}
+                  current={number === page}
+                  active={
+                    spread || number === page || (number >= visible.first && number <= visible.last)
+                  }
+                  onRendered={pageRendered}
+                  onError={setError}
+                />
+              ))}
           </div>
         </div>
         <ButtonGroup

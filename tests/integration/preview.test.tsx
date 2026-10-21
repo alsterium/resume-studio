@@ -345,10 +345,11 @@ vi.mock("../../src/infrastructure/pdf-runtime", () => ({
     return {
       destroy: renderer.destroy,
       promise: Promise.resolve({
-        numPages: bytes[0] === 2 ? 2 : 3,
+        numPages: bytes[0] === 100 ? 100 : bytes[0] === 2 ? 2 : 3,
         getPage: async (page: number) => {
           renderer.page(page);
-          if (page < 1 || page > (bytes[0] === 2 ? 2 : 3)) throw new Error("Invalid PDF page");
+          if (page < 1 || page > (bytes[0] === 100 ? 100 : bytes[0] === 2 ? 2 : 3))
+            throw new Error("Invalid PDF page");
           return {
             getViewport: ({ scale }: { scale: number }) => ({
               width: 600 * scale,
@@ -640,7 +641,7 @@ test("見開きは2ページを描画し、奇数の最終ページから戻り�
   expect(screen.getByRole("button", { name: "次のページ" })).toBeDisabled();
   await user.click(screen.getByRole("button", { name: "前のページ" }));
   await user.click(screen.getByRole("button", { name: "見開き" }));
-  expect(screen.queryByLabelText("生成されたPDFページ 2")).not.toBeInTheDocument();
+  expect(screen.getByLabelText("生成されたPDFページ 2")).toBeInTheDocument();
   await setZoom(user, 1.5);
   await waitFor(() =>
     expect(screen.getByLabelText("生成されたPDFページ")).toHaveAttribute(
@@ -694,7 +695,7 @@ test("手動・自動の再生成と書類切替でも書類ごとの見開き�
     await user.click(screen.getByRole("button", { name: "履歴書PDF更新" }));
     await regenerated(previous);
     expect(screen.getByRole("button", { name: "見開き" })).toHaveAttribute("aria-pressed", "false");
-    expect(screen.queryByLabelText("生成されたPDFページ 2")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("生成されたPDFページ 2")).toBeInTheDocument();
     expect(screen.getByLabelText("表示倍率")).toHaveTextContent("150%");
     expect(screen.getByLabelText("生成されたPDFページ")).toHaveAttribute("width", "900");
     await user.click(screen.getByRole("tab", { name: "職務経歴書" }));
@@ -722,7 +723,7 @@ test("手動・自動の再生成と書類切替でも書類ごとの見開き�
     expect(screen.getByLabelText("表示倍率")).toHaveTextContent("150%");
     expect(screen.getByLabelText("生成されたPDFページ")).toHaveAttribute("width", "900");
     expect(screen.getByRole("button", { name: "見開き" })).toHaveAttribute("aria-pressed", "false");
-    expect(screen.queryByLabelText("生成されたPDFページ 2")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("生成されたPDFページ 2")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "見開き" }));
     previous = screen.getByLabelText("生成されたPDFページ");
     await user.click(screen.getByRole("button", { name: "履歴書PDF更新" }));
@@ -785,7 +786,12 @@ test("PDF再生成と書類切替で表示ページを保持し、ページ数�
     await user.click(screen.getByRole("button", { name: "履歴書PDF更新" }));
     await displayed(1);
     await user.click(screen.getByRole("button", { name: "見開き" }));
-    await user.click(screen.getByRole("button", { name: "次のページ" }));
+    const scroller = screen
+      .getByLabelText("生成されたPDFページ")
+      .closest(".pdf-paper") as HTMLElement;
+    Object.defineProperty(scroller, "clientHeight", { configurable: true, value: 600 });
+    scroller.scrollTop = 820 + 24;
+    fireEvent.scroll(scroller);
     await displayed(2);
     await setZoom(user, 1.5);
     let previous = screen.getByLabelText("生成されたPDFページ");
@@ -949,4 +955,53 @@ test("2指タッチで拡大縮小し、指が離れた後の1指操作を維持
   fireEvent(paper, single);
   expect(single.defaultPrevented).toBe(false);
   expect(screen.getByLabelText("表示倍率")).toHaveTextContent("50%");
+});
+
+test("縦スクロールでページ番号と移動を同期し、多ページの画面外キャンバスを解放する", async () => {
+  const user = userEvent.setup();
+  render(<PdfPreview bytes={new Uint8Array([100])} />);
+  await waitFor(() =>
+    expect(screen.getByLabelText("生成されたPDFページ")).toHaveAttribute("data-rendered-page", "1"),
+  );
+  const first = screen.getByLabelText("生成されたPDFページ") as HTMLCanvasElement;
+  const paper = first.closest(".pdf-paper") as HTMLElement;
+  Object.defineProperty(paper, "clientHeight", { configurable: true, value: 600 });
+  expect(paper.querySelectorAll(".pdf-page")).toHaveLength(100);
+  expect(paper.querySelector(".pdf-pages")).toHaveClass("pdf-pages-continuous");
+  expect(screen.getByLabelText("生成されたPDFページ 100")).toHaveAttribute("width", "0");
+  paper.scrollTop = 49 * 820 + 24;
+  fireEvent.scroll(paper);
+  await waitFor(() =>
+    expect(screen.getByLabelText("生成されたPDFページ")).toHaveAttribute(
+      "data-rendered-page",
+      "50",
+    ),
+  );
+  expect(screen.getByLabelText("ページ番号")).toHaveTextContent("50 / 100");
+  expect(paper.scrollTop).toBe(49 * 820 + 24); // No snap to the page top during ordinary scrolling.
+  await waitFor(() => expect(first).toHaveAttribute("width", "0"));
+  expect(paper.querySelectorAll("canvas[data-rendered-page]").length).toBeLessThan(7);
+  await user.click(screen.getByRole("button", { name: "次のページ" }));
+  await waitFor(() => expect(screen.getByLabelText("ページ番号")).toHaveTextContent("51 / 100"));
+  expect(paper.scrollTop).toBe(50 * 820);
+  await setZoom(user, 1.5);
+  await waitFor(() =>
+    expect(screen.getByLabelText("生成されたPDFページ")).toHaveAttribute(
+      "data-rendered-scale",
+      "1.5",
+    ),
+  );
+  // The anchor inside page 51 scales; the fifty gaps above it remain 20px.
+  expect(paper.scrollTop).toBe(50 * 1220 + 138);
+  await user.click(screen.getByRole("button", { name: "見開き" }));
+  expect(paper.querySelectorAll(".pdf-page")).toHaveLength(2);
+  expect(paper.scrollTop).toBe(0);
+  await user.click(screen.getByRole("button", { name: "見開き" }));
+  expect(paper.querySelectorAll(".pdf-page")).toHaveLength(100);
+  expect(paper.scrollTop).toBe(50 * 1220);
+  Object.defineProperty(paper, "clientWidth", { configurable: true, value: 348 });
+  await user.click(screen.getByRole("button", { name: "画面に合わせる" }));
+  await waitFor(() => expect(screen.getByLabelText("表示倍率")).toHaveTextContent("50%"));
+  expect(paper.scrollTop).toBe(50 * 420);
+  expect(screen.getByLabelText("ページ番号")).toHaveTextContent("51 / 100");
 });

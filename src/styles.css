@@ -480,6 +480,7 @@ select {
 }
 .pdf-paper {
   overflow: auto;
+  overflow-anchor: none;
   min-height: 0;
   flex: 1;
   padding: 24px;
@@ -494,7 +495,17 @@ select {
   min-width: 100%;
   justify-content: center;
 }
+.pdf-pages-continuous {
+  flex-direction: column;
+  align-items: center;
+}
+.pdf-page {
+  flex: none;
+  background: white;
+}
 .pdf-paper canvas {
+  width: 100%;
+  height: 100%;
   display: block;
   background: white;
   box-shadow: 0 2px 10px #18181b14;
